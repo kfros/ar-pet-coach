@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "staging": "ar-pet-coach",
+    "ar-pet-coach": "ar-pet-coach"
+  },
+  "targets": {},
+  "etags": {}
+}

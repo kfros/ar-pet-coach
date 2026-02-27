@@ -4,12 +4,33 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:https": "concurrently \"next dev\" \"local-ssl-proxy --source 3001 --target 3000\"",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-    "next": "16.0.6",
+    "@google/generative-ai": "^0.24.1",
+    "@huggingface/inference": "^4.13.5",
+    "@mediapipe/pose": "^0.5.1675469404",
+    "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.2",
+    "@reactvision/react-viro": "^2.52.1",
+    "@stripe/stripe-js": "^8.6.0",
+    "bootstrap": "^5.3.8",
+    "firebase": "^12.6.0",
+    "firebase-admin": "^13.6.0",
+    "lucide-react": "^0.555.0",
+    "meyda": "^5.6.3",
+    "next": "^16.0.7",
+    "openai": "^6.14.0",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-bootstrap": "^2.10.10",
+    "react-dom": "19.2.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "local-ssl-proxy": "^2.0.5"
   }
 }
