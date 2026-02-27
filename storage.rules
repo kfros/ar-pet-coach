@@ -1,0 +1,48 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Public Assets (Read-only for everyone)
+    match /public-assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Course Audio Content
+    match /audio/{allPaths=**} {
+        allow read: if true;
+        allow write: if false; // Admin only
+    }
+    
+    // User-specific NFT Data
+    // Path: /nft/{uid}/{petId}/{timestamp}/...
+    match /nft/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // MindAR Targets
+    // Path: /mind-targets/{uid}/{petId}/{timestamp}.mind
+    match /mind-targets/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Voice Messages
+    // Path: /voice/{uid}/{petId}/{timestamp}.m4a
+    match /voice/{userId}/{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Bark Analysis
+    // Path: /analysis/{uid}/{timestamp}.m4a
+    match /analysis/{userId}/{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

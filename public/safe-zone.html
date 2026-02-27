@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Safe Zone</title>
+    <!-- Use same clean style as ar.html -->
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        #status {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        #status.loading {
+            background: rgba(234, 179, 8, 0.8);
+            color: black;
+        }
+
+        #status.ready {
+            background: rgba(34, 197, 94, 0.8);
+        }
+
+        #status.error {
+            background: rgba(255, 15, 15, 0.8);
+            color: white;
+        }
+
+        #close-btn {
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #add-btn {
+            pointer-events: auto !important;
+        }
+    </style>
+
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- Firebase SDKs (Compat for simple HTML usage) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+</head>
+
+<body>
+    <a-scene id="ar-scene" vr-mode-ui="enabled: false;"
+        renderer="logarithmicDepthBuffer: false; precision: medium; alpha: true; antialias: false;" embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+        <!-- Dynamic markers will be injected here -->
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <div id="overlay">
+        <div class="status-bar">
+            <div id="status" class="loading">Initializing...</div>
+            <div style="display:flex; gap: 8px; align-items: center;">
+                <button id="add-btn"
+                    style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(7, 255, 152, 0.856); color: rgba(7, 255, 152, 0.856); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); font-size: 24px;"
+                    onclick="goToScan()">+</button>
+                <button id="close-btn" onclick="closeAR()">×</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Firebase Config (Injected from .env.local)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCX37e9zlHcVsEsKqQr6R9TPiDiFqfsnDA",
+            authDomain: "ar-pet-coach.firebaseapp.com",
+            projectId: "ar-pet-coach",
+            storageBucket: "ar-pet-coach.firebasestorage.app",
+            messagingSenderId: "293725153990",
+            appId: "1:293725153990:web:079e5d7e64ef32170d05c7"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const storage = firebase.storage();
+
+        // --- NFT BLOB INTERCEPTOR ---
+        // AR.js expects clean URLs (e.g. path/to/marker) and appends .fset/.iset
+        // We intercept these requests and serve local Blob URLs from Firebase Storage
+        window.NFT_BLOBS = {};
+        (function () {
+            const originalOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function (method, url) {
+                if (typeof url === 'string') {
+                    for (const [markerId, blobs] of Object.entries(window.NFT_BLOBS)) {
+                        // Check if the requested URL matches our virtual marker ID
+                        if (url.includes(markerId)) {
+                            if (url.endsWith('.fset') && blobs.fset) {
+                                console.log(`[NFT Interceptor] Serving .fset for ${markerId}`);
+                                arguments[1] = blobs.fset;
+                            } else if (url.endsWith('.iset') && blobs.iset) {
+                                console.log(`[NFT Interceptor] Serving .iset for ${markerId}`);
+                                arguments[1] = blobs.iset;
+                            } else if (url.endsWith('.fset3') && blobs.fset3) {
+                                console.log(`[NFT Interceptor] Serving .fset3 for ${markerId}`);
+                                arguments[1] = blobs.fset3;
+                            }
+                        }
+                    }
+                }
+                return originalOpen.apply(this, arguments);
+            };
+        })();
+        // ----------------------------
+
+        function log(msg) {
+            console.log(msg);
+        }
+
+        function closeAR() {
+            const videos = document.querySelectorAll('video');
+            videos.forEach(v => { if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); });
+            window.location.href = '/dashboard';
+        }
+
+        function goToScan() {
+            const urlParams = new URLSearchParams(window.location.search);
+            window.location.href = `/scan-room?${urlParams.toString()}&t=${Date.now()}`;
+        }
+
+        async function loadSafeZones(userId, petId) {
+            log(`Loading Safe Zones for ${userId}/${petId}...`);
+            const statusEl = document.getElementById('status');
+
+            try {
+                const snapshot = await db.collection('users').doc(userId)
+                    .collection('pets').doc(petId)
+                    .collection('safeZones').get();
+
+                if (snapshot.empty) {
+                    log('No Safe Zones found.');
+                    statusEl.innerText = 'No Safe Zones found. Scan room first.';
+                    statusEl.className = 'loading';
+                    return;
+                }
+
+                const scene = document.getElementById('ar-scene');
+                let count = 0;
+
+                // Process docs sequentially to handle async downloads
+                for (const doc of snapshot.docs) {
+                    const data = doc.data();
+                    log(`Found marker: ${doc.id} (${data.type})`);
+
+                    // 1. Handle Processing State
+                    if (data.markerStatus === 'processing') {
+                        statusEl.innerText = 'Creating Room Marker... (Processing)';
+                        statusEl.className = 'loading';
+                        continue; // Skip rendering
+                    }
+
+                    // 2. Handle Custom NFT Markers
+                    if (data.type === 'custom_nft' && data.markerStatus === 'ready' && data.markerPath) {
+                        try {
+                            log(`Downloading NFT Data for: ${doc.id}...`);
+                            statusEl.innerText = 'Downloading Marker Data...';
+
+                            // Generate a virtual ID for interception
+                            const virtualMarkerId = `nft_${doc.id}`;
+
+                            // Enable debug log for mobile visibility
+                            const debugLog = document.getElementById('debug-log');
+                            if (debugLog) debugLog.style.display = 'block';
+
+                            // Construct public Firebase Storage URL directly
+                            // Format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media
+                            const bucket = firebaseConfig.storageBucket;
+                            const buildStorageUrl = (path) => {
+                                const encodedPath = encodeURIComponent(path);
+                                return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+                            };
+
+                            // Helper to check if URL exists with HEAD request
+                            const checkUrl = async (path) => {
+                                const url = buildStorageUrl(path);
+                                log(`checking ${path}...`);
+                                try {
+                                    const response = await fetch(url, { method: 'HEAD' });
+                                    if (response.ok) {
+                                        log(`✓ found: ${path}`);
+                                        return url;
+                                    } else {
+                                        log(`✗ not found (${response.status}): ${path}`);
+                                        return null;
+                                    }
+                                } catch (e) {
+                                    log(`✗ error: ${path} - ${e.message}`);
+                                    return null;
+                                }
+                            };
+
+                            log(`[1/4] resolving URLs for ${data.markerPath}...`);
+                            statusEl.innerText = '[1/4] Resolving Marker URLs...';
+
+                            const fsetPath = data.markerPath + '.fset';
+                            const isetPath = data.markerPath + '.iset';
+                            const fset3Path = data.markerPath + '.fset3';
+
+                            // Check files exist
+                            const fsetUrl = await checkUrl(fsetPath);
+                            if (!fsetUrl) throw new Error("Could not find .fset file");
+
+                            const isetUrl = await checkUrl(isetPath);
+                            if (!isetUrl) throw new Error("Could not find .iset file");
+
+                            const fset3Url = await checkUrl(fset3Path);
+
+                            log(`[2/4] Downloading files...`);
+
+                            statusEl.innerText = 'Downloading .fset...';
+                            const fsetBlob = await fetch(fsetUrl).then(r => {
+                                if (!r.ok) throw new Error(`Failed to fetch .fset: ${r.status}`);
+                                return r.blob();
+                            });
+
+                            statusEl.innerText = 'Downloading .iset...';
+                            const isetBlob = await fetch(isetUrl).then(r => {
+                                if (!r.ok) throw new Error(`Failed to fetch .iset: ${r.status}`);
+                                return r.blob();
+                            });
+
+                            let fset3Blob = null;
+                            if (fset3Url) {
+                                statusEl.innerText = 'Downloading .fset3...';
+                                try {
+                                    fset3Blob = await fetch(fset3Url).then(r => {
+                                        if (!r.ok) throw new Error(`Failed to fetch .fset3: ${r.status}`);
+                                        return r.blob();
+                                    });
+                                } catch (e) {
+                                    log("Skipping .fset3 (download failed)");
+                                }
+                            }
+
+                            statusEl.innerText = 'Processing Blobs...';
+                            log(`[3/4] Creating Blob URLs...`);
+
+                            // Register blobs for interception
+                            window.NFT_BLOBS[virtualMarkerId] = {
+                                fset: URL.createObjectURL(fsetBlob),
+                                iset: URL.createObjectURL(isetBlob),
+                                fset3: fset3Blob ? URL.createObjectURL(fset3Blob) : null
+                            };
+
+                            log(`[4/4] NFT Data ready. Initializing tracker for ${virtualMarkerId}`);
+
+                            const nft = document.createElement('a-nft');
+                            nft.setAttribute('type', 'nft');
+                            nft.setAttribute('url', virtualMarkerId);
+                            nft.setAttribute('smooth', 'true');
+                            nft.setAttribute('smoothCount', '10');
+                            nft.setAttribute('smoothTolerance', '0.01');
+                            nft.setAttribute('smoothThreshold', '5');
+
+                            // Content
+                            const entity = document.createElement('a-entity');
+                            entity.setAttribute('scale', '150 150 150');
+                            entity.setAttribute('position', '0 0 -100');
+
+                            const box = document.createElement('a-entity');
+                            box.setAttribute('geometry', 'primitive: box; width: 1; height: 1; depth: 1');
+                            box.setAttribute('material', 'color: #34d399; opacity: 0.5; transparent: true; wireframe: false');
+                            box.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear');
+
+                            entity.appendChild(box);
+                            nft.appendChild(entity);
+                            scene.appendChild(nft);
+
+                            statusEl.innerText = 'Marker Loaded! Point at your room.';
+                            count++;
+                        } catch (err) {
+                            console.error('Error loading NFT data:', err);
+                            log(`Failed to load NFT ${doc.id}: ${err.message}`);
+                            statusEl.innerText = 'Error loading marker.';
+                            statusEl.className = 'error';
+                        }
+                        continue;
+                    }
+
+                    // 3. Fallback to Hiro Marker (Legacy / Default types like calm_circle, soft_glow)
+                    const marker = document.createElement('a-marker');
+                    marker.setAttribute('preset', 'hiro');
+                    marker.setAttribute('id', `marker-${doc.id}`);
+                    marker.setAttribute('emitevents', 'true');
+
+                    // Visual Content based on type
+                    const entity = document.createElement('a-entity');
+                    if (data.type === 'calm_circle') {
+                        entity.setAttribute('geometry', 'primitive: ring; radiusInner: 0.5; radiusOuter: 0.8');
+                        entity.setAttribute('material', 'color: #34d399; side: double');
+                        entity.setAttribute('rotation', '-90 0 0');
+                    } else if (data.type === 'soft_glow') {
+                        entity.setAttribute('geometry', 'primitive: sphere; radius: 0.5');
+                        entity.setAttribute('material', 'color: #818cf8; transparent: true; opacity: 0.6');
+                    } else {
+                        // Default Box
+                        entity.setAttribute('geometry', 'primitive: box; width: 0.5; height: 0.5; depth: 0.5');
+                        entity.setAttribute('material', 'color: #f472b6');
+                    }
+
+                    entity.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 10000');
+                    entity.setAttribute('position', '0 0.5 0');
+
+                    marker.appendChild(entity);
+                    scene.appendChild(marker);
+
+                    marker.addEventListener('markerFound', () => {
+                        statusEl.innerText = 'Tracking Safe Zone';
+                        statusEl.className = 'ready';
+                    });
+
+                    marker.addEventListener('markerLost', () => {
+                        statusEl.innerText = 'Point at Marker';
+                        statusEl.className = '';
+                    });
+
+                    count++;
+                } // End for loop
+
+                statusEl.innerText = `${count} Safe Zones Loaded`;
+                statusEl.className = 'ready';
+
+            } catch (error) {
+                // ... same error handling
+                console.error("Error loading safe zones:", error);
+                if (error.code === 'permission-denied') {
+                    statusEl.innerText = 'Login Required / Permission Denied';
+                    log('Permission Denied. Check Auth.');
+                } else {
+                    statusEl.innerText = 'Error loading content';
+                }
+                log(error.message);
+            }
+        }
+
+
+        window.addEventListener('load', async () => {
+            // iOS Permission Check
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try { await DeviceOrientationEvent.requestPermission(); } catch (e) { log(e); }
+            }
+
+            // Parse URL Params
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlUserId = urlParams.get('userId');
+            const petId = urlParams.get('petId');
+
+            if (urlUserId && petId) {
+                document.getElementById('status').innerText = 'Authenticating...';
+
+                // Wait for Auth Synchronization
+                // Since this page is on the same domain, it inherits the Auth Persistence from the main app.
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        log(`User authenticated: ${user.uid}`);
+                        // Optional: Verify URL param matches logged in user to prevent spoofing checks
+                        if (user.uid !== urlUserId) {
+                            log('Warning: URL userId param does not match authenticated user.');
+                        }
+
+                        loadSafeZones(urlUserId, petId);
+                    } else {
+                        log('No user logged in.');
+                        document.getElementById('status').innerText = 'Not Logged In. Return to Dashboard.';
+                        // alert('Please log in via the Dashboard first.');
+                    }
+                });
+            } else {
+                document.getElementById('status').innerText = 'Missing Pet Data';
+                log('Missing userId or petId param');
+            }
+        });
+    </script>
+</body>
+
+</html>

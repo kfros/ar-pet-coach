@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Pet Coach Scanner</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        #status {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        #status.tracking {
+            background: rgba(34, 197, 94, 0.8);
+        }
+
+        #close-btn {
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .instruction-box {
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 24px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 280px;
+            margin: auto;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .instruction-box h2 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+        }
+
+        .instruction-box p {
+            margin: 0;
+            font-size: 14px;
+            color: #e5e5e5;
+        }
+
+        .instruction-box.hidden {
+            display: none;
+        }
+    </style>
+
+    <!-- A-Frame 1.6.0 and AR.js -->
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+</head>
+
+<body>
+    <!-- AR Scene - visible immediately for iOS Safari compatibility -->
+    <a-scene id="ar-scene" vr-mode-ui="enabled: false;"
+        renderer="logarithmicDepthBuffer: false; precision: medium; alpha: true; antialias: false;" embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+        <a-marker preset="hiro" id="hiro-marker" emitevents="true">
+            <a-entity geometry="primitive: box" material="color: #6d28d9; transparent: true; opacity: 0.8"
+                scale="0.5 0.5 0.5" position="0 0.25 0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 4000"></a-entity>
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <!-- Overlay UI -->
+    <div id="overlay">
+        <div class="status-bar">
+            <div id="status">Point at Hiro marker</div>
+            <button id="close-btn" onclick="closeAR()">×</button>
+        </div>
+        <div class="instruction-box" id="instruction">
+            <h2>Scan Hiro Marker</h2>
+            <p>Print or display a Hiro marker and point your camera at it.</p>
+        </div>
+    </div>
+
+    <script>
+        // Marker events
+        const marker = document.getElementById('hiro-marker');
+
+        marker.addEventListener('markerFound', function () {
+            document.getElementById('status').textContent = 'Tracking Active';
+            document.getElementById('status').classList.add('tracking');
+            document.getElementById('instruction').classList.add('hidden');
+        });
+
+        marker.addEventListener('markerLost', function () {
+            document.getElementById('status').textContent = 'Point at Hiro marker';
+            document.getElementById('status').classList.remove('tracking');
+            document.getElementById('instruction').classList.remove('hidden');
+        });
+
+        function closeAR() {
+            // Stop camera
+            const videos = document.querySelectorAll('video');
+            videos.forEach(function (video) {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+            });
+            window.location.href = '/dashboard';
+        }
+
+        // Request motion permission on iOS (required for AR.js)
+        window.addEventListener('load', async function () {
+            if (typeof DeviceOrientationEvent !== 'undefined' &&
+                typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    await DeviceOrientationEvent.requestPermission();
+                } catch (e) {
+                    console.log('Motion permission error:', e);
+                }
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function () {
+            const videos = document.querySelectorAll('video');
+            videos.forEach(function (video) {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+            });
+        });
+
+        window.addEventListener('pagehide', function () {
+            const videos = document.querySelectorAll('video');
+            videos.forEach(function (video) {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
