@@ -8,12 +8,14 @@ import {
     Image,
     RefreshControl,
     Alert,
-    Dimensions
+    Dimensions,
+    Pressable
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../services/firebaseConfig';
 import { doc, getDoc, collection, query, limit, getDocs, where, orderBy } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
 import PaywallModal from '../components/PaywallModal';
 import RoomSelectorModal from '../components/RoomSelectorModal';
@@ -155,22 +157,25 @@ export default function DashboardScreen({ navigation }: any) {
 
     if (!petId) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#A5D4FF' }]}>
-                <View style={{ width: 150, height: 150, backgroundColor: '#E0BBE4', borderRadius: 75, justifyContent: 'center', alignItems: 'center', marginBottom: 30, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 }}>
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: COLORS.backgroundLight }]}>
+                <View style={{ width: 150, height: 150, backgroundColor: COLORS.lavender, borderRadius: 75, justifyContent: 'center', alignItems: 'center', marginBottom: 30, ...SHADOWS.small }}>
                     <Text style={{ fontSize: 80 }}>🐕</Text>
                 </View>
-                <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0D99FF', textAlign: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 28, fontWeight: 'bold', color: COLORS.primary, textAlign: 'center', marginBottom: 16 }}>
                     Welcome to ChillPup!
                 </Text>
-                <Text style={{ fontSize: 16, color: '#007ACC', textAlign: 'center', marginBottom: 40, lineHeight: 24 }}>
+                <Text style={{ fontSize: 16, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 24 }}>
                     Add your furry friend to start tracking their anxiety and building a calmer environment together.
                 </Text>
-                <TouchableOpacity
-                    style={{ backgroundColor: '#0D99FF', padding: 18, borderRadius: 16, width: '100%', alignItems: 'center', elevation: 3, shadowColor: '#0D99FF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+                <Pressable
+                    style={({ pressed }: { pressed: boolean }) => [
+                        { backgroundColor: COLORS.primary, padding: 18, borderRadius: 16, width: '100%', alignItems: 'center', ...SHADOWS.medium },
+                        pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] as const }
+                    ]}
                     onPress={() => navigation.navigate('PetProfileStepper')}
                 >
                     <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>Add First Pet</Text>
-                </TouchableOpacity>
+                </Pressable>
             </View>
         );
     }
@@ -225,8 +230,12 @@ export default function DashboardScreen({ navigation }: any) {
             {/* Quick Actions */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionsScroll} contentContainerStyle={{ paddingRight: 20 }}>
                 {/* AR Heatmap */}
-                <TouchableOpacity
-                    style={[styles.actionCard, safeZones.length === 0 && styles.disabledAction]}
+                <Pressable
+                    style={({ pressed }: { pressed: boolean }) => [
+                        styles.actionCard,
+                        safeZones.length === 0 && styles.disabledAction,
+                        pressed && safeZones.length > 0 && { backgroundColor: COLORS.backgroundLight, transform: [{ scale: 0.97 }] as const }
+                    ]}
                     onPress={handleARAction}
                     disabled={safeZones.length === 0}
                 >
@@ -235,40 +244,49 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
                     <Text style={styles.actionText}>Activity Heatmap</Text>
                     {safeZones.length === 0 && <Text style={styles.subText}>(Scan Room First)</Text>}
-                </TouchableOpacity>
+                </Pressable>
 
                 {/* Add Room */}
-                <TouchableOpacity
-                    style={styles.actionCard}
+                <Pressable
+                    style={({ pressed }: { pressed: boolean }) => [
+                        styles.actionCard,
+                        pressed && { backgroundColor: COLORS.backgroundLight, transform: [{ scale: 0.97 }] as const }
+                    ]}
                     onPress={() => navigation.navigate('ARSafeZones', { mode: 'scan', userId: auth.currentUser?.uid, petId })}
                 >
                     <View style={[styles.iconCircle, { backgroundColor: '#f3e8ff' }]}>
                         <Ionicons name="camera-outline" size={28} color="#9333ea" />
                     </View>
                     <Text style={styles.actionText}>Add New Room</Text>
-                </TouchableOpacity>
+                </Pressable>
 
                 {/* Schedule Plan */}
-                <TouchableOpacity
-                    style={styles.actionCard}
+                <Pressable
+                    style={({ pressed }: { pressed: boolean }) => [
+                        styles.actionCard,
+                        pressed && { backgroundColor: COLORS.backgroundLight, transform: [{ scale: 0.97 }] as const }
+                    ]}
                     onPress={() => navigation.navigate('Paywall')}
                 >
                     <View style={[styles.iconCircle, { backgroundColor: '#ffedd5' }]}>
                         <Ionicons name="calendar-outline" size={28} color="#ea580c" />
                     </View>
                     <Text style={styles.actionText}>Schedule Plan</Text>
-                </TouchableOpacity>
+                </Pressable>
 
                 {/* Bark Analysis */}
-                <TouchableOpacity
-                    style={styles.actionCard}
+                <Pressable
+                    style={({ pressed }: { pressed: boolean }) => [
+                        styles.actionCard,
+                        pressed && { backgroundColor: COLORS.backgroundLight, transform: [{ scale: 0.97 }] as const }
+                    ]}
                     onPress={() => navigation.navigate('Analysis', { petId })}
                 >
                     <View style={[styles.iconCircle, { backgroundColor: '#fee2e2' }]}>
                         <Ionicons name="mic-outline" size={28} color="#ef4444" />
                     </View>
                     <Text style={styles.actionText}>Bark Analysis</Text>
-                </TouchableOpacity>
+                </Pressable>
             </ScrollView>
 
             {todaysContent && (
@@ -280,10 +298,16 @@ export default function DashboardScreen({ navigation }: any) {
                         </View>
                     </View>
                     <Text style={styles.dailyDesc} numberOfLines={2}>{todaysContent.description}</Text>
-                    <TouchableOpacity style={styles.startButton} onPress={() => Alert.alert('Coming Soon', 'Exercises coming soon')}>
+                    <Pressable
+                        style={({ pressed }: { pressed: boolean }) => [
+                            styles.startButton,
+                            pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] as const }
+                        ]}
+                        onPress={() => Alert.alert('Coming Soon', 'Exercises coming soon')}
+                    >
                         <Ionicons name="play-circle-outline" size={20} color="#fff" />
                         <Text style={styles.startBtnText}>Start Daily Routine</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                 </View>
             )}
 
@@ -450,9 +474,9 @@ const styles = StyleSheet.create({
         marginTop: -8,
     },
     dailyCard: {
-        borderColor: '#93c5fd',
+        borderColor: COLORS.primaryLight,
         borderWidth: 1,
-        backgroundColor: '#eff6ff',
+        backgroundColor: '#F0FDF4', // Very light mint/green
     },
     dailyTitle: {
         fontSize: 16,

@@ -1,15 +1,17 @@
 export const COLORS = {
-    primary: '#0D99FF', // Primary Blue for buttons/CTAs
-    accent: '#007ACC', // Dark Accent
-    backgroundLight: '#eaf5ffff', // Light Blue BG
-    mint: '#A8DADC', // Mint for calm elements
-    lavender: '#E0BBE4', // Lavender for onboarding
+    primary: '#0F766E', // Teal Accent
+    primaryDark: '#0B5E57', // Pressed state
+    primaryLight: 'rgba(45, 212, 191, 0.6)', // Focus ring / light tint
+    accent: '#007ACC', // Dark Accent (keep if used elsewhere, else replace later)
+    backgroundLight: '#F9FAFB', // Light Gray-White BG
+    mint: '#0F766E', // Mint for calm elements
+    lavender: '#E9D5FF', // Lavender for onboarding
     background: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#666666',
+    text: '#1F2937', // Dark Gray
+    textSecondary: '#4B5563', // Lighter Gray
     error: '#EF4444',
     success: '#10B981',
-    border: '#E5E5E5',
+    border: '#E5E7EB',
 };
 
 export const SIZES = {
@@ -32,15 +34,15 @@ export const SHADOWS = {
     small: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
         elevation: 2,
     },
     medium: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 3,
     },
 };

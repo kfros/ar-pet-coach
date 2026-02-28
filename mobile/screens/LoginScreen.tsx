@@ -4,6 +4,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    Pressable,
     StyleSheet,
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -278,13 +279,22 @@ export default function LoginScreen({ navigation }: any) {
                     {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
                     {isLogin && (
-                        <TouchableOpacity style={styles.forgotPassword}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.forgotPassword,
+                                pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                            ]}
+                        >
                             <Text style={styles.linkText}>Forgot your password?</Text>
-                        </TouchableOpacity>
+                        </Pressable>
                     )}
 
-                    <TouchableOpacity
-                        style={[styles.mainButton, loading && styles.disabledButton]}
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.mainButton,
+                            pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },
+                            loading && styles.disabledButton
+                        ]}
                         onPress={handleEmailAuth}
                         disabled={loading}
                     >
@@ -293,18 +303,23 @@ export default function LoginScreen({ navigation }: any) {
                         ) : (
                             <Text style={styles.mainButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
                         )}
-                    </TouchableOpacity>
+                    </Pressable>
 
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>
                             {isLogin ? "Don't have an account? " : "Already have an account? "}
                         </Text>
-                        <TouchableOpacity onPress={(() => {
-                            setIsLogin(!isLogin);
-                            setError('');
-                        })}>
+                        <Pressable
+                            onPress={() => {
+                                setIsLogin(!isLogin);
+                                setError('');
+                            }}
+                            style={({ pressed }) => [
+                                pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                            ]}
+                        >
                             <Text style={styles.footerLinkText}>{isLogin ? 'Sign up' : 'Sign in'}</Text>
-                        </TouchableOpacity>
+                        </Pressable>
                     </View>
                 </View>
             </ScrollView>
@@ -422,7 +437,7 @@ const styles = StyleSheet.create({
     },
     linkText: {
         ...FONTS.caption,
-        color: COLORS.primary,
+        color: 'rgba(15, 118, 110, 0.85)',
         fontWeight: '600',
     },
     mainButton: {
@@ -452,7 +467,7 @@ const styles = StyleSheet.create({
     },
     footerLinkText: {
         ...FONTS.body,
-        color: COLORS.primary,
+        color: 'rgba(15, 118, 110, 0.85)',
         fontWeight: 'bold',
     },
 });

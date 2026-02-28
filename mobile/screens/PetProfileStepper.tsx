@@ -5,6 +5,7 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
+    Pressable,
     ScrollView,
     KeyboardAvoidingView,
     Platform,
@@ -256,15 +257,19 @@ export default function PetProfileStepper({ navigation }: any) {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity
-                    style={[styles.nextBtn, !isCurrentStepValid() && styles.nextBtnDisabled]}
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.nextBtn,
+                        !isCurrentStepValid() && styles.nextBtnDisabled,
+                        pressed && isCurrentStepValid() && !loading && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] }
+                    ]}
                     onPress={handleNext}
                     disabled={!isCurrentStepValid() || loading}
                 >
                     {loading ? <ActivityIndicator color="#fff" /> : (
                         <Text style={styles.nextBtnText}>{step === TOTAL_STEPS ? 'Complete Setup' : 'Continue'}</Text>
                     )}
-                </TouchableOpacity>
+                </Pressable>
             </View>
         </KeyboardAvoidingView>
     );
@@ -398,7 +403,7 @@ const styles = StyleSheet.create({
         borderRadius: SIZES.radius,
         justifyContent: 'center',
         alignItems: 'center',
-        ...SHADOWS.medium,
+        ...SHADOWS.small,
         borderWidth: 2,
         borderColor: 'transparent',
         borderStyle: 'dashed',
@@ -454,10 +459,10 @@ const styles = StyleSheet.create({
         borderRadius: SIZES.radius,
         justifyContent: 'center',
         alignItems: 'center',
-        ...SHADOWS.medium,
+        ...SHADOWS.small,
     },
     nextBtnDisabled: {
-        backgroundColor: '#A0B3C6',
+        backgroundColor: '#D1D5DB', // Standard gray for disabled states
         shadowOpacity: 0,
     },
     nextBtnText: {
