@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, Platform, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, Linking, Platform, ScrollView } from 'react-native';
 import { auth, db } from '../services/firebaseConfig';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Purchases from 'react-native-purchases';
@@ -71,9 +71,15 @@ export default function SettingsScreen({ navigation }: any) {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Pressable
+                    onPress={() => navigation.goBack()}
+                    style={({ pressed }) => [
+                        styles.backButton,
+                        pressed && { opacity: 0.7 }
+                    ]}
+                >
                     <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-                </TouchableOpacity>
+                </Pressable>
                 <Text style={styles.headerTitle}>Profile</Text>
             </View>
 
@@ -101,29 +107,45 @@ export default function SettingsScreen({ navigation }: any) {
                                 <Text style={styles.petName} numberOfLines={1}>{pet.petName}</Text>
                             </View>
                         ))}
-                        <TouchableOpacity
-                            style={styles.addPetCard}
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.addPetCard,
+                                pressed && { backgroundColor: COLORS.border, transform: [{ scale: 0.98 }] }
+                            ]}
                             onPress={() => navigation.navigate('PetProfileStepper')}
                         >
                             <Ionicons name="add" size={32} color={COLORS.primary} />
                             <Text style={styles.addPetText}>Add New</Text>
-                        </TouchableOpacity>
+                        </Pressable>
                     </ScrollView>
                 </View>
 
                 {/* Menu List */}
                 <View style={styles.menuSection}>
                     {MENU_ITEMS.map((item, index) => (
-                        <TouchableOpacity key={index} style={styles.menuItem} onPress={item.onPress}>
+                        <Pressable
+                            key={index}
+                            style={({ pressed }) => [
+                                styles.menuItem,
+                                pressed && { backgroundColor: COLORS.backgroundLight }
+                            ]}
+                            onPress={item.onPress}
+                        >
                             <Ionicons name={item.icon as any} size={24} color={COLORS.primary} />
                             <Text style={styles.menuItemText}>{item.label}</Text>
                             <Ionicons name="chevron-forward" size={20} color={COLORS.border} />
-                        </TouchableOpacity>
+                        </Pressable>
                     ))}
-                    <TouchableOpacity style={styles.menuItemLogOut} onPress={handleSignOut}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.menuItemLogOut,
+                            pressed && { backgroundColor: COLORS.backgroundLight }
+                        ]}
+                        onPress={handleSignOut}
+                    >
                         <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
                         <Text style={styles.menuItemTextLogOut}>Log Out</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                 </View>
             </ScrollView>
         </View>

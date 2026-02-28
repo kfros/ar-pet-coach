@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../constants/Theme';
 
@@ -63,9 +63,15 @@ export default function OnboardingCarousel({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <Pressable
+                style={({ pressed }) => [
+                    styles.skipButton,
+                    pressed && { opacity: 0.7 }
+                ]}
+                onPress={handleSkip}
+            >
                 <Text style={styles.skipText}>Skip</Text>
-            </TouchableOpacity>
+            </Pressable>
 
             <FlatList
                 ref={flatListRef}
@@ -93,14 +99,20 @@ export default function OnboardingCarousel({ navigation }: any) {
                     ))}
                 </View>
 
-                <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.nextButton,
+                        pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] }
+                    ]}
+                    onPress={handleNext}
+                >
                     <Text style={styles.nextButtonText}>
                         {currentIndex === SLIDES.length - 1 ? 'Get Started' : 'Next'}
                     </Text>
                     {currentIndex < SLIDES.length - 1 && (
                         <Ionicons name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8 }} />
                     )}
-                </TouchableOpacity>
+                </Pressable>
             </View>
         </View>
     );
@@ -183,10 +195,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flexDirection: 'row',
         shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
     },
     nextButtonText: {
         ...FONTS.h3,

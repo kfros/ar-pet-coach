@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import RevenueCatService from '../services/revenueCatService';
 import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 
 export default function PaywallScreen({ route, navigation }: any) {
     const [packages, setPackages] = useState<PurchasesPackage[]>([]);
@@ -96,22 +97,32 @@ export default function PaywallScreen({ route, navigation }: any) {
 
             <View style={styles.packagesContainer}>
                 {packages.map((pack) => (
-                    <TouchableOpacity
+                    <Pressable
                         key={pack.identifier}
-                        style={styles.packageCard}
+                        style={({ pressed }) => [
+                            styles.packageCard,
+                            pressed && { backgroundColor: COLORS.backgroundLight, borderColor: COLORS.primary, transform: [{ scale: 0.98 }] }
+                        ]}
                         onPress={() => handlePurchase(pack)}
                         disabled={purchasing}
                     >
                         <Text style={styles.packageTitle}>{pack.product.title}</Text>
                         <Text style={styles.packagePrice}>{pack.product.priceString}</Text>
                         <Text style={styles.packageDescription}>{pack.product.description}</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                 ))}
             </View>
 
-            <TouchableOpacity onPress={handleRestore} disabled={purchasing} style={styles.restoreButton}>
+            <Pressable
+                onPress={handleRestore}
+                disabled={purchasing}
+                style={({ pressed }) => [
+                    styles.restoreButton,
+                    pressed && { opacity: 0.7 }
+                ]}
+            >
                 <Text style={styles.restoreText}>Restore Purchases</Text>
-            </TouchableOpacity>
+            </Pressable>
 
             {purchasing && (
                 <View style={styles.overlay}>
@@ -125,7 +136,7 @@ export default function PaywallScreen({ route, navigation }: any) {
 function FeatureItem({ text }: { text: string }) {
     return (
         <View style={styles.featureItem}>
-            <Ionicons name="checkmark-circle" size={24} color="#2563eb" />
+            <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
             <Text style={styles.featureText}>{text}</Text>
         </View>
     );
@@ -164,8 +175,8 @@ const styles = StyleSheet.create({
         marginTop: 40,
     },
     title: {
-        fontSize: 28,
-        fontWeight: 'bold',
+        ...FONTS.h1,
+        color: COLORS.text,
         marginBottom: 8,
         textAlign: 'center',
     },
@@ -199,14 +210,13 @@ const styles = StyleSheet.create({
         backgroundColor: '#f9f9f9',
     },
     packageTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        ...FONTS.h3,
+        color: COLORS.text,
         marginBottom: 4,
     },
     packagePrice: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#2563eb',
+        ...FONTS.h2,
+        color: COLORS.primary,
         marginBottom: 4,
     },
     packageDescription: {

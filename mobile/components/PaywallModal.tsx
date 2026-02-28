@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { Modal, View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import RevenueCatService from '../services/revenueCatService';
 import { PurchasesPackage } from 'react-native-purchases';
 import { useSubscription } from './SubscriptionManager';
+import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 
 interface PaywallModalProps {
     visible: boolean;
@@ -76,9 +77,12 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ visible, onClose }) => {
                                 </Text>
                             ) : (
                                 packages.map((pack) => (
-                                    <TouchableOpacity
+                                    <Pressable
                                         key={pack.identifier}
-                                        style={styles.packageButton}
+                                        style={({ pressed }) => [
+                                            styles.packageButton,
+                                            pressed && { backgroundColor: COLORS.backgroundLight, borderColor: COLORS.primary, transform: [{ scale: 0.98 }] }
+                                        ]}
                                         onPress={() => handlePurchase(pack)}
                                     >
                                         <View>
@@ -86,19 +90,31 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ visible, onClose }) => {
                                             <Text style={styles.packageDesc}>{pack.product.description}</Text>
                                         </View>
                                         <Text style={styles.packagePrice}>{pack.product.priceString}</Text>
-                                    </TouchableOpacity>
+                                    </Pressable>
                                 ))
                             )}
                         </View>
                     )}
 
-                    <TouchableOpacity style={styles.restoreButton} onPress={handleRestore}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.restoreButton,
+                            pressed && { opacity: 0.7 }
+                        ]}
+                        onPress={handleRestore}
+                    >
                         <Text style={styles.restoreButtonText}>Restore Purchases</Text>
-                    </TouchableOpacity>
+                    </Pressable>
 
-                    <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.closeButton,
+                            pressed && { opacity: 0.7 }
+                        ]}
+                        onPress={onClose}
+                    >
                         <Text style={styles.closeButtonText}>Not Now</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                 </View>
             </View>
         </Modal>
@@ -161,16 +177,15 @@ const styles = StyleSheet.create({
         maxWidth: 200,
     },
     packagePrice: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#2563eb',
+        ...FONTS.h3,
+        color: COLORS.primary,
     },
     restoreButton: {
         marginTop: 10,
         padding: 10,
     },
     restoreButtonText: {
-        color: '#2563eb',
+        color: COLORS.primary,
         fontSize: 14,
         fontWeight: '600',
     },
