@@ -16,11 +16,43 @@ import { auth, db } from '../services/firebaseConfig';
 import { doc, getDoc, collection, query, limit, getDocs, where, orderBy } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
-import { useSubscription } from '../components/SubscriptionManager';
 import PaywallModal from '../components/PaywallModal';
 import RoomSelectorModal from '../components/RoomSelectorModal';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing, useReducedMotion } from 'react-native-reanimated';
+import { useSubscription } from '../components/SubscriptionManager';
 
 const { width } = Dimensions.get('window');
+
+const ActivePulseBadge = () => {
+    const reducedMotion = useReducedMotion();
+    const opacity = useSharedValue(0.4);
+    useEffect(() => {
+        if (!reducedMotion) {
+            opacity.value = withRepeat(
+                withSequence(
+                    withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(0.4, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+                ),
+                -1,
+                true
+            );
+        } else {
+            opacity.value = 1;
+        }
+    }, [reducedMotion]);
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        backgroundColor: '#10B981',
+        width: 8, height: 8, borderRadius: 4, marginRight: 6
+    }));
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+            <Animated.View style={animatedStyle} />
+            <Text style={{ fontSize: 10, color: '#047857', fontWeight: 'bold' }}>Active</Text>
+        </View>
+    );
+};
 
 export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
@@ -110,6 +142,13 @@ export default function DashboardScreen({ navigation }: any) {
     const onRefresh = () => {
         setRefreshing(true);
         fetchData();
+    };
+
+    const getAnxietyDetails = (score: number) => {
+        if (score < 4) return { label: 'Low', color: '#10B981' };
+        if (score < 7) return { label: 'Moderate', color: '#D97706' };
+        if (score < 9) return { label: 'Elevated', color: '#F97316' };
+        return { label: 'High', color: '#EF4444' };
     };
 
     const handleARAction = async () => {
@@ -211,20 +250,105 @@ export default function DashboardScreen({ navigation }: any) {
             <View style={styles.card}>
                 <View style={styles.rowBetween}>
                     <View style={styles.row}>
-                        <Ionicons name="pulse" size={20} color="#ef4444" />
+                        <Ionicons name="pulse" size={20} color={getAnxietyDetails(petData?.anxietyScore ?? 0).color} />
                         <Text style={[styles.cardTitle, { marginLeft: 8 }]}>Anxiety Alert Level</Text>
                     </View>
-                    <Text style={[styles.score, { color: '#ef4444' }]}>{petData?.anxietyScore ?? 0}/10</Text>
+                    <Text style={[styles.score, { color: getAnxietyDetails(petData?.anxietyScore ?? 0).color }]}>{petData?.anxietyScore ?? 0}/10</Text>
                 </View>
-                <View style={styles.progressBarBg}>
-                    <View
+                <View style={styles.gradientBarBg}>
+                    <LinearGradient
+                        colors={['#10B981', '#F59E0B', '#F97316', '#EF4444']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
                         style={[
-                            styles.progressBarFill,
-                            { width: `${((petData?.anxietyScore ?? 0) / 10) * 100}%`, backgroundColor: '#ef4444' }
+                            styles.gradientBarFill,
+                            { width: `${Math.max(3, ((petData?.anxietyScore ?? 0) / 10) * 100)}%` }
                         ]}
                     />
                 </View>
-                <Text style={styles.helperText}>Auto-updating based on analysis</Text>
+                <Text style={styles.helperText}>{getAnxietyDetails(petData?.anxietyScore ?? 0).label} anxiety detected</Text>
+            </View>
+
+            {/* Central Session Status */}
+            <View style={[styles.card, { paddingVertical: 24, paddingHorizontal: 20, alignItems: 'center' }]}>
+                <Text style={{ fontSize: 22, fontWeight: 'bold', color: COLORS.text, marginBottom: 8 }}>Current Session Status</Text>
+                <Text style={{ fontSize: 14, color: COLORS.textSecondary, marginBottom: 20, textAlign: 'center' }}>
+                    {safeZones.length === 0 ? 'Map a safe room to begin coaching.' : 'Your AR environment is ready.'}
+                </Text>
+                <Pressable
+                    style={({ pressed }) => [
+                        { backgroundColor: COLORS.primary, paddingVertical: 18, paddingHorizontal: 32, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', justifyContent: 'center', ...SHADOWS.medium },
+                        pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] as const }
+                    ]}
+                    onPress={handleARAction}
+                >
+                    <Ionicons name={safeZones.length === 0 ? "scan-outline" : "play-circle-outline"} size={26} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>
+                        {safeZones.length === 0 ? "Scan AR Zone" : "Start Calming Session"}
+                    </Text>
+                </Pressable>
+            </View>
+
+            {/* Your AR Safe Zones */}
+            <View style={{ marginBottom: 24 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 16, paddingHorizontal: 20 }}>Your AR Safe Zones</Text>
+                {safeZones.length === 0 ? (
+                    <View style={{ paddingHorizontal: 20 }}>
+                        <View style={[styles.card, { alignItems: 'center', padding: 30, backgroundColor: '#f9fafb' }]}>
+                            <Ionicons name="scan-outline" size={40} color="#9ca3af" />
+                            <Text style={{ color: '#6b7280', marginTop: 10 }}>No zones mapped yet.</Text>
+                        </View>
+                    </View>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        snapToInterval={width * 0.75}
+                        decelerationRate="fast"
+                        contentContainerStyle={{ paddingHorizontal: 20 }}
+                    >
+                        {safeZones.map((zone, index) => (
+                            <Pressable
+                                key={zone.id || index}
+                                style={({ pressed }) => [
+                                    styles.zoneCard,
+                                    pressed && { backgroundColor: COLORS.backgroundLight, transform: [{ scale: 0.98 }] as const }
+                                ]}
+                                onPress={() => navigation.navigate('ARSafeZones', { mode: 'view', userId: auth.currentUser?.uid, petId, zoneId: zone.id })}
+                            >
+                                <View style={styles.zonePreviewBg}>
+                                    <Ionicons name="cube-outline" size={32} color={COLORS.primaryLight} />
+                                </View>
+                                <View style={{ padding: 12 }}>
+                                    <View style={styles.rowBetween}>
+                                        <Text style={styles.zoneName} numberOfLines={1}>{zone.name || `Zone ${index + 1}`}</Text>
+                                        {index === 0 ? <ActivePulseBadge /> : (
+                                            <View style={styles.inactiveBadge}>
+                                                <Text style={{ fontSize: 10, color: '#6b7280' }}>Last 2h ago</Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <View style={{ marginTop: 12 }}>
+                                        <View style={styles.zoneHeatBarBg}>
+                                            <View style={[styles.zoneHeatBarFill, { width: `${Math.max(10, ((zone.anxietyHeat ?? 3) / 10) * 100)}%`, backgroundColor: getAnxietyDetails(zone.anxietyHeat ?? 3).color }]} />
+                                        </View>
+                                    </View>
+                                </View>
+                            </Pressable>
+                        ))}
+                        {/* Add new zone card */}
+                        <Pressable
+                            style={styles.addZoneCard}
+                            onPress={() => navigation.navigate('ARSafeZones', { mode: 'scan', userId: auth.currentUser?.uid, petId })}
+                        >
+                            <View style={styles.addZoneIconBg}>
+                                <Ionicons name="add" size={32} color={COLORS.primary} />
+                            </View>
+                            <Text style={{ color: COLORS.primary, fontWeight: 'bold', marginTop: 8 }}>Add Zone</Text>
+                        </Pressable>
+                    </ScrollView>
+                )}
             </View>
 
             {/* Quick Actions */}
@@ -289,27 +413,7 @@ export default function DashboardScreen({ navigation }: any) {
                 </Pressable>
             </ScrollView>
 
-            {todaysContent && (
-                <View style={[styles.card, styles.dailyCard]}>
-                    <View style={styles.rowBetween}>
-                        <Text style={styles.dailyTitle}>Day {todaysContent.day}: {todaysContent.title}</Text>
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>Today</Text>
-                        </View>
-                    </View>
-                    <Text style={styles.dailyDesc} numberOfLines={2}>{todaysContent.description}</Text>
-                    <Pressable
-                        style={({ pressed }: { pressed: boolean }) => [
-                            styles.startButton,
-                            pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] as const }
-                        ]}
-                        onPress={() => Alert.alert('Coming Soon', 'Exercises coming soon')}
-                    >
-                        <Ionicons name="play-circle-outline" size={20} color="#fff" />
-                        <Text style={styles.startBtnText}>Start Daily Routine</Text>
-                    </Pressable>
-                </View>
-            )}
+
 
             <PaywallModal
                 visible={paywallVisible}
@@ -418,15 +522,16 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
-    progressBarBg: {
-        height: 8,
+    gradientBarBg: {
+        height: 10,
         backgroundColor: '#f3f4f6',
-        borderRadius: 4,
+        borderRadius: 5,
         overflow: 'hidden',
         marginBottom: 8,
     },
-    progressBarFill: {
+    gradientBarFill: {
         height: '100%',
+        borderRadius: 5,
     },
     helperText: {
         fontSize: 12,
@@ -473,42 +578,64 @@ const styles = StyleSheet.create({
         color: '#666',
         marginTop: -8,
     },
-    dailyCard: {
-        borderColor: COLORS.primaryLight,
-        borderWidth: 1,
-        backgroundColor: '#F0FDF4', // Very light mint/green
+    zoneCard: {
+        width: width * 0.75 - 12,
+        marginRight: 12,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    dailyTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#1e3a8a',
-    },
-    badge: {
-        backgroundColor: '#2563eb',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-    },
-    badgeText: {
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: 'bold',
-    },
-    dailyDesc: {
-        color: '#1e40af',
-        marginBottom: 16,
-    },
-    startButton: {
-        backgroundColor: '#2563eb',
-        padding: 12,
-        borderRadius: 8,
-        flexDirection: 'row',
+    zonePreviewBg: {
+        height: 100,
+        backgroundColor: '#e0f2fe',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 8,
     },
-    startBtnText: {
-        color: '#fff',
-        fontWeight: '600',
+    zoneName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: COLORS.text,
+        flex: 1,
+        marginRight: 8,
     },
+    inactiveBadge: {
+        backgroundColor: '#f3f4f6',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    zoneHeatBarBg: {
+        height: 4,
+        backgroundColor: '#f3f4f6',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    zoneHeatBarFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    addZoneCard: {
+        width: 120,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
+        borderStyle: 'dashed',
+    },
+    addZoneIconBg: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: COLORS.backgroundLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
 });

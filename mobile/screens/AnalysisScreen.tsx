@@ -7,12 +7,101 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, storage, db } from '../services/firebaseConfig';
 import { ref, uploadBytes } from 'firebase/storage';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, limit, getDocs } from 'firebase/firestore';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, withSpring, useReducedMotion } from 'react-native-reanimated';
+import { COLORS, FONTS, SHADOWS } from '../constants/Theme';
 
 // Initialize Gemini
 // Note: In a real app, use a secure backend proxy or Firebase Functions to hide this key.
 // Using EXPO_PUBLIC_GEMINI_API_KEY from env for this MVP.
 const GEN_AI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(GEN_AI_KEY);
+
+const PulsingMicrophone = ({ isRecording, analyzing, onPress }: any) => {
+    const reducedMotion = useReducedMotion();
+    const scale = useSharedValue(1);
+    const opacity = useSharedValue(0.2);
+
+    useEffect(() => {
+        if (isRecording && !reducedMotion) {
+            scale.value = withRepeat(withTiming(1.3, { duration: 1200, easing: Easing.inOut(Easing.ease) }), -1, true);
+            opacity.value = withRepeat(withTiming(0, { duration: 1200, easing: Easing.inOut(Easing.ease) }), -1, true);
+        } else {
+            scale.value = withTiming(1);
+            opacity.value = withTiming(0);
+        }
+    }, [isRecording, reducedMotion]);
+
+    const animatedHaloStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+        opacity: opacity.value,
+        position: 'absolute',
+        width: 100, height: 100,
+        borderRadius: 50,
+        backgroundColor: COLORS.primaryLight,
+    }));
+
+    return (
+        <View style={{ justifyContent: 'center', alignItems: 'center', width: 140, height: 140 }}>
+            {isRecording && <Animated.View style={animatedHaloStyle} />}
+            <TouchableOpacity
+                style={[
+                    styles.recordButton,
+                    isRecording ? { backgroundColor: COLORS.primary } : styles.idleBtn,
+                    analyzing && styles.disabledBtn
+                ]}
+                onPress={onPress}
+                disabled={analyzing}
+            >
+                {analyzing ? (
+                    <ActivityIndicator size="large" color="#fff" />
+                ) : (
+                    <Ionicons
+                        name={isRecording ? "stop" : "mic"}
+                        size={40}
+                        color={isRecording ? "#fff" : COLORS.primary}
+                    />
+                )}
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+const AnimatedWaveform = ({ isRecording, metering }: any) => {
+    const reducedMotion = useReducedMotion();
+    const height1 = useSharedValue(10);
+    const height2 = useSharedValue(10);
+    const height3 = useSharedValue(10);
+    const height4 = useSharedValue(10);
+
+    useEffect(() => {
+        if (isRecording && !reducedMotion) {
+            const normalized = Math.max(10, Math.min(40, ((metering + 60) / 60) * 40));
+            height1.value = withSpring(normalized * 0.8 + Math.random() * 5);
+            height2.value = withSpring(normalized * 1.2 + Math.random() * 5);
+            height3.value = withSpring(normalized * 0.9 + Math.random() * 5);
+            height4.value = withSpring(normalized * 1.1 + Math.random() * 5);
+        } else {
+            height1.value = withTiming(10);
+            height2.value = withTiming(10);
+            height3.value = withTiming(10);
+            height4.value = withTiming(10);
+        }
+    }, [metering, isRecording, reducedMotion]);
+
+    const style1 = useAnimatedStyle(() => ({ height: height1.value }));
+    const style2 = useAnimatedStyle(() => ({ height: height2.value }));
+    const style3 = useAnimatedStyle(() => ({ height: height3.value }));
+    const style4 = useAnimatedStyle(() => ({ height: height4.value }));
+
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 50, justifyContent: 'center', marginTop: 30 }}>
+            <Animated.View style={[styles.waveBar, style1]} />
+            <Animated.View style={[styles.waveBar, style2]} />
+            <Animated.View style={[styles.waveBar, style3]} />
+            <Animated.View style={[styles.waveBar, style4]} />
+        </View>
+    );
+};
 
 export default function AnalysisScreen({ navigation, route }: any) {
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -292,66 +381,39 @@ export default function AnalysisScreen({ navigation, route }: any) {
             <View style={styles.content}>
                 {!result ? (
                     <View style={styles.recordContainer}>
-                        <View style={styles.metrics}>
-                            <Text style={styles.metricText}>Barks: {barkCount}</Text>
-                            <View style={styles.intensityBar}>
-                                <View style={[styles.intensityFill, { height: `${maxIntensity * 100}%` }]} />
-                            </View>
-                        </View>
+                        <PulsingMicrophone isRecording={isRecording} analyzing={analyzing} onPress={isRecording ? stopRecording : startRecording} />
 
-                        <Text style={styles.timer}>
+                        <AnimatedWaveform isRecording={isRecording} metering={metering} />
+
+                        <Text style={[styles.timer, { marginTop: 20 }]}>
                             {isRecording ? `00:${timeLeft < 10 ? '0' : ''}${timeLeft}` : '00:30'}
                         </Text>
                         <Text style={styles.status}>
-                            {isRecording ? "Recording..." : "Tap mic to analyze"}
+                            {isRecording ? "Listening for stress patterns…" : "Tap mic to analyze"}
                         </Text>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.recordButton,
-                                isRecording ? styles.recordingBtn : styles.idleBtn,
-                                analyzing && styles.disabledBtn
-                            ]}
-                            onPress={isRecording ? stopRecording : startRecording}
-                            disabled={analyzing}
-                        >
-                            {analyzing ? (
-                                <ActivityIndicator size="large" color="#fff" />
-                            ) : (
-                                <Ionicons
-                                    name={isRecording ? "stop" : "mic"}
-                                    size={40}
-                                    color="#fff"
-                                />
-                            )}
-                        </TouchableOpacity>
                     </View>
                 ) : (
                     <View style={styles.resultContainer}>
-                        <View style={[
-                            styles.scoreCard,
-                            result.score >= 7 ? styles.bgRed : result.score >= 4 ? styles.bgOrange : styles.bgGreen
-                        ]}>
-                            <Text style={styles.scoreLabel}>Anxiety Score</Text>
-                            <Text style={[
-                                styles.scoreValue,
-                                result.score >= 7 ? styles.textRed : result.score >= 4 ? styles.textOrange : styles.textGreen
-                            ]}>
-                                {result.score}/10
-                            </Text>
-                            <Text style={styles.scoreDesc}>
-                                {result.score >= 9 ? "Severe Panic" :
-                                    result.score >= 7 ? "High Anxiety" :
-                                        result.score >= 4 ? "Mild Stress" :
-                                            "Normal/Playful"}
-                            </Text>
-                        </View>
+                        <View style={styles.summaryCard}>
+                            <Text style={styles.summaryTitle}>Analysis Complete</Text>
 
-                        <View style={styles.tipCard}>
-                            <Text style={styles.tipTitle}>💡 AI Tip</Text>
-                            <Text style={styles.tipText}>{result.tip}</Text>
+                            <View style={styles.metricRow}>
+                                <Text style={styles.metricLabel}>Stress Probability</Text>
+                                <Text style={[styles.metricValue, { color: COLORS.primary }]}>{Math.round((result.score / 10) * 100)}%</Text>
+                            </View>
+
+                            <View style={styles.metricRow}>
+                                <Text style={styles.metricLabel}>Bark/Stress Intensity</Text>
+                                <View style={styles.barBg}>
+                                    <View style={[styles.barFill, { width: `${result.score * 10}%`, backgroundColor: COLORS.primary }]} />
+                                </View>
+                            </View>
+
                             <View style={styles.divider} />
-                            <Text style={styles.detailsText}>{result.details}</Text>
+
+                            <Text style={styles.tipTitle}>💡 Suggested Action</Text>
+                            <Text style={styles.tipText}>{result.tip}</Text>
+                            {result.details ? <Text style={styles.detailsText}>{result.details}</Text> : null}
                         </View>
 
                         <View style={styles.actions}>
@@ -359,7 +421,7 @@ export default function AnalysisScreen({ navigation, route }: any) {
                                 style={[styles.actionBtn, styles.outlineBtn]}
                                 onPress={() => setResult(null)}
                             >
-                                <Text style={styles.outlineBtnText}>Record Again</Text>
+                                <Text style={styles.outlineBtnText}>Start New Analysis</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.actionBtn, styles.primaryBtn]}
@@ -406,119 +468,95 @@ const styles = StyleSheet.create({
     recordContainer: {
         alignItems: 'center',
         width: '100%',
-    },
-    metrics: {
-        position: 'absolute',
-        top: -50,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 15
-    },
-    metricText: {
-        color: '#666',
-        fontWeight: '600'
-    },
-    intensityBar: {
-        width: 10,
-        height: 50,
-        backgroundColor: '#eee',
-        borderRadius: 5,
-        overflow: 'hidden',
-        justifyContent: 'flex-end'
-    },
-    intensityFill: {
-        backgroundColor: '#ef4444',
-        width: '100%'
+        marginTop: 40,
     },
     timer: {
-        fontSize: 64,
+        fontSize: 48,
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
         fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
+        color: COLORS.text,
+        marginBottom: 8,
     },
     status: {
         fontSize: 16,
-        color: '#666',
+        color: COLORS.textSecondary,
         marginBottom: 40,
     },
     recordButton: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
+        ...SHADOWS.medium,
+        zIndex: 10,
     },
     idleBtn: {
-        backgroundColor: '#2563eb',
-    },
-    recordingBtn: {
-        backgroundColor: '#ef4444',
-        transform: [{ scale: 1.1 }],
-        borderWidth: 4,
-        borderColor: '#fee2e2'
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: COLORS.primaryLight,
     },
     disabledBtn: {
         backgroundColor: '#9ca3af',
+    },
+    waveBar: {
+        width: 8,
+        backgroundColor: COLORS.primary,
+        borderRadius: 4,
     },
     resultContainer: {
         width: '100%',
         gap: 20,
     },
-    scoreCard: {
-        borderRadius: 16,
-        padding: 24,
-        alignItems: 'center',
-        borderWidth: 1,
-    },
-    bgRed: { backgroundColor: '#fef2f2', borderColor: '#fee2e2' },
-    bgOrange: { backgroundColor: '#fff7ed', borderColor: '#ffedd5' },
-    bgGreen: { backgroundColor: '#f0fdf4', borderColor: '#dcfce7' },
-    textRed: { color: '#ef4444' },
-    textOrange: { color: '#f97316' },
-    textGreen: { color: '#22c55e' },
-    scoreLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#666',
-        marginBottom: 8,
-    },
-    scoreValue: {
-        fontSize: 64,
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    scoreDesc: {
-        fontSize: 16,
-        fontWeight: '600',
-        opacity: 0.8,
-    },
-    tipCard: {
+    summaryCard: {
         backgroundColor: '#fff',
         borderRadius: 16,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: '#eee',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        padding: 24,
+        ...SHADOWS.small,
+    },
+    summaryTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: COLORS.text,
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    metricRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    metricLabel: {
+        fontSize: 16,
+        color: COLORS.textSecondary,
+        fontWeight: '600',
+    },
+    metricValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    barBg: {
+        width: 120,
+        height: 8,
+        backgroundColor: '#f3f4f6',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    barFill: {
+        height: '100%',
+        borderRadius: 4,
     },
     tipTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        marginBottom: 10,
+        marginBottom: 8,
+        color: COLORS.text,
     },
     tipText: {
         fontSize: 16,
         lineHeight: 24,
-        color: '#333',
+        color: COLORS.text,
     },
     divider: {
         height: 1,
@@ -528,7 +566,8 @@ const styles = StyleSheet.create({
     },
     detailsText: {
         fontSize: 14,
-        color: '#666',
+        color: COLORS.textSecondary,
+        marginTop: 8,
     },
     actions: {
         flexDirection: 'row',
@@ -542,11 +581,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     primaryBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: COLORS.primary,
     },
     outlineBtn: {
         borderWidth: 1,
-        borderColor: '#e5e5e5',
+        borderColor: COLORS.primary,
         backgroundColor: '#fff',
     },
     primaryBtnText: {
@@ -554,7 +593,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     outlineBtnText: {
-        color: '#333',
+        color: COLORS.primary,
         fontWeight: '600',
     },
 });
