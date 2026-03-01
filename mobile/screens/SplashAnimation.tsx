@@ -1,6 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Animated, Easing } from 'react-native';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import React, { useEffect } from 'react';
+import { StyleSheet, View, Text } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    withDelay,
+    withSequence,
+    withRepeat,
+    Easing,
+    runOnJS,
+    useReducedMotion,
+} from 'react-native-reanimated';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../constants/Theme';
 
 interface SplashAnimationProps {
@@ -8,83 +19,109 @@ interface SplashAnimationProps {
 }
 
 export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
-    const tailRotation = useRef(new Animated.Value(0)).current;
-    const tailOpacity = useRef(new Animated.Value(1)).current;
-    const heartScale = useRef(new Animated.Value(0)).current;
-    const heartOpacity = useRef(new Animated.Value(0)).current;
-    const overlayOpacity = useRef(new Animated.Value(0)).current;
-    const textOpacity = useRef(new Animated.Value(0)).current;
-    const textTranslateY = useRef(new Animated.Value(20)).current;
+    const reducedMotion = useReducedMotion();
+
+    // Phase 1 (0.0-0.8s): Paw appearance + breathing
+    const pawScale = useSharedValue(0);
+    const pawTranslateY = useSharedValue(0);
+
+    // Phase 2 (0.8-1.8s): Floor plane fade
+    const floorOpacity = useSharedValue(0);
+
+    // Phase 3 (1.8-2.8s): Tap + wave
+    const waveScale = useSharedValue(0);
+    const waveOpacity = useSharedValue(0);
+
+    // Phase 4 (2.8-3.2s): Title reveal
+    const titleOpacity = useSharedValue(0);
+    const titleTranslateY = useSharedValue(30);
 
     useEffect(() => {
-        // 1. Shaking tail (wagging erratically)
-        const tailWag = Animated.loop(
-            Animated.sequence([
-                Animated.timing(tailRotation, { toValue: 1, duration: 80, easing: Easing.linear, useNativeDriver: true }),
-                Animated.timing(tailRotation, { toValue: -1, duration: 80, easing: Easing.linear, useNativeDriver: true }),
-            ]),
-            { iterations: 8 }
+        if (reducedMotion) {
+            pawScale.value = 1;
+            floorOpacity.value = 0.15;
+            titleOpacity.value = 1;
+            titleTranslateY.value = 0;
+            const t = setTimeout(onComplete, 1000);
+            return () => clearTimeout(t);
+        }
+
+        // Phase 1: Paw pops in + breathing
+        pawScale.value = withSequence(
+            withTiming(1, { duration: 700, easing: Easing.out(Easing.back(1.5)) }),
+            withRepeat(
+                withSequence(
+                    withTiming(1.02, { duration: 1300, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.ease) }),
+                ),
+                -1, true,
+            ),
         );
 
-        tailWag.start(() => {
-            // After wagging, reset tail rotation
-            Animated.timing(tailRotation, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+        // Phase 2: Floor plane fades in
+        floorOpacity.value = withDelay(800,
+            withTiming(0.18, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+        );
 
-            // 2. Fade out tail, show heart
-            Animated.parallel([
-                Animated.timing(tailOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-                Animated.spring(heartScale, { toValue: 1, damping: 10, stiffness: 80, useNativeDriver: true }),
-                Animated.timing(heartOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-            ]).start(() => {
-                // 3. AR overlay fades in
-                Animated.timing(overlayOpacity, { toValue: 1, duration: 1000, useNativeDriver: true }).start();
+        // Phase 3: Calm tap down + bounce back
+        pawTranslateY.value = withDelay(1800,
+            withSequence(
+                withTiming(10, { duration: 300, easing: Easing.in(Easing.ease) }),
+                withTiming(0, { duration: 400, easing: Easing.out(Easing.back(1.2)) }),
+            ),
+        );
 
-                // 4. App name fades in
-                setTimeout(() => {
-                    Animated.parallel([
-                        Animated.timing(textOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-                        Animated.timing(textTranslateY, { toValue: 0, duration: 800, useNativeDriver: true }),
-                    ]).start();
-                }, 400);
-            });
-        });
+        // Wave at tap-bottom (1800+300=2100ms)
+        waveOpacity.value = withDelay(2100,
+            withSequence(
+                withTiming(0.35, { duration: 80 }),
+                withTiming(0, { duration: 1300, easing: Easing.out(Easing.ease) }),
+            ),
+        );
+        waveScale.value = withDelay(2100,
+            withTiming(4.5, { duration: 1300, easing: Easing.out(Easing.ease) }),
+        );
 
-        // Navigate away after animation completes
-        const timeout = setTimeout(() => {
-            onComplete();
-        }, 4500);
+        // Phase 4: Title reveal
+        titleOpacity.value = withDelay(2800,
+            withTiming(1, { duration: 600, easing: Easing.out(Easing.ease) }),
+        );
+        titleTranslateY.value = withDelay(2800,
+            withTiming(0, { duration: 600, easing: Easing.out(Easing.back(1)) }),
+        );
 
-        return () => clearTimeout(timeout);
+        // Completion
+        const completionTimer = setTimeout(onComplete, 3600);
+        return () => clearTimeout(completionTimer);
     }, []);
 
-    const tailRotateInterpolation = tailRotation.interpolate({
-        inputRange: [-1, 1],
-        outputRange: ['-20deg', '20deg'],
-    });
+    const pawStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pawScale.value }, { translateY: pawTranslateY.value }],
+    }));
+
+    const floorStyle = useAnimatedStyle(() => ({
+        opacity: floorOpacity.value,
+    }));
+
+    const waveStyle = useAnimatedStyle(() => ({
+        opacity: waveOpacity.value,
+        transform: [{ scale: waveScale.value }],
+    }));
+
+    const titleStyle = useAnimatedStyle(() => ({
+        opacity: titleOpacity.value,
+        transform: [{ translateY: titleTranslateY.value }],
+    }));
 
     return (
         <View style={styles.container}>
-            <View style={styles.iconContainer}>
-                {/* Dog Tail / Anxiety Phase */}
-                <Animated.View style={[styles.iconWrapper, { opacity: tailOpacity, transform: [{ rotate: tailRotateInterpolation }] }]}>
-                    <FontAwesome5 name="dog" size={80} color="#EF4444" />
-                </Animated.View>
-
-                {/* Heart / Calm Phase */}
-                <Animated.View style={[styles.iconWrapper, { position: 'absolute', opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
-                    <Ionicons name="heart" size={100} color={COLORS.mint} />
-                </Animated.View>
-
-                {/* AR Overlay */}
-                <Animated.View style={[styles.arOverlay, { opacity: overlayOpacity }]}>
-                    <Ionicons name="scan" size={160} color={COLORS.primary} style={{ opacity: 0.3 }} />
-                    <Ionicons name="glasses" size={60} color={COLORS.primary} style={styles.absoluteCenter} />
-                </Animated.View>
-            </View>
-
-            <Animated.View style={[styles.textContainer, { opacity: textOpacity, transform: [{ translateY: textTranslateY }] }]}>
-                <Text style={styles.title}>ChillPup AR</Text>
-                <Text style={styles.subtitle}>Calm Your Furry Friend</Text>
+            <Animated.View style={[styles.floorPlane, floorStyle]} />
+            <Animated.View style={[styles.wave, waveStyle]} />
+            <Animated.View style={[styles.pawContainer, pawStyle]}>
+                <FontAwesome5 name="paw" size={140} color="#FFFFFF" />
+            </Animated.View>
+            <Animated.View style={[styles.titleContainer, titleStyle]}>
+                <Text style={styles.brandTitle}>ChillPup AR</Text>
             </Animated.View>
         </View>
     );
@@ -93,41 +130,44 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.backgroundLight,
-        justifyContent: 'center',
+        backgroundColor: COLORS.primaryDark,
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    iconContainer: {
-        height: 200,
-        justifyContent: 'center',
-        alignItems: 'center',
+    floorPlane: {
+        position: 'absolute',
+        bottom: 0,
         width: '100%',
-    },
-    iconWrapper: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 2,
-    },
-    arOverlay: {
-        position: 'absolute',
+        height: '45%',
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 180,
+        borderTopRightRadius: 180,
         zIndex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
-    absoluteCenter: {
+    wave: {
         position: 'absolute',
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+        backgroundColor: 'rgba(255,255,255,0.30)',
+        zIndex: 5,
     },
-    textContainer: {
-        marginTop: 40,
-        alignItems: 'center',
+    pawContainer: {
+        zIndex: 10,
     },
-    title: {
+    titleContainer: {
+        position: 'absolute',
+        bottom: '22%',
+        zIndex: 10,
+    },
+    brandTitle: {
         ...FONTS.h1,
-        color: COLORS.primary,
-        marginBottom: 8,
-    },
-    subtitle: {
-        ...FONTS.body,
-        color: COLORS.accent,
+        fontSize: 54,
+        fontWeight: 'bold',
+        color: '#FFFFFF',
+        letterSpacing: 2,
+        textShadowColor: 'rgba(0,0,0,0.15)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
 });
