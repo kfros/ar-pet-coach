@@ -1,5 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator, Platform, ScrollView } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withRepeat,
+    withSequence,
+    withTiming,
+    withDelay,
+    Easing,
+    useReducedMotion,
+} from 'react-native-reanimated';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -7,12 +17,107 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, storage, db } from '../services/firebaseConfig';
 import { ref, uploadBytes } from 'firebase/storage';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, limit, getDocs } from 'firebase/firestore';
+import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
+import { getAnxietyColor, getAnxietyBgColor, getAnxietyLabel } from '../helpers/anxietyGradient';
 
-// Initialize Gemini
-// Note: In a real app, use a secure backend proxy or Firebase Functions to hide this key.
-// Using EXPO_PUBLIC_GEMINI_API_KEY from env for this MVP.
 const GEN_AI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(GEN_AI_KEY);
+
+// ── Animated Waveform Bars ──────────────────────────────
+
+function WaveformBars({ isActive }: { isActive: boolean }) {
+    const reducedMotion = useReducedMotion();
+    const bars = [
+        useSharedValue(0.3),
+        useSharedValue(0.3),
+        useSharedValue(0.3),
+        useSharedValue(0.3),
+        useSharedValue(0.3),
+    ];
+
+    useEffect(() => {
+        if (!isActive || reducedMotion) {
+            bars.forEach(b => { b.value = withTiming(0.3, { duration: 300 }); });
+            return;
+        }
+        bars.forEach((bar, i) => {
+            bar.value = withDelay(i * 120,
+                withRepeat(
+                    withSequence(
+                        withTiming(0.5 + Math.random() * 0.5, { duration: 300 + i * 80, easing: Easing.inOut(Easing.ease) }),
+                        withTiming(0.15 + Math.random() * 0.2, { duration: 250 + i * 60, easing: Easing.inOut(Easing.ease) }),
+                    ),
+                    -1, true,
+                ),
+            );
+        });
+    }, [isActive]);
+
+    const barStyles = bars.map(bar =>
+        useAnimatedStyle(() => ({ height: `${bar.value * 100}%` }))
+    );
+
+    return (
+        <View style={wfStyles.container}>
+            {barStyles.map((style, i) => (
+                <Animated.View key={i} style={[wfStyles.bar, style]} />
+            ))}
+        </View>
+    );
+}
+
+const wfStyles = StyleSheet.create({
+    container: { flexDirection: 'row', alignItems: 'flex-end', height: 50, gap: 6, marginBottom: 20 },
+    bar: { width: 8, backgroundColor: COLORS.primary, borderRadius: 4, opacity: 0.7 },
+});
+
+// ── Pulsing Record Circle ───────────────────────────────
+
+function PulsingCircle({ isActive }: { isActive: boolean }) {
+    const reducedMotion = useReducedMotion();
+    const scale = useSharedValue(1);
+    const glowOpacity = useSharedValue(0);
+
+    useEffect(() => {
+        if (!isActive || reducedMotion) {
+            scale.value = withTiming(1, { duration: 300 });
+            glowOpacity.value = withTiming(0, { duration: 300 });
+            return;
+        }
+        scale.value = withRepeat(
+            withSequence(
+                withTiming(1.15, { duration: 600, easing: Easing.inOut(Easing.ease) }),
+                withTiming(1, { duration: 600, easing: Easing.inOut(Easing.ease) }),
+            ), -1, true,
+        );
+        glowOpacity.value = withRepeat(
+            withSequence(
+                withTiming(0.25, { duration: 600, easing: Easing.inOut(Easing.ease) }),
+                withTiming(0.08, { duration: 600, easing: Easing.inOut(Easing.ease) }),
+            ), -1, true,
+        );
+    }, [isActive]);
+
+    const circleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+    const glowStyle = useAnimatedStyle(() => ({ opacity: glowOpacity.value, transform: [{ scale: scale.value * 1.4 }] }));
+
+    return (
+        <View style={pulseStyles.wrapper}>
+            <Animated.View style={[pulseStyles.glow, glowStyle]} />
+            <Animated.View style={[pulseStyles.circle, circleStyle]}>
+                <Ionicons name={isActive ? 'stop' : 'mic'} size={40} color="#fff" />
+            </Animated.View>
+        </View>
+    );
+}
+
+const pulseStyles = StyleSheet.create({
+    wrapper: { alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+    glow: { position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: COLORS.primary },
+    circle: { width: 100, height: 100, borderRadius: 50, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', ...SHADOWS.small },
+});
+
+// ── Main Screen ─────────────────────────────────────────
 
 export default function AnalysisScreen({ navigation, route }: any) {
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -21,54 +126,36 @@ export default function AnalysisScreen({ navigation, route }: any) {
     const [timeLeft, setTimeLeft] = useState(30);
     const [analyzing, setAnalyzing] = useState(false);
     const [result, setResult] = useState<any>(null);
-    const [metering, setMetering] = useState(0); // -160 to 0
+    const [metering, setMetering] = useState(0);
     const [maxIntensity, setMaxIntensity] = useState(0);
     const [barkCount, setBarkCount] = useState(0);
     const [petData, setPetData] = useState<any>(null);
     const [currentPetId, setCurrentPetId] = useState<string | null>(null);
 
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const lastBarkTimeRef = useRef(0);
 
     useEffect(() => {
         fetchPetProfile();
-        return () => {
-            if (recording) {
-                stopRecording();
-            }
-        };
+        return () => { if (recording) stopRecording(); };
     }, []);
 
     const fetchPetProfile = async () => {
         const user = auth.currentUser;
         if (!user) return;
-
         try {
             let id = route.params?.petId;
             let data = null;
-
             if (id) {
                 const docSnap = await getDoc(doc(db, 'users', user.uid, 'pets', id));
-                if (docSnap.exists()) {
-                    data = docSnap.data();
-                }
+                if (docSnap.exists()) data = docSnap.data();
             } else {
                 const q = query(collection(db, 'users', user.uid, 'pets'), limit(1));
                 const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    id = querySnapshot.docs[0].id;
-                    data = querySnapshot.docs[0].data();
-                }
+                if (!querySnapshot.empty) { id = querySnapshot.docs[0].id; data = querySnapshot.docs[0].data(); }
             }
-
-            if (id && data) {
-                console.log("Analysis for pet:", data.name, data.breed);
-                setCurrentPetId(id);
-                setPetData(data);
-            }
-        } catch (e) {
-            console.error("Error fetching pet profile:", e);
-        }
+            if (id && data) { setCurrentPetId(id); setPetData(data); }
+        } catch (e) { console.error("Error fetching pet profile:", e); }
     };
 
     const startRecording = async () => {
@@ -80,33 +167,16 @@ export default function AnalysisScreen({ navigation, route }: any) {
                     return;
                 }
             }
-
-            // Reset Telemetry
-            setResult(null);
-            setMaxIntensity(0);
-            setBarkCount(0);
-            lastBarkTimeRef.current = 0;
-
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-                staysActiveInBackground: true,
-            });
+            setResult(null); setMaxIntensity(0); setBarkCount(0); lastBarkTimeRef.current = 0;
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true, staysActiveInBackground: true });
 
             const { recording } = await Audio.Recording.createAsync(
                 Audio.RecordingOptionsPresets.HIGH_QUALITY,
                 (status) => {
                     if (status.isRecording && status.metering !== undefined) {
                         setMetering(status.metering);
-
-                        // normalize -160 (silence) to 0 (loud) -> 0 to 1
-                        // typical range is -60 to 0 for speech
-                        // let's say -60 is 0.1, 0 is 1.0
                         const normalized = Math.min(1, Math.max(0, (status.metering + 60) / 60));
-
                         if (normalized > maxIntensity) setMaxIntensity(normalized);
-
-                        // Simple Bark Detection (Threshold > 0.6 & debounce 400ms)
                         const now = Date.now();
                         if (normalized > 0.6 && (now - lastBarkTimeRef.current > 400)) {
                             setBarkCount(prev => prev + 1);
@@ -114,259 +184,164 @@ export default function AnalysisScreen({ navigation, route }: any) {
                         }
                     }
                 },
-                100 // update every 100ms
+                100,
             );
-
-            setRecording(recording);
-            setIsRecording(true);
-            setTimeLeft(30);
-
-            // Timer
+            setRecording(recording); setIsRecording(true); setTimeLeft(30);
             timerRef.current = setInterval(() => {
-                setTimeLeft((prev) => {
-                    if (prev <= 1) {
-                        stopRecording();
-                        return 0;
-                    }
-                    return prev - 1;
-                });
+                setTimeLeft((prev) => { if (prev <= 1) { stopRecording(); return 0; } return prev - 1; });
             }, 1000);
-
-        } catch (err) {
-            console.error('Failed to start recording', err);
-            Alert.alert("Error", "Failed to start recording.");
-        }
+        } catch (err) { console.error('Failed to start recording', err); Alert.alert("Error", "Failed to start recording."); }
     };
 
     const stopRecording = async () => {
         if (!recording) return;
-
         setIsRecording(false);
         if (timerRef.current) clearInterval(timerRef.current);
-
         try {
             await recording.stopAndUnloadAsync();
             const uri = recording.getURI();
-            console.log('Recording stopped and stored at', uri);
-
-            if (uri) {
-                analyzeAudio(uri);
-            }
-        } catch (err) {
-            console.error('Failed to stop recording', err);
-        } finally {
-            setRecording(null);
-        }
+            if (uri) analyzeAudio(uri);
+        } catch (err) { console.error('Failed to stop recording', err); }
+        finally { setRecording(null); }
     };
 
     const analyzeAudio = async (uri: string) => {
-        if (!GEN_AI_KEY) {
-            Alert.alert("Config Error", "Gemini API Key is missing. Check your .env file.");
-            return;
-        }
-
+        if (!GEN_AI_KEY) { Alert.alert("Config Error", "Gemini API Key is missing."); return; }
         setAnalyzing(true);
         try {
-            // 1. Read file as Base64
-            const base64Audio = await FileSystem.readAsStringAsync(uri, {
-                encoding: 'base64',
-            });
-
-            // 2. Gemini Analysis
+            const base64Audio = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-            const prompt = `
-            Analyze this dog bark audio for separation anxiety.
-            
-            Context Telemetry:
-            - Max Intensity (0-1): ${maxIntensity.toFixed(2)}
-            - Bark Count (approx): ${barkCount}
-            - Duration: ${30 - timeLeft}s
-            - Pet Breed: ${petData?.breed || 'Unknown'}
-            - Pet Age: ${petData?.age || 'Unknown'}
+            const prompt = `Analyze this dog bark audio for separation anxiety.
+Context: Max Intensity (0-1): ${maxIntensity.toFixed(2)}, Bark Count: ${barkCount}, Duration: ${30 - timeLeft}s, Breed: ${petData?.breed || 'Unknown'}, Age: ${petData?.age || 'Unknown'}
+Scoring: 1-3 Normal, 4-6 Mild stress, 7-8 High anxiety, 9-10 Severe panic.
+Return ONLY valid JSON: {"score": number, "tip": "string (max 15 words)", "details": "string reasoning", "stressProbability": number}`;
 
-            Goal: Determine the Anxiety Level (1-10) and provide a nature of barking (alert, panic, playful, angry, etc.) short Tip.
-            
-            Scoring Guide:
-            - 1-3: Normal behavior, playful barking, or silence.
-            - 4-6: Mild stress, alert barking, occasional whining.
-            - 7-8: High anxiety, repetitive barking, howling, sustained whining.
-            - 9-10: Severe panic, frantic barking/panting, distress.
-
-            Return ONLY valid JSON in this format:
-            {
-                "score": number, 
-                "tip": "string advice (max 15 words)",
-                "details": "string reasoning"
-            }
-            `;
-
-            const result = await model.generateContent([
-                prompt,
-                {
-                    inlineData: {
-                        mimeType: 'audio/mp4', // iOS/Android usually save as m4a/mp4 container
-                        data: base64Audio
-                    }
-                }
-            ]);
-
-            const response = await result.response;
-            const text = response.text();
-            console.log("Gemini Response:", text);
-
+            const genResult = await model.generateContent([prompt, { inlineData: { mimeType: 'audio/mp4', data: base64Audio } }]);
+            const text = (await genResult.response).text();
             const jsonStr = text.replace(/```json|```/g, '').trim();
             const data = JSON.parse(jsonStr);
             setResult(data);
-
-            // 3. Upload to Firebase (Background)
             uploadToFirebase(uri);
-
-        } catch (error: any) {
-            console.error("Analysis Error:", error);
-            Alert.alert("Analysis Failed", error.message);
-        } finally {
-            setAnalyzing(false);
-        }
+        } catch (error: any) { console.error("Analysis Error:", error); Alert.alert("Analysis Failed", error.message); }
+        finally { setAnalyzing(false); }
     };
 
     const uploadToFirebase = async (uri: string) => {
         const user = auth.currentUser;
         if (!user) return;
-
         try {
             const blob = await new Promise<Blob>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.onload = function () {
-                    resolve(xhr.response);
-                };
-                xhr.onerror = function (e) {
-                    console.log(e);
-                    reject(new TypeError('Network request failed'));
-                };
-                xhr.responseType = 'blob';
-                xhr.open('GET', uri, true);
-                xhr.send(null);
+                xhr.onload = () => resolve(xhr.response);
+                xhr.onerror = () => reject(new TypeError('Network request failed'));
+                xhr.responseType = 'blob'; xhr.open('GET', uri, true); xhr.send(null);
             });
-
-            const timestamp = Date.now();
-            const audioRef = ref(storage, `analysis/${user.uid}/${timestamp}.m4a`);
+            const audioRef = ref(storage, `analysis/${user.uid}/${Date.now()}.m4a`);
             await uploadBytes(audioRef, blob);
-            console.log("Audio uploaded to Firebase");
-        } catch (e) {
-            console.error("Upload failed", e);
-        }
+        } catch (e) { console.error("Upload failed", e); }
     };
 
     const handleSaveAndExit = async () => {
-        if (!result || !auth.currentUser) {
-            navigation.goBack();
-            return;
-        }
-
+        if (!result || !auth.currentUser) { navigation.goBack(); return; }
         try {
             const user = auth.currentUser;
-
             if (currentPetId) {
                 await setDoc(doc(db, 'users', user.uid, 'pets', currentPetId), {
-                    anxietyScore: result.score,
-                    lastAnalysis: serverTimestamp(),
-                    lastAnalysisResult: result
+                    anxietyScore: result.score, lastAnalysis: serverTimestamp(), lastAnalysisResult: result,
                 }, { merge: true });
             }
-        } catch (e) {
-            console.error("Save failed", e);
-        } finally {
-            navigation.goBack();
-        }
+        } catch (e) { console.error("Save failed", e); }
+        finally { navigation.goBack(); }
     };
+
+    const scoreColor = result ? getAnxietyColor(result.score) : COLORS.primary;
+    const scoreBg = result ? getAnxietyBgColor(result.score) : '#F3F4F6';
+    const scoreLabel = result ? getAnxietyLabel(result.score) : '';
+    const stressProb = result?.stressProbability ?? Math.round((result?.score ?? 0) * 10);
 
     return (
         <ScrollView contentContainerStyle={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color="#333" />
-                </TouchableOpacity>
+                <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}>
+                    <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+                </Pressable>
                 <Text style={styles.title}>AI Analysis</Text>
             </View>
 
             <View style={styles.content}>
                 {!result ? (
-                    <View style={styles.recordContainer}>
-                        <View style={styles.metrics}>
-                            <Text style={styles.metricText}>Barks: {barkCount}</Text>
-                            <View style={styles.intensityBar}>
-                                <View style={[styles.intensityFill, { height: `${maxIntensity * 100}%` }]} />
-                            </View>
-                        </View>
-
+                    <View style={styles.recordSection}>
+                        <Text style={styles.listeningText}>
+                            {isRecording ? 'Listening for stress-related barking patterns…'
+                                : analyzing ? 'Analyzing audio with AI…'
+                                    : 'Tap to start listening'}
+                        </Text>
+                        <Pressable onPress={isRecording ? stopRecording : startRecording} disabled={analyzing}>
+                            <PulsingCircle isActive={isRecording} />
+                        </Pressable>
+                        <WaveformBars isActive={isRecording} />
                         <Text style={styles.timer}>
                             {isRecording ? `00:${timeLeft < 10 ? '0' : ''}${timeLeft}` : '00:30'}
                         </Text>
-                        <Text style={styles.status}>
-                            {isRecording ? "Recording..." : "Tap mic to analyze"}
-                        </Text>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.recordButton,
-                                isRecording ? styles.recordingBtn : styles.idleBtn,
-                                analyzing && styles.disabledBtn
-                            ]}
-                            onPress={isRecording ? stopRecording : startRecording}
-                            disabled={analyzing}
-                        >
-                            {analyzing ? (
-                                <ActivityIndicator size="large" color="#fff" />
-                            ) : (
-                                <Ionicons
-                                    name={isRecording ? "stop" : "mic"}
-                                    size={40}
-                                    color="#fff"
-                                />
-                            )}
-                        </TouchableOpacity>
+                        {analyzing && (
+                            <View style={styles.analyzingRow}>
+                                <ActivityIndicator size="small" color={COLORS.primary} />
+                                <Text style={styles.analyzingText}>Processing with Gemini AI...</Text>
+                            </View>
+                        )}
+                        {(barkCount > 0 || maxIntensity > 0) && (
+                            <View style={styles.liveMetrics}>
+                                <Text style={styles.liveMetricText}>Barks detected: {barkCount}</Text>
+                                <Text style={styles.liveMetricText}>Peak intensity: {(maxIntensity * 100).toFixed(0)}%</Text>
+                            </View>
+                        )}
                     </View>
                 ) : (
-                    <View style={styles.resultContainer}>
-                        <View style={[
-                            styles.scoreCard,
-                            result.score >= 7 ? styles.bgRed : result.score >= 4 ? styles.bgOrange : styles.bgGreen
-                        ]}>
+                    <View style={styles.resultsSection}>
+                        <View style={[styles.scoreCard, { backgroundColor: scoreBg, borderColor: scoreColor + '30' }]}>
                             <Text style={styles.scoreLabel}>Anxiety Score</Text>
-                            <Text style={[
-                                styles.scoreValue,
-                                result.score >= 7 ? styles.textRed : result.score >= 4 ? styles.textOrange : styles.textGreen
-                            ]}>
-                                {result.score}/10
-                            </Text>
-                            <Text style={styles.scoreDesc}>
-                                {result.score >= 9 ? "Severe Panic" :
-                                    result.score >= 7 ? "High Anxiety" :
-                                        result.score >= 4 ? "Mild Stress" :
-                                            "Normal/Playful"}
-                            </Text>
+                            <Text style={[styles.scoreValue, { color: scoreColor }]}>{result.score}/10</Text>
+                            <Text style={[styles.scoreLevelText, { color: scoreColor }]}>{scoreLabel}</Text>
                         </View>
-
-                        <View style={styles.tipCard}>
-                            <Text style={styles.tipTitle}>💡 AI Tip</Text>
-                            <Text style={styles.tipText}>{result.tip}</Text>
-                            <View style={styles.divider} />
+                        <View style={styles.metricsRow}>
+                            <View style={styles.metricCard}>
+                                <Text style={styles.metricLabel}>Bark Intensity</Text>
+                                <View style={styles.metricBarBg}>
+                                    <View style={[styles.metricBarFill, { width: `${Math.max(5, maxIntensity * 100)}%`, backgroundColor: scoreColor }]} />
+                                </View>
+                                <Text style={styles.metricValue}>{(maxIntensity * 100).toFixed(0)}%</Text>
+                            </View>
+                            <View style={styles.metricCard}>
+                                <Text style={styles.metricLabel}>Stress Prob.</Text>
+                                <View style={styles.circleProgress}>
+                                    <Text style={[styles.circleProgressText, { color: scoreColor }]}>{stressProb}%</Text>
+                                </View>
+                            </View>
+                        </View>
+                        <View style={styles.actionCard}>
+                            <Ionicons name="bulb-outline" size={20} color={COLORS.primary} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.actionCardLabel}>Suggested Action</Text>
+                                <Text style={styles.actionCardText}>{result.tip}</Text>
+                            </View>
+                        </View>
+                        <View style={styles.detailsCard}>
+                            <Text style={styles.detailsTitle}>Analysis Details</Text>
                             <Text style={styles.detailsText}>{result.details}</Text>
                         </View>
-
-                        <View style={styles.actions}>
-                            <TouchableOpacity
-                                style={[styles.actionBtn, styles.outlineBtn]}
+                        <View style={styles.buttonsRow}>
+                            <Pressable
+                                style={({ pressed }) => [styles.outlineBtn, pressed && { backgroundColor: '#F3F4F6' }]}
                                 onPress={() => setResult(null)}
                             >
-                                <Text style={styles.outlineBtnText}>Record Again</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.actionBtn, styles.primaryBtn]}
+                                <Text style={styles.outlineBtnText}>Start New Analysis</Text>
+                            </Pressable>
+                            <Pressable
+                                style={({ pressed }) => [styles.primaryBtn, pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] }]}
                                 onPress={handleSaveAndExit}
                             >
                                 <Text style={styles.primaryBtnText}>Save & Exit</Text>
-                            </TouchableOpacity>
+                            </Pressable>
                         </View>
                     </View>
                 )}
@@ -376,185 +351,40 @@ export default function AnalysisScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flexGrow: 1,
-        backgroundColor: '#fff',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 60,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    backButton: {
-        padding: 5,
-        marginRight: 10,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    content: {
-        flex: 1,
-        padding: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    recordContainer: {
-        alignItems: 'center',
-        width: '100%',
-    },
-    metrics: {
-        position: 'absolute',
-        top: -50,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 15
-    },
-    metricText: {
-        color: '#666',
-        fontWeight: '600'
-    },
-    intensityBar: {
-        width: 10,
-        height: 50,
-        backgroundColor: '#eee',
-        borderRadius: 5,
-        overflow: 'hidden',
-        justifyContent: 'flex-end'
-    },
-    intensityFill: {
-        backgroundColor: '#ef4444',
-        width: '100%'
-    },
-    timer: {
-        fontSize: 64,
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-    },
-    status: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 40,
-    },
-    recordButton: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    idleBtn: {
-        backgroundColor: '#2563eb',
-    },
-    recordingBtn: {
-        backgroundColor: '#ef4444',
-        transform: [{ scale: 1.1 }],
-        borderWidth: 4,
-        borderColor: '#fee2e2'
-    },
-    disabledBtn: {
-        backgroundColor: '#9ca3af',
-    },
-    resultContainer: {
-        width: '100%',
-        gap: 20,
-    },
-    scoreCard: {
-        borderRadius: 16,
-        padding: 24,
-        alignItems: 'center',
-        borderWidth: 1,
-    },
-    bgRed: { backgroundColor: '#fef2f2', borderColor: '#fee2e2' },
-    bgOrange: { backgroundColor: '#fff7ed', borderColor: '#ffedd5' },
-    bgGreen: { backgroundColor: '#f0fdf4', borderColor: '#dcfce7' },
-    textRed: { color: '#ef4444' },
-    textOrange: { color: '#f97316' },
-    textGreen: { color: '#22c55e' },
-    scoreLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#666',
-        marginBottom: 8,
-    },
-    scoreValue: {
-        fontSize: 64,
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    scoreDesc: {
-        fontSize: 16,
-        fontWeight: '600',
-        opacity: 0.8,
-    },
-    tipCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: '#eee',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    tipTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 10,
-    },
-    tipText: {
-        fontSize: 16,
-        lineHeight: 24,
-        color: '#333',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#eee',
-        marginTop: 20,
-        marginBottom: 15,
-    },
-    detailsText: {
-        fontSize: 14,
-        color: '#666',
-    },
-    actions: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 10,
-    },
-    actionBtn: {
-        flex: 1,
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    primaryBtn: {
-        backgroundColor: '#2563eb',
-    },
-    outlineBtn: {
-        borderWidth: 1,
-        borderColor: '#e5e5e5',
-        backgroundColor: '#fff',
-    },
-    primaryBtnText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    outlineBtnText: {
-        color: '#333',
-        fontWeight: '600',
-    },
+    container: { flexGrow: 1, backgroundColor: COLORS.backgroundLight },
+    header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    backBtn: { padding: 5, marginRight: 10 },
+    title: { ...FONTS.h3, color: COLORS.text },
+    content: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' },
+    recordSection: { alignItems: 'center', width: '100%' },
+    listeningText: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
+    timer: { fontSize: 48, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: 'bold', color: COLORS.text, marginBottom: 16 },
+    analyzingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+    analyzingText: { ...FONTS.caption, color: COLORS.primary },
+    liveMetrics: { marginTop: 16, backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 12, width: '100%', gap: 4, ...SHADOWS.small },
+    liveMetricText: { ...FONTS.caption, color: COLORS.textSecondary },
+    resultsSection: { width: '100%', gap: 16 },
+    scoreCard: { borderRadius: SIZES.radius, padding: 24, alignItems: 'center', borderWidth: 1 },
+    scoreLabel: { ...FONTS.caption, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 4 },
+    scoreValue: { fontSize: 56, fontWeight: 'bold', marginBottom: 4 },
+    scoreLevelText: { ...FONTS.body, fontWeight: '600' },
+    metricsRow: { flexDirection: 'row', gap: 12 },
+    metricCard: { flex: 1, backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, alignItems: 'center', ...SHADOWS.small },
+    metricLabel: { ...FONTS.small, color: COLORS.textSecondary, marginBottom: 8, fontWeight: '600' },
+    metricBarBg: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, width: '100%', overflow: 'hidden', marginBottom: 6 },
+    metricBarFill: { height: '100%', borderRadius: 4 },
+    metricValue: { ...FONTS.h3, color: COLORS.text },
+    circleProgress: { width: 56, height: 56, borderRadius: 28, borderWidth: 4, borderColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+    circleProgressText: { ...FONTS.body, fontWeight: 'bold' },
+    actionCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, alignItems: 'center', gap: 12, ...SHADOWS.small },
+    actionCardLabel: { ...FONTS.small, color: COLORS.textSecondary, fontWeight: '600' },
+    actionCardText: { ...FONTS.body, color: COLORS.text, marginTop: 2 },
+    detailsCard: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, ...SHADOWS.small },
+    detailsTitle: { ...FONTS.caption, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
+    detailsText: { ...FONTS.caption, color: COLORS.textSecondary, lineHeight: 20 },
+    buttonsRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
+    outlineBtn: { flex: 1, padding: 16, borderRadius: SIZES.radius, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#fff' },
+    outlineBtnText: { ...FONTS.caption, fontWeight: '600', color: COLORS.text },
+    primaryBtn: { flex: 1, padding: 16, borderRadius: SIZES.radius, alignItems: 'center', backgroundColor: COLORS.primary },
+    primaryBtnText: { ...FONTS.caption, fontWeight: 'bold', color: '#fff' },
 });
