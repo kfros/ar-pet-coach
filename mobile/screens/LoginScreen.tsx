@@ -11,8 +11,6 @@ import {
     Platform,
     Alert,
     ScrollView,
-    Animated,
-    Easing
 } from 'react-native';
 import {
     GoogleSignin,
@@ -28,41 +26,17 @@ import {
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 
-import { auth } from '../services/firebaseConfig';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Purchases from 'react-native-purchases';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
+import AnimatedPawIcon from '../components/AnimatedPawIcon';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { auth } from '../services/firebaseConfig';
 
 // Configure Google Sign-In
 GoogleSignin.configure({
     webClientId: '293725153990-hm4jc29v4438lqq66b59gamqu6nmi1g3.apps.googleusercontent.com',
 });
-
-function WaggingDogIcon() {
-    const rotation = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(rotation, { toValue: 1, duration: 150, easing: Easing.linear, useNativeDriver: true }),
-                Animated.timing(rotation, { toValue: -1, duration: 150, easing: Easing.linear, useNativeDriver: true }),
-            ])
-        ).start();
-    }, []);
-
-    const rotateInterpolation = rotation.interpolate({
-        inputRange: [-1, 1],
-        outputRange: ['-15deg', '15deg'],
-    });
-
-    return (
-        <Animated.View style={[{ alignItems: 'center', marginBottom: 20 }, { transform: [{ rotate: rotateInterpolation }] }]}>
-            <View style={styles.iconCircle}>
-                <FontAwesome5 name="dog" size={40} color={COLORS.primary} />
-            </View>
-        </Animated.View>
-    );
-}
 
 export default function LoginScreen({ navigation }: any) {
     const [isLogin, setIsLogin] = useState(true);
@@ -206,124 +180,126 @@ export default function LoginScreen({ navigation }: any) {
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.container}
-        >
-            <ScrollView contentContainerStyle={styles.scrollContainer} bounces={false}>
-                <View style={styles.formContainer}>
-                    <WaggingDogIcon />
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.container}
+            >
+                <ScrollView contentContainerStyle={styles.scrollContainer} bounces={false}>
+                    <View style={styles.formContainer}>
+                        <AnimatedPawIcon color={COLORS.primary} size={40} />
 
-                    <View style={styles.header}>
-                        <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
-                        <Text style={styles.subtitle}>
-                            {isLogin ? 'Sign in to continue your progress' : 'Start your journey to a calmer pet'}
-                        </Text>
-                    </View>
+                        <View style={styles.header}>
+                            <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
+                            <Text style={styles.subtitle}>
+                                {isLogin ? 'Sign in to continue your progress' : 'Start your journey to a calmer pet'}
+                            </Text>
+                        </View>
 
-                    <View style={styles.socialContainer}>
-                        <TouchableOpacity
-                            style={[styles.socialButton, loading && styles.disabledButton]}
-                            disabled={loading}
-                            onPress={handleGoogleSignIn}
-                        >
-                            <Ionicons name="logo-google" size={20} color={COLORS.text} />
-                            <Text style={styles.socialBtnText}>Continue with Google</Text>
-                        </TouchableOpacity>
+                        <View style={styles.socialContainer}>
+                            <TouchableOpacity
+                                style={[styles.socialButton, loading && styles.disabledButton]}
+                                disabled={loading}
+                                onPress={handleGoogleSignIn}
+                            >
+                                <Ionicons name="logo-google" size={20} color={COLORS.text} />
+                                <Text style={styles.socialBtnText}>Continue with Google</Text>
+                            </TouchableOpacity>
 
-                        {Platform.OS === 'ios' && isAppleAuthAvailable && (
-                            <View style={{ height: 50, width: '100%', marginTop: 8 }}>
-                                <AppleAuthentication.AppleAuthenticationButton
-                                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                                    cornerRadius={SIZES.radius}
-                                    style={{ width: '100%', height: 50 }}
-                                    onPress={handleAppleSignIn}
+                            {Platform.OS === 'ios' && isAppleAuthAvailable && (
+                                <View style={{ height: 50, width: '100%', marginTop: 8 }}>
+                                    <AppleAuthentication.AppleAuthenticationButton
+                                        buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                                        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                                        cornerRadius={SIZES.radius}
+                                        style={{ width: '100%', height: 50 }}
+                                        onPress={handleAppleSignIn}
+                                    />
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.divider} />
+                            <Text style={styles.dividerText}>OR CONTINUE WITH EMAIL</Text>
+                            <View style={styles.divider} />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <View style={styles.inputWrapper}>
+                                <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Email address"
+                                    placeholderTextColor={COLORS.textSecondary}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
                                 />
                             </View>
+                            <View style={styles.inputWrapper}>
+                                <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Password"
+                                    placeholderTextColor={COLORS.textSecondary}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                />
+                            </View>
+                        </View>
+
+                        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+                        {isLogin && (
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.forgotPassword,
+                                    pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                                ]}
+                            >
+                                <Text style={styles.linkText}>Forgot your password?</Text>
+                            </Pressable>
                         )}
-                    </View>
 
-                    <View style={styles.dividerContainer}>
-                        <View style={styles.divider} />
-                        <Text style={styles.dividerText}>OR CONTINUE WITH EMAIL</Text>
-                        <View style={styles.divider} />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                        <View style={styles.inputWrapper}>
-                            <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Email address"
-                                placeholderTextColor={COLORS.textSecondary}
-                                value={email}
-                                onChangeText={setEmail}
-                                autoCapitalize="none"
-                                keyboardType="email-address"
-                            />
-                        </View>
-                        <View style={styles.inputWrapper}>
-                            <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Password"
-                                placeholderTextColor={COLORS.textSecondary}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                            />
-                        </View>
-                    </View>
-
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-                    {isLogin && (
                         <Pressable
                             style={({ pressed }) => [
-                                styles.forgotPassword,
-                                pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                                styles.mainButton,
+                                pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },
+                                loading && styles.disabledButton
                             ]}
+                            onPress={handleEmailAuth}
+                            disabled={loading}
                         >
-                            <Text style={styles.linkText}>Forgot your password?</Text>
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.mainButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+                            )}
                         </Pressable>
-                    )}
 
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.mainButton,
-                            pressed && { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },
-                            loading && styles.disabledButton
-                        ]}
-                        onPress={handleEmailAuth}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.mainButtonText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
-                        )}
-                    </Pressable>
-
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>
-                            {isLogin ? "Don't have an account? " : "Already have an account? "}
-                        </Text>
-                        <Pressable
-                            onPress={() => {
-                                setIsLogin(!isLogin);
-                                setError('');
-                            }}
-                            style={({ pressed }) => [
-                                pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
-                            ]}
-                        >
-                            <Text style={styles.footerLinkText}>{isLogin ? 'Sign up' : 'Sign in'}</Text>
-                        </Pressable>
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>
+                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                            </Text>
+                            <Pressable
+                                onPress={() => {
+                                    setIsLogin(!isLogin);
+                                    setError('');
+                                }}
+                                style={({ pressed }) => [
+                                    pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                                ]}
+                            >
+                                <Text style={styles.footerLinkText}>{isLogin ? 'Sign up' : 'Sign in'}</Text>
+                            </Pressable>
+                        </View>
                     </View>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </GestureHandlerRootView>
     );
 }
 

@@ -242,7 +242,7 @@ export default function OnboardingScreen({ navigation }: any) {
 
                         <View style={styles.permIconContainer}>
                             <View style={[styles.permIconCircle, permission?.granted && styles.permGranted]}>
-                                <Ionicons name="camera" size={40} color={permission?.granted ? '#16a34a' : '#2563eb'} />
+                                <Ionicons name="camera" size={40} color={permission?.granted ? '#16a34a' : '#0F766E'} />
                             </View>
                             <Text style={styles.permLabel}>Camera</Text>
                         </View>
@@ -271,7 +271,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                 <Ionicons
                                     name={formData.termsAccepted ? "checkbox" : "square-outline"}
                                     size={24}
-                                    color="#2563eb"
+                                    color="#0F766E"
                                 />
                                 <Text style={styles.checkboxText}>
                                     I agree to the <Text style={styles.link}>Terms of Service</Text> and <Text style={styles.link}>Privacy Policy</Text>.
@@ -285,7 +285,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                 <Ionicons
                                     name={formData.gdprAccepted ? "checkbox" : "square-outline"}
                                     size={24}
-                                    color="#2563eb"
+                                    color="#0F766E"
                                 />
                                 <Text style={styles.checkboxText}>
                                     I agree to the processing of audio and photos of my pet for analysis purposes.
@@ -321,7 +321,7 @@ export default function OnboardingScreen({ navigation }: any) {
                             </>
                         )}
 
-                        {loading ? <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 20 }} /> : (
+                        {loading ? <ActivityIndicator size="large" color="#0F766E" style={{ marginTop: 20 }} /> : (
                             <TouchableOpacity style={styles.createBtn} onPress={createProfile}>
                                 <Text style={styles.createBtnText}>{isProfileSetupMode ? 'Save Profile' : 'Create Account & Save'}</Text>
                             </TouchableOpacity>
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     },
     progressBar: {
         height: '100%',
-        backgroundColor: '#2563eb',
+        backgroundColor: '#0F766E',
     },
     content: {
         padding: 24,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     inputLarge: {
         fontSize: 24,
         borderBottomWidth: 2,
-        borderBottomColor: '#2563eb',
+        borderBottomColor: '#0F766E',
         paddingVertical: 8,
         marginTop: 16,
     },
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
     },
     choiceBtnActive: {
-        borderColor: '#2563eb',
+        borderColor: '#0F766E',
         backgroundColor: '#eff6ff',
     },
     choiceText: {
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     choiceTextActive: {
-        color: '#2563eb',
+        color: '#0F766E',
         fontWeight: 'bold',
     },
     problemBtn: {
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     problemBtnActive: {
-        borderColor: '#2563eb',
+        borderColor: '#0F766E',
         backgroundColor: '#eff6ff',
     },
     problemText: {
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     problemTextActive: {
-        color: '#2563eb',
+        color: '#0F766E',
         fontWeight: '600',
     },
     permIconContainer: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     grantBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: '#0F766E',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 8,
@@ -509,11 +509,11 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     link: {
-        color: '#2563eb',
+        color: '#0F766E',
         fontWeight: '600',
     },
     createBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: '#0F766E',
         padding: 16,
         borderRadius: 12,
         alignItems: 'center',
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     nextBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: '#0F766E',
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     loginLinkBold: {
-        color: '#2563eb',
+        color: '#0F766E',
         fontWeight: 'bold',
     },
 });
