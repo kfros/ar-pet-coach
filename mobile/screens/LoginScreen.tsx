@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,8 @@ import {
     Alert,
     ScrollView,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import AnimatedPawIcon from '../components/AnimatedPawIcon';
 import {
     GoogleSignin,
     statusCodes,
@@ -26,17 +28,17 @@ import {
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 
-import { Ionicons } from '@expo/vector-icons';
+import { auth } from '../services/firebaseConfig';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Purchases from 'react-native-purchases';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
-import AnimatedPawIcon from '../components/AnimatedPawIcon';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { auth } from '../services/firebaseConfig';
 
 // Configure Google Sign-In
 GoogleSignin.configure({
     webClientId: '293725153990-hm4jc29v4438lqq66b59gamqu6nmi1g3.apps.googleusercontent.com',
 });
+
+
 
 export default function LoginScreen({ navigation }: any) {
     const [isLogin, setIsLogin] = useState(true);
@@ -187,7 +189,7 @@ export default function LoginScreen({ navigation }: any) {
             >
                 <ScrollView contentContainerStyle={styles.scrollContainer} bounces={false}>
                     <View style={styles.formContainer}>
-                        <AnimatedPawIcon color={COLORS.primary} size={40} />
+                        <AnimatedPawIcon />
 
                         <View style={styles.header}>
                             <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
