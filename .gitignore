@@ -43,4 +43,29 @@ next-env.d.ts
 !/.env
 CV_Kyryl_Frosyniak_-Senior_Software_Engineer.docx
 functions/node_modules/.bin/
-public/ar-assets/
+public/ar-assets
+
+src/
+web-build/
+.next/
+dist/
+build/
+
+# Expo / React Native
+.expo/*
+.expo-shared/*
+.cache/*
+.metro-cache/*
+babel-cache/*
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# iOS
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/*.xcworkspace
+ios/*.xcodeproj/project.xcworkspace
+ios/*.xcodeproj/xcshareddata
