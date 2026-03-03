@@ -3,31 +3,12 @@
         "development": {
             "developmentClient": true,
             "distribution": "internal",
-            "env": {
-                "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCX37e9zlHcVsEsKqQr6R9TPiDiFqfsnDA",
-                "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "ar-pet-coach.firebaseapp.com",
-                "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "ar-pet-coach",
-                "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "ar-pet-coach.firebasestorage.app",
-                "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "293725153990",
-                "EXPO_PUBLIC_FIREBASE_APP_ID": "1:293725153990:web:079e5d7e64ef32170d05c7",
-                "EXPO_PUBLIC_RC_IOS_API_KEY": "test_xTRDLZbtVqTedcZLkIHaKpAjJDz",
-                "EXPO_PUBLIC_RC_ANDROID_API_KEY": "test_xTRDLZbtVqTedcZLkIHaKpAjJDz",
-                "EXPO_PUBLIC_RC_TEST_STORE_API_KEY": "test_xTRDLZbtVqTedcZLkIHaKpAjJDz"
+            "android": {
+                "buildType": "apk"
             }
         },
         "production": {
-            "distribution": "store",
-            "env": {
-                "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCX37e9zlHcVsEsKqQr6R9TPiDiFqfsnDA",
-                "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "ar-pet-coach.firebaseapp.com",
-                "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "ar-pet-coach",
-                "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "ar-pet-coach.firebasestorage.app",
-                "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "293725153990",
-                "EXPO_PUBLIC_FIREBASE_APP_ID": "1:293725153990:web:079e5d7e64ef32170d05c7",
-                "EXPO_PUBLIC_RC_IOS_API_KEY": "sk_XoHtSNwInbKxJjVBRRGLnGqBKcPKs",
-                "EXPO_PUBLIC_RC_ANDROID_API_KEY": "sk_ulJZaMtwxmtaWKAeuUDwPkSgDIbnh",
-                "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SmxXaQAiAmwpv89fBSQOu9gwnqYEbvcoTUFqS1qzJMxMe8PkbH3RAYskwkFW9gtfKDWuPaG7VjHpMiHj8lsWdBg00We0BNRsW"
-            }
+            "distribution": "store"
         }
     },
     "submit": {

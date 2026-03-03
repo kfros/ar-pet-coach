@@ -171,8 +171,10 @@ export default function DashboardScreen({ navigation }: any) {
                         <Text style={{ fontSize: 30 }}>🐶</Text>
                     </View>
                     <View>
-                        <Text style={styles.petName}>{profile.petName}</Text>
-                        <Text style={styles.petDetails}>{profile.breed} • {profile.age}y • {profile.weight}kg</Text>
+                        <Text style={styles.petName}>{petData?.petName || profile?.petName || 'Unknown Pet'}</Text>
+                        <Text style={styles.petDetails}>
+                            {petData?.breed || profile?.breed || 'Unknown'} • {petData?.age || profile?.age || '?'}y • {petData?.weight || profile?.weight || '?'}kg
+                        </Text>
                     </View>
                 </View>
             </View>
