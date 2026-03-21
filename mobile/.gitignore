@@ -39,3 +39,5 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+!mobile/node_modules/react-native/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterCpp.js
+!mobile/node_modules/react-native/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterH.js

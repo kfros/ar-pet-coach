@@ -16,6 +16,7 @@ import { useCameraPermissions } from 'expo-camera';
 import { auth, db } from '../services/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
+import { COLORS, SIZES, FONTS, SHADOWS } from '../constants/Theme';
 
 export default function OnboardingScreen({ navigation }: any) {
     const [step, setStep] = useState(1);
@@ -242,7 +243,7 @@ export default function OnboardingScreen({ navigation }: any) {
 
                         <View style={styles.permIconContainer}>
                             <View style={[styles.permIconCircle, permission?.granted && styles.permGranted]}>
-                                <Ionicons name="camera" size={40} color={permission?.granted ? '#16a34a' : '#0F766E'} />
+                                <Ionicons name="camera" size={40} color={permission?.granted ? COLORS.success : COLORS.primary} />
                             </View>
                             <Text style={styles.permLabel}>Camera</Text>
                         </View>
@@ -271,7 +272,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                 <Ionicons
                                     name={formData.termsAccepted ? "checkbox" : "square-outline"}
                                     size={24}
-                                    color="#0F766E"
+                                    color={COLORS.primary}
                                 />
                                 <Text style={styles.checkboxText}>
                                     I agree to the <Text style={styles.link}>Terms of Service</Text> and <Text style={styles.link}>Privacy Policy</Text>.
@@ -285,7 +286,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                 <Ionicons
                                     name={formData.gdprAccepted ? "checkbox" : "square-outline"}
                                     size={24}
-                                    color="#0F766E"
+                                    color={COLORS.primary}
                                 />
                                 <Text style={styles.checkboxText}>
                                     I agree to the processing of audio and photos of my pet for analysis purposes.
@@ -321,7 +322,7 @@ export default function OnboardingScreen({ navigation }: any) {
                             </>
                         )}
 
-                        {loading ? <ActivityIndicator size="large" color="#0F766E" style={{ marginTop: 20 }} /> : (
+                        {loading ? <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20 }} /> : (
                             <TouchableOpacity style={styles.createBtn} onPress={createProfile}>
                                 <Text style={styles.createBtnText}>{isProfileSetupMode ? 'Save Profile' : 'Create Account & Save'}</Text>
                             </TouchableOpacity>
@@ -364,54 +365,59 @@ export default function OnboardingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.mint,
     },
     header: {
-        height: 4,
+        height: 6,
         width: '100%',
-        backgroundColor: '#f3f4f6',
-        marginTop: 50, // Safe area
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        marginTop: Platform.OS === 'ios' ? 50 : 30,
     },
     progressBar: {
         height: '100%',
-        backgroundColor: '#0F766E',
+        backgroundColor: COLORS.primary,
     },
     content: {
-        padding: 24,
+        padding: SIZES.padding,
         paddingBottom: 100,
     },
     stepContainer: {
         gap: 16,
     },
     title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#111',
+        ...FONTS.h1,
+        color: COLORS.text,
+        marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
-        color: '#666',
+        ...FONTS.body,
+        color: COLORS.textSecondary,
         marginTop: -8,
+        lineHeight: 22,
     },
     label: {
-        fontSize: 14,
-        color: '#666',
+        ...FONTS.caption,
+        color: COLORS.textSecondary,
         marginBottom: 4,
+        fontWeight: '600',
     },
     inputLarge: {
-        fontSize: 24,
-        borderBottomWidth: 2,
-        borderBottomColor: '#0F766E',
+        ...FONTS.h1,
+        borderBottomWidth: 3,
+        borderBottomColor: COLORS.primary,
         paddingVertical: 8,
         marginTop: 16,
+        color: COLORS.primary,
     },
     input: {
+        backgroundColor: COLORS.background,
         borderWidth: 1,
-        borderColor: '#e5e5e5',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        backgroundColor: '#fff',
+        borderColor: COLORS.border,
+        borderRadius: SIZES.radius,
+        padding: 14,
+        ...FONTS.body,
+        color: COLORS.text,
+        ...SHADOWS.small,
     },
     row: {
         flexDirection: 'row',
@@ -419,41 +425,45 @@ const styles = StyleSheet.create({
     },
     choiceBtn: {
         flex: 1,
+        backgroundColor: COLORS.background,
         borderWidth: 1,
-        borderColor: '#e5e5e5',
-        padding: 12,
-        borderRadius: 8,
+        borderColor: COLORS.border,
+        padding: 14,
+        borderRadius: SIZES.radius,
         alignItems: 'center',
         marginHorizontal: 4,
+        ...SHADOWS.small,
     },
     choiceBtnActive: {
-        borderColor: '#0F766E',
-        backgroundColor: '#eff6ff',
+        borderColor: COLORS.primary,
+        backgroundColor: '#E0F2F1',
     },
     choiceText: {
-        fontSize: 16,
-        color: '#666',
+        ...FONTS.body,
+        color: COLORS.textSecondary,
     },
     choiceTextActive: {
-        color: '#0F766E',
+        color: COLORS.primary,
         fontWeight: 'bold',
     },
     problemBtn: {
+        backgroundColor: COLORS.background,
         borderWidth: 1,
-        borderColor: '#e5e5e5',
+        borderColor: COLORS.border,
         padding: 16,
-        borderRadius: 12,
+        borderRadius: SIZES.radius,
+        ...SHADOWS.small,
     },
     problemBtnActive: {
-        borderColor: '#0F766E',
-        backgroundColor: '#eff6ff',
+        borderColor: COLORS.primary,
+        backgroundColor: '#E0F2F1',
     },
     problemText: {
-        fontSize: 16,
-        color: '#333',
+        ...FONTS.body,
+        color: COLORS.text,
     },
     problemTextActive: {
-        color: '#0F766E',
+        color: COLORS.primary,
         fontWeight: '600',
     },
     permIconContainer: {
@@ -464,38 +474,41 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#dbeafe',
+        backgroundColor: '#E0F2F1',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
+        ...SHADOWS.small,
     },
     permGranted: {
-        backgroundColor: '#dcfce7',
+        backgroundColor: '#DCFCE7',
     },
     permLabel: {
-        fontSize: 14,
-        color: '#666',
+        ...FONTS.caption,
+        color: COLORS.textSecondary,
     },
     grantBtn: {
-        backgroundColor: '#0F766E',
+        backgroundColor: COLORS.primary,
         paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
+        paddingVertical: 14,
+        borderRadius: SIZES.radius,
+        ...SHADOWS.medium,
     },
     grantBtnText: {
+        ...FONTS.body,
         color: '#fff',
         fontWeight: 'bold',
     },
     successText: {
-        color: '#16a34a',
-        fontWeight: 'bold',
-        fontSize: 18,
+        ...FONTS.h3,
+        color: COLORS.success,
     },
     legalBox: {
-        backgroundColor: '#f9fafb',
-        padding: 16,
-        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+        padding: SIZES.padding,
+        borderRadius: SIZES.radius,
         gap: 16,
+        ...SHADOWS.small,
     },
     checkboxRow: {
         flexDirection: 'row',
@@ -504,56 +517,59 @@ const styles = StyleSheet.create({
     },
     checkboxText: {
         flex: 1,
-        fontSize: 14,
+        ...FONTS.caption,
         lineHeight: 20,
-        color: '#333',
+        color: COLORS.text,
     },
     link: {
-        color: '#0F766E',
+        color: COLORS.primary,
         fontWeight: '600',
     },
     createBtn: {
-        backgroundColor: '#0F766E',
+        backgroundColor: COLORS.primary,
         padding: 16,
-        borderRadius: 12,
+        borderRadius: SIZES.radius,
         alignItems: 'center',
         marginTop: 20,
+        ...SHADOWS.medium,
     },
     createBtnText: {
+        ...FONTS.h3,
         color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
     },
     errorBox: {
-        backgroundColor: '#fee2e2',
+        backgroundColor: '#FEE2E2',
         padding: 12,
-        borderRadius: 8,
+        borderRadius: SIZES.radius,
         marginTop: 16,
     },
     errorText: {
-        color: '#b91c1c',
+        color: COLORS.error,
         textAlign: 'center',
+        ...FONTS.small,
     },
     navBtnText: {
-        fontSize: 16,
-        color: '#666',
+        ...FONTS.body,
+        color: COLORS.textSecondary,
+        fontWeight: 'bold',
     },
     navBtn: {
         paddingVertical: 12,
         paddingHorizontal: 16,
-        borderRadius: 8,
+        borderRadius: SIZES.radius,
     },
     nextBtn: {
-        backgroundColor: '#0F766E',
+        backgroundColor: COLORS.primary,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+        ...SHADOWS.small,
     },
     footerContainer: {
         borderTopWidth: 1,
-        borderTopColor: '#f3f4f6',
+        borderTopColor: 'rgba(0, 0, 0, 0.05)',
         paddingVertical: 20,
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.mint,
     },
     footer: {
         flexDirection: 'row',
@@ -566,11 +582,12 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     loginLinkText: {
-        color: '#666',
-        fontSize: 14,
+        ...FONTS.caption,
+        color: COLORS.textSecondary,
     },
     loginLinkBold: {
-        color: '#0F766E',
+        ...FONTS.caption,
+        color: COLORS.primary,
         fontWeight: 'bold',
     },
 });

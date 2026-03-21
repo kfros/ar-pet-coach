@@ -58,9 +58,6 @@ build/
 .metro-cache/*
 babel-cache/*
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # iOS
 ios/build/
@@ -70,3 +67,5 @@ ios/*.xcworkspace
 ios/*.xcodeproj/project.xcworkspace
 ios/*.xcodeproj/xcshareddata
 mobile/eas — копия.json
+mobile/clear.ps1
+mobile/rm.ps1
