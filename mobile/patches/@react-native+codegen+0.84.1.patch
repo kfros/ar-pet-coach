@@ -1,0 +1,50 @@
+diff --git a/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterH.js b/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterH.js
+index 7fbda20..cd072cd 100644
+--- a/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterH.js
++++ b/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterH.js
+@@ -97,6 +97,9 @@ function getNativeTypeFromAnnotation(componentName, eventProperty, nameParts) {
+         eventProperty.name,
+       ]);
+     default:
++      if (typeAnnotation.type === 'UnionTypeAnnotation') {
++         return 'folly::dynamic';
++      }
+       typeAnnotation.type;
+       throw new Error(
+         `Received invalid event property type ${typeAnnotation.type}`,
+diff --git a/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJavaSpec.js b/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJavaSpec.js
+index fc6d2b3..474c67a 100644
+--- a/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJavaSpec.js
++++ b/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJavaSpec.js
+@@ -194,6 +194,7 @@ function translateFunctionParamToJavaType(
+         case 'string':
+           return wrapOptional('String', isRequired);
+         default:
++          return 'ObjectKind';
+           validUnionType;
+           throw new Error(`Unsupported union member type`);
+       }
+@@ -365,6 +366,7 @@ function getFalsyReturnStatementFromReturnType(
+           return nullable ? 'return null;' : 'return "";';
+         default:
+           validUnionType;
++          return 'WritableMap';
+           throw new Error(`Unsupported union member type`);
+       }
+     case 'StringTypeAnnotation':
+diff --git a/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJniCpp.js b/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJniCpp.js
+index 1301bb9..44d03fe 100644
+--- a/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJniCpp.js
++++ b/node_modules/@react-native/codegen/lib/generators/modules/GenerateModuleJniCpp.js
+@@ -289,8 +289,9 @@ function translateReturnTypeToJniType(nullableTypeAnnotation, resolveAlias) {
+         case 'string':
+           return 'Ljava/lang/String;';
+         default:
+-          validUnionType;
+-          throw new Error(`Unsupported union member type`);
++          default:
++          // ХАК ДЛЯ STRIPE И WEBVIEW: Возвращаем универсальный WritableMap для неизвестных Union
++          return 'Lcom/facebook/react/bridge/WritableMap;';
+       }
+     case 'NumberTypeAnnotation':
+       return nullable ? 'Ljava/lang/Double;' : 'D';
