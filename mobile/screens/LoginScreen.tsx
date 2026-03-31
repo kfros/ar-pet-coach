@@ -18,17 +18,9 @@ import {
     GoogleSignin,
     statusCodes,
 } from '@react-native-google-signin/google-signin';
-import {
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    GoogleAuthProvider,
-    OAuthProvider,
-    signInWithCredential
-} from 'firebase/auth';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
-
-import { auth } from '../services/firebaseConfig';
+import { auth, db } from '../services/firebaseConfig';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Purchases from 'react-native-purchases';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
@@ -68,13 +60,19 @@ export default function LoginScreen({ navigation }: any) {
             const idToken = userInfo.data?.idToken;
             if (!idToken) throw new Error('No ID token received from Google');
 
-            const credential = GoogleAuthProvider.credential(idToken);
-            const userCredential = await signInWithCredential(auth, credential);
+            const credential = auth.GoogleAuthProvider.credential(idToken);
+            const userCredential = await auth().signInWithCredential(credential);
 
             if (userCredential.user) {
                 console.log('RevenueCat: Logging in with Firebase UID:', userCredential.user.uid);
-                const loginResult = await Purchases.logIn(userCredential.user.uid);
-                console.log('RevenueCat: Login result - new user created?', loginResult.created, 'originalAppUserId:', loginResult.customerInfo.originalAppUserId);
+                try {
+                    const loginResult = await Purchases.logIn(userCredential.user.uid);
+                    console.log('RevenueCat: Login result - new user created?', loginResult.created, 'originalAppUserId:', loginResult.customerInfo.originalAppUserId);
+                } catch (purchaseErr: any) {
+                    console.error('RevenueCat Login Error:', purchaseErr);
+                    // Don't block sign-in, but inform user if needed or just log
+                    // Alert.alert('Subscription Sync', 'We couldn\'t sync your subscription status, but you are signed in.');
+                }
             }
         } catch (err: any) {
             console.error('Google Sign-In Error:', err);
@@ -115,18 +113,18 @@ export default function LoginScreen({ navigation }: any) {
                 throw new Error('Apple Sign-In failed - no identity token returned');
             }
 
-            const provider = new OAuthProvider('apple.com');
-            const oauthCredential = provider.credential({
-                idToken: identityToken,
-                rawNonce: nonce,
-            });
+            const oauthCredential = auth.AppleAuthProvider.credential(identityToken, nonce);
 
-            const userCredential = await signInWithCredential(auth, oauthCredential);
+            const userCredential = await auth().signInWithCredential(oauthCredential);
 
             if (userCredential.user) {
                 console.log('RevenueCat: Logging in with Firebase UID:', userCredential.user.uid);
-                const loginResult = await Purchases.logIn(userCredential.user.uid);
-                console.log('RevenueCat: Login result - new user created?', loginResult.created, 'originalAppUserId:', loginResult.customerInfo.originalAppUserId);
+                try {
+                    const loginResult = await Purchases.logIn(userCredential.user.uid);
+                    console.log('RevenueCat: Login result - new user created?', loginResult.created, 'originalAppUserId:', loginResult.customerInfo.originalAppUserId);
+                } catch (purchaseErr: any) {
+                    console.error('RevenueCat Login Error:', purchaseErr);
+                }
             }
 
         } catch (e: any) {
@@ -157,15 +155,19 @@ export default function LoginScreen({ navigation }: any) {
         try {
             let userCredential;
             if (isLogin) {
-                userCredential = await signInWithEmailAndPassword(auth, email, password);
+                userCredential = await auth().signInWithEmailAndPassword(email, password);
             } else {
-                userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                userCredential = await auth().createUserWithEmailAndPassword(email, password);
             }
 
             if (userCredential.user) {
                 console.log('RevenueCat: Logging in with Firebase UID:', userCredential.user.uid);
-                const loginResult = await Purchases.logIn(userCredential.user.uid);
-                console.log('RevenueCat: Login result - new user created?', loginResult.created, 'originalAppUserId:', loginResult.customerInfo.originalAppUserId);
+                try {
+                    const loginResult = await Purchases.logIn(userCredential.user.uid);
+                    console.log('RevenueCat: Login result - new user created?', loginResult.created, 'originalAppUserId:', loginResult.customerInfo.originalAppUserId);
+                } catch (purchaseErr: any) {
+                    console.error('RevenueCat Login Error:', purchaseErr);
+                }
             }
         } catch (err: any) {
             console.error(err);

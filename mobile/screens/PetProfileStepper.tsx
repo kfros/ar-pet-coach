@@ -13,8 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
-import { auth, db } from '../services/firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
+import { auth, db, firestore } from '../services/firebaseConfig';
 
 const TOTAL_STEPS = 7;
 const MANDATORY_STEPS = 4;
@@ -72,11 +71,11 @@ export default function PetProfileStepper({ navigation }: any) {
     const handleComplete = async () => {
         setLoading(true);
         try {
-            const uid = auth.currentUser?.uid;
-            if (!uid) throw new Error("Not logged in");
+            const user = auth().currentUser;
+            if (!user) throw new Error("Not logged in");
+            const uid = user.uid;
 
-            const petsRef = collection(db, 'users', uid, 'pets');
-            await addDoc(petsRef, {
+            await db.collection('users').doc(uid).collection('pets').add({
                 petName,
                 hasPhoto,
                 breed,
@@ -84,7 +83,7 @@ export default function PetProfileStepper({ navigation }: any) {
                 weight,
                 birthDate,
                 notes,
-                createdAt: new Date(),
+                createdAt: firestore.FieldValue.serverTimestamp(),
                 anxietyScore: 5
             });
             navigation.replace('Dashboard');
