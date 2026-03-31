@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
+import { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -21,9 +22,9 @@ const AuthStack = createNativeStackNavigator();
 const AppStack = createNativeStackNavigator();
 
 // Auth Stack - shown when user is NOT logged in
-function AuthNavigator() {
+function AuthNavigator({ isFirstLaunch }: { isFirstLaunch: boolean }) {
     return (
-        <AuthStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Onboarding">
+        <AuthStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={isFirstLaunch ? "Onboarding" : "Login"}>
             <AuthStack.Screen name="Onboarding" component={OnboardingCarousel} />
             <AuthStack.Screen name="Login" component={LoginScreen} />
         </AuthStack.Navigator>
@@ -48,14 +49,31 @@ function AppNavigatorStack() {
 }
 
 export default function AppNavigator() {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
     const [initializing, setInitializing] = useState(true);
     const [showSplash, setShowSplash] = useState(true);
+    const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const checkFirstLaunch = async () => {
+            try {
+                const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+                if (hasLaunched === null) {
+                    await AsyncStorage.setItem('hasLaunched', 'true');
+                    setIsFirstLaunch(true);
+                } else {
+                    setIsFirstLaunch(false);
+                }
+            } catch (error) {
+                console.error('Error checking first launch:', error);
+                setIsFirstLaunch(false);
+            }
+        };
+        checkFirstLaunch();
+
+        const unsubscribe = auth().onAuthStateChanged((currentUser: FirebaseAuthTypes.User | null) => {
             console.log('Auth state changed:', currentUser?.uid || 'null');
-            setUser(currentUser);
+            setUser(currentUser as any);
             if (initializing) setInitializing(false);
         });
 
@@ -66,7 +84,7 @@ export default function AppNavigator() {
         return <SplashAnimation onComplete={() => setShowSplash(false)} />;
     }
 
-    if (initializing) {
+    if (initializing || isFirstLaunch === null) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#2563eb" />
@@ -78,7 +96,7 @@ export default function AppNavigator() {
     // This forces a complete remount when auth state changes, ensuring proper navigation
     return (
         <NavigationContainer>
-            {user ? <AppNavigatorStack /> : <AuthNavigator />}
+            {user ? <AppNavigatorStack /> : <AuthNavigator isFirstLaunch={isFirstLaunch} />}
         </NavigationContainer>
     );
 }

@@ -4,7 +4,7 @@ export const COLORS = {
     primaryLight: 'rgba(45, 212, 191, 0.6)', // Focus ring / light tint
     accent: '#007ACC', // Dark Accent (keep if used elsewhere, else replace later)
     backgroundLight: '#F9FAFB', // Light Gray-White BG
-    mint: '#0F766E', // Mint for calm elements
+    mint: '#F0FDF4', // Light Mint for calming backgrounds
     lavender: '#E9D5FF', // Lavender for onboarding
     background: '#FFFFFF',
     text: '#1F2937', // Dark Gray

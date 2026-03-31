@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert, Linking, Platform, ScrollView } from 'react-native';
 import { auth, db } from '../services/firebaseConfig';
+import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Purchases from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../components/SubscriptionManager';
-import { collection, getDocs } from 'firebase/firestore';
-import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 
 export default function SettingsScreen({ navigation }: any) {
-    const user = auth.currentUser;
+    const user = auth().currentUser;
     const { isPremium, customerInfo } = useSubscription();
     const [pets, setPets] = useState<any[]>([]);
 
@@ -17,16 +16,15 @@ export default function SettingsScreen({ navigation }: any) {
         const fetchPets = async () => {
             if (!user) return;
             try {
-                const petsRef = collection(db, 'users', user.uid, 'pets');
-                const snap = await getDocs(petsRef);
-                const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const snap = await db.collection('users').doc(user.uid).collection('pets').get();
+                const fetched = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
                 setPets(fetched);
             } catch (err) {
                 console.error(err);
             }
         };
         fetchPets();
-    }, []);
+    }, [user]);
 
     const handleManageSubscription = async () => {
         try {
@@ -50,7 +48,7 @@ export default function SettingsScreen({ navigation }: any) {
             const isAnonymous = await Purchases.isAnonymous();
             if (!isAnonymous) await Purchases.logOut();
             try { await GoogleSignin.signOut(); } catch (e) { }
-            await auth.signOut();
+            await auth().signOut();
         } catch (error: any) {
             console.error("Sign out error:", error);
             Alert.alert("Error", "Failed to sign out. Please try again.");

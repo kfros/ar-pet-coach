@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, Modal, TouchableOpacity, StyleSheet, FlatList, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { deleteDoc, doc, writeBatch, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../services/firebaseConfig';
 
 interface RoomSelectorModalProps {
@@ -14,7 +13,7 @@ interface RoomSelectorModalProps {
 }
 
 export default function RoomSelectorModal({ visible, onClose, safeZones, onSelectZone, petId, onZoneDeleted }: RoomSelectorModalProps) {
-    const user = auth.currentUser;
+    const user = auth().currentUser;
 
     const handleDelete = async (zoneId: string) => {
         if (!user) return;
@@ -29,19 +28,27 @@ export default function RoomSelectorModal({ visible, onClose, safeZones, onSelec
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            const batch = writeBatch(db);
+                            const batch = db.batch();
 
                             // 1. Delete Associated Activity Points
-                            const pointsRef = collection(db, 'users', user.uid, 'pets', petId, 'activityPoints');
-                            const pointsQuery = query(pointsRef, where('zoneId', '==', zoneId));
-                            const pointsSnap = await getDocs(pointsQuery);
+                            const pointsSnap = await db.collection('users')
+                                .doc(user.uid)
+                                .collection('pets')
+                                .doc(petId)
+                                .collection('activityPoints')
+                                .where('zoneId', '==', zoneId).get();
 
-                            pointsSnap.docs.forEach((doc) => {
+                            pointsSnap.docs.forEach((doc: any) => {
                                 batch.delete(doc.ref);
                             });
 
                             // 2. Delete the Zone itself
-                            const zoneRef = doc(db, 'users', user.uid, 'pets', petId, 'safeZones', zoneId);
+                            const zoneRef = db.collection('users')
+                                .doc(user.uid)
+                                .collection('pets')
+                                .doc(petId)
+                                .collection('safeZones')
+                                .doc(zoneId);
                             batch.delete(zoneRef);
 
                             await batch.commit();

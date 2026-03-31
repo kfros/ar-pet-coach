@@ -13,9 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCameraPermissions } from 'expo-camera';
-import { auth, db } from '../services/firebaseConfig';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
+import { auth, db, firestore } from '../services/firebaseConfig';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../constants/Theme';
 
 export default function OnboardingScreen({ navigation }: any) {
@@ -25,7 +23,7 @@ export default function OnboardingScreen({ navigation }: any) {
     const [permission, requestPermission] = useCameraPermissions();
 
     // Check if user is already logged in (Profile Setup Mode)
-    const currentUser = auth.currentUser;
+    const currentUser = auth().currentUser;
     const isProfileSetupMode = !!currentUser;
 
     const [formData, setFormData] = useState({
@@ -115,22 +113,21 @@ export default function OnboardingScreen({ navigation }: any) {
                 uid = currentUser.uid;
             } else {
                 // New user - create account
-                const result = await createUserWithEmailAndPassword(auth, email, password);
+                const result = await auth().createUserWithEmailAndPassword(email, password);
                 uid = result.user.uid;
             }
 
             // 1. User Doc
-            await setDoc(doc(db, 'users', uid), {
+            await db.collection('users').doc(uid).set({
                 email: isProfileSetupMode ? currentUser?.email : email,
-                createdAt: new Date(),
+                createdAt: firestore.FieldValue.serverTimestamp(),
                 onboardingCompleted: true
             }, { merge: true });
 
             // 2. Pet Doc (Subcollection)
-            const petsRef = collection(db, 'users', uid, 'pets');
-            await addDoc(petsRef, {
+            await db.collection('users').doc(uid).collection('pets').add({
                 ...formData,
-                createdAt: new Date(),
+                createdAt: firestore.FieldValue.serverTimestamp(),
                 anxietyScore: 5 // Default
             });
 

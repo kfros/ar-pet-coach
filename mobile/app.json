@@ -16,7 +16,9 @@
     "plugins": [
       "expo-web-browser",
       "@react-native-google-signin/google-signin",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "@react-native-firebase/app",
+      "@viro-community/react-viro"
     ],
     "ios": {
       "buildNumber": "3",

@@ -32,7 +32,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     useEffect(() => {
         const init = async () => {
-            await RevenueCatService.configure();
+            // NOTE: configure() is now handled globally in index.ts
             // NOTE: syncPurchases() removed from startup — it triggers
             // the native iOS Apple ID login prompt via StoreKit.
             // It's called automatically by RevenueCat when needed, and

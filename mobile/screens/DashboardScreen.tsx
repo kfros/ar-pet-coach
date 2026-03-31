@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../services/firebaseConfig';
-import { doc, getDoc, collection, query, limit, getDocs } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
@@ -40,22 +39,19 @@ export default function DashboardScreen({ navigation }: any) {
     const { isPremium, checkPaywallTrigger, trackARSession } = useSubscription();
 
     const fetchData = async () => {
-        const user = auth.currentUser;
+        const user = auth().currentUser;
         if (!user) { navigation.replace('Login'); return; }
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            const userDoc = await db.collection('users').doc(user.uid).get();
             if (userDoc.exists()) {
                 setProfile(userDoc.data());
-                const petsRef = collection(db, 'users', user.uid, 'pets');
-                const q = query(petsRef, limit(1));
-                const querySnapshot = await getDocs(q);
+                const querySnapshot = await db.collection('users').doc(user.uid).collection('pets').limit(1).get();
                 if (!querySnapshot.empty) {
                     const petDoc = querySnapshot.docs[0];
                     setPetId(petDoc.id);
                     setPetData(petDoc.data());
-                    const zonesRef = collection(db, 'users', user.uid, 'pets', petDoc.id, 'safeZones');
-                    const zSnap = await getDocs(zonesRef);
-                    const zones = zSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    const zSnap = await db.collection('users').doc(user.uid).collection('pets').doc(petDoc.id).collection('safeZones').get();
+                    const zones = zSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
                     zones.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                     setSafeZones(zones);
                 }
@@ -81,9 +77,9 @@ export default function DashboardScreen({ navigation }: any) {
         const shouldTrigger = await checkPaywallTrigger();
         if (shouldTrigger) { navigation.navigate('Paywall'); return; }
         if (safeZones.length === 0) {
-            navigation.navigate('ARSafeZones', { mode: 'scan', userId: auth.currentUser?.uid, petId });
+            navigation.navigate('ARSafeZones', { mode: 'scan', userId: auth().currentUser?.uid, petId });
         } else if (safeZones.length === 1) {
-            navigation.navigate('ARSafeZones', { mode: 'view', userId: auth.currentUser?.uid, petId, zoneId: safeZones[0].id });
+            navigation.navigate('ARSafeZones', { mode: 'view', userId: auth().currentUser?.uid, petId, zoneId: safeZones[0].id });
         } else {
             setRoomSelectorVisible(true);
         }
@@ -125,7 +121,7 @@ export default function DashboardScreen({ navigation }: any) {
             <Pressable
                 style={({ pressed }) => [styles.zoneCard, pressed && { transform: [{ scale: 0.97 }] }]}
                 onPress={() => navigation.navigate('ARSafeZones', {
-                    mode: 'view', userId: auth.currentUser?.uid, petId, zoneId: item.id,
+                    mode: 'view', userId: auth().currentUser?.uid, petId, zoneId: item.id,
                 })}
             >
                 <View style={styles.zonePreview}>
@@ -246,7 +242,7 @@ export default function DashboardScreen({ navigation }: any) {
             <View style={styles.quickActionsRow}>
                 <Pressable
                     style={({ pressed }) => [styles.quickAction, pressed && { transform: [{ scale: 0.96 }], backgroundColor: COLORS.backgroundLight }]}
-                    onPress={() => navigation.navigate('ARSafeZones', { mode: 'scan', userId: auth.currentUser?.uid, petId })}
+                    onPress={() => navigation.navigate('ARSafeZones', { mode: 'scan', userId: auth().currentUser?.uid, petId })}
                 >
                     <View style={[styles.quickIconCircle, { backgroundColor: '#E0F2FE' }]}>
                         <Ionicons name="camera-outline" size={24} color={COLORS.primary} />
@@ -281,7 +277,7 @@ export default function DashboardScreen({ navigation }: any) {
                 petId={petId || ''}
                 onSelectZone={(zoneId) => {
                     setRoomSelectorVisible(false);
-                    navigation.navigate('ARSafeZones', { mode: 'view', userId: auth.currentUser?.uid, petId, zoneId });
+                    navigation.navigate('ARSafeZones', { mode: 'view', userId: auth().currentUser?.uid, petId, zoneId });
                 }}
                 onZoneDeleted={(zoneId) => {
                     setSafeZones(prev => prev.filter(z => z.id !== zoneId));

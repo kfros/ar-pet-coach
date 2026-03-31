@@ -14,9 +14,7 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Ionicons } from '@expo/vector-icons';
-import { auth, storage, db } from '../services/firebaseConfig';
-import { ref, uploadBytes } from 'firebase/storage';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, limit, getDocs } from 'firebase/firestore';
+import { auth, db, storage, firestore } from '../services/firebaseConfig';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { getAnxietyColor, getAnxietyBgColor, getAnxietyLabel } from '../helpers/anxietyGradient';
 
@@ -141,18 +139,20 @@ export default function AnalysisScreen({ navigation, route }: any) {
     }, []);
 
     const fetchPetProfile = async () => {
-        const user = auth.currentUser;
+        const user = auth().currentUser;
         if (!user) return;
         try {
             let id = route.params?.petId;
             let data = null;
             if (id) {
-                const docSnap = await getDoc(doc(db, 'users', user.uid, 'pets', id));
+                const docSnap = await db.collection('users').doc(user.uid).collection('pets').doc(id).get();
                 if (docSnap.exists()) data = docSnap.data();
             } else {
-                const q = query(collection(db, 'users', user.uid, 'pets'), limit(1));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) { id = querySnapshot.docs[0].id; data = querySnapshot.docs[0].data(); }
+                const querySnapshot = await db.collection('users').doc(user.uid).collection('pets').limit(1).get();
+                if (!querySnapshot.empty) { 
+                    id = querySnapshot.docs[0].id; 
+                    data = querySnapshot.docs[0].data(); 
+                }
             }
             if (id && data) { setCurrentPetId(id); setPetData(data); }
         } catch (e) { console.error("Error fetching pet profile:", e); }
@@ -227,27 +227,23 @@ Return ONLY valid JSON: {"score": number, "tip": "string (max 15 words)", "detai
     };
 
     const uploadToFirebase = async (uri: string) => {
-        const user = auth.currentUser;
+        const user = auth().currentUser;
         if (!user) return;
         try {
-            const blob = await new Promise<Blob>((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.onload = () => resolve(xhr.response);
-                xhr.onerror = () => reject(new TypeError('Network request failed'));
-                xhr.responseType = 'blob'; xhr.open('GET', uri, true); xhr.send(null);
-            });
-            const audioRef = ref(storage, `analysis/${user.uid}/${Date.now()}.m4a`);
-            await uploadBytes(audioRef, blob);
+            const path = `analysis/${user.uid}/${Date.now()}.m4a`;
+            await storage.ref(path).putFile(uri);
         } catch (e) { console.error("Upload failed", e); }
     };
 
     const handleSaveAndExit = async () => {
-        if (!result || !auth.currentUser) { navigation.goBack(); return; }
+        if (!result || !auth().currentUser) { navigation.goBack(); return; }
         try {
-            const user = auth.currentUser;
-            if (currentPetId) {
-                await setDoc(doc(db, 'users', user.uid, 'pets', currentPetId), {
-                    anxietyScore: result.score, lastAnalysis: serverTimestamp(), lastAnalysisResult: result,
+            const user = auth().currentUser;
+            if (currentPetId && user) {
+                await db.collection('users').doc(user.uid).collection('pets').doc(currentPetId).set({
+                    anxietyScore: result.score, 
+                    lastAnalysis: firestore.FieldValue.serverTimestamp(), 
+                    lastAnalysisResult: result,
                 }, { merge: true });
             }
         } catch (e) { console.error("Save failed", e); }

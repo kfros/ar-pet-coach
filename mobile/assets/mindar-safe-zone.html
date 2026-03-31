@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 
     <style>
         html,
@@ -22,14 +16,12 @@
             overflow: hidden;
         }
 
-        /* Fullscreen A-Frame */
         a-scene {
             position: fixed !important;
             top: 0;
             left: 0;
             width: 100vw !important;
             height: 100vh !important;
-            height: 100dvh !important;
         }
 
         #overlay {
@@ -56,20 +48,23 @@
         }
 
         .status {
-            background: rgba(0, 0, 0, 0.6);
-            color: white;
+            background: rgba(15, 23, 42, 0.8);
+            color: #f1f5f9;
             padding: 10px 20px;
             border-radius: 20px;
             font-family: sans-serif;
             text-align: center;
             backdrop-filter: blur(5px);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            font-size: 14px;
+            font-weight: 600;
         }
 
         .exit-btn {
             pointer-events: auto;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.1);
             color: white;
-            border: none;
+            border: 1px solid rgba(255,255,255,0.2);
             padding: 10px 16px;
             border-radius: 20px;
             font-family: sans-serif;
@@ -78,17 +73,13 @@
             cursor: pointer;
         }
 
-        .exit-btn:active {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
         .loading-screen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: #0f172a;
             z-index: 999;
             display: flex;
             flex-direction: column;
@@ -98,8 +89,19 @@
             font-family: sans-serif;
         }
 
-        .loading-screen h2 {
-            margin-bottom: 10px;
+        /* Reticle for center-screen interaction */
+        #reticle {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            border: 2px solid #38bdf8;
+            border-radius: 50%;
+            z-index: 200;
+            pointer-events: none;
+            background: rgba(56, 189, 248, 0.1);
         }
 
         .hidden {
@@ -110,1130 +112,164 @@
 
 <body>
     <div id="loading-screen" class="loading-screen">
-        <h2>Initializing Safe Zone...</h2>
+        <h2 id="loading-header">Initializing Calm Space...</h2>
         <p id="loading-text">Authenticating...</p>
     </div>
 
+    <div id="reticle"></div>
+
     <div id="overlay">
         <div class="top-bar">
-            <div id="status-chip" class="status">Scanning Room...</div>
-            <button id="rescan-btn" class="exit-btn hidden"
-                style="background: rgba(255, 87, 34, 0.9); margin-left: 10px;">↻ Rescan Room</button>
-            <button id="toggle-heatmap-btn" class="exit-btn"
-                style="background: rgba(0,100,255,0.7); margin-right: 10px;">Hide Heatmap</button>
+            <div id="status-chip" class="status">Loading...</div>
             <button class="exit-btn" onclick="exitAR()">✕ Exit</button>
         </div>
-        <div></div> <!-- Spacer for flex layout -->
+        <div></div>
     </div>
 
-    <!-- Debug Overlay (Hidden in production) -->
-    <div id="debug-overlay"
-        style="display:block; position: fixed; bottom: 10px; left: 10px; right: 10px; color: yellow; font-family: monospace; font-size: 11px; pointer-events: auto; z-index: 9999; text-shadow: 1px 1px 0 #000; max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px;">
-        Debug Log...
-    </div>
-
-    <!-- Heatmap Canvas Overlay -->
     <canvas id="heatmap-canvas"
         style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50;"></canvas>
 
-    <!-- Global Error Handler (Before Module Load) -->
     <script>
-        window.debugLog = function (msg) {
-            const el = document.getElementById('debug-overlay');
-            if (el) {
-                const div = document.createElement('div');
-                div.textContent = msg;
-                div.style.color = '#ff5555'; // Red for visibility
-                el.appendChild(div);
-                // keep last 30 lines
-                if (el.children.length > 30) el.removeChild(el.children[0]);
-                // Auto-scroll to bottom to see newest messages
-                el.scrollTop = el.scrollHeight;
-            }
-            console.log("[GlobalLog]", msg);
-        };
-
-        window.onerror = function (message, source, lineno, colno, error) {
-            window.debugLog(`Global Error: ${message} at ${lineno}:${colno}`);
-            document.getElementById('loading-text').innerText = 'App Error - See Log';
-            return false;
-        };
-
-        window.addEventListener('unhandledrejection', function (event) {
-            window.debugLog(`Unhandled Promise: ${event.reason}`);
-        });
-    </script>
-
-    <script type="module">
-        import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
-
-        // Use Global Logger if available
+        // Use Global Logger
         function log(msg) {
-            if (window.debugLog) window.debugLog(msg);
-            else console.log(msg);
-        }
-
-        log("Module Script Initialized");
-
-        // Initialize MediaPipe Pose
-        let poseLandmarker = null;
-        async function initMediaPipe() {
-            log("Loading MediaPipe (Module)...");
-            try {
-                const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-                );
-                poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-                        delegate: "GPU"
-                    },
-                    runningMode: "VIDEO",
-                    numPoses: 1
-                });
-                log("MediaPipe Loaded!");
-            } catch (e) {
-                log("MediaPipe Error: " + e.message);
-                console.error(e);
+            console.log("[AR Engine]", msg);
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'log', message: msg }));
             }
         }
 
-        // Start MediaPipe ASAP
-        initMediaPipe();
-
-        // Firebase Config (Sync with your project)
-        const firebaseConfig = {
-            apiKey: "AIzaSyCX37e9zlHcVsEsKqQr6R9TPiDiFqfsnDA",
-            authDomain: "ar-pet-coach.firebaseapp.com",
-            projectId: "ar-pet-coach",
-            storageBucket: "ar-pet-coach.firebasestorage.app",
-            messagingSenderId: "293725153990",
-            appId: "1:293725153990:web:079e5d7e64ef32170d05c7"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
-        // Enable offline persistence (suppresses "backend unreachable" warning)
-        db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-            if (err.code === 'failed-precondition') {
-                console.warn('Firestore persistence: Multiple tabs open');
-            } else if (err.code === 'unimplemented') {
-                console.warn('Firestore persistence: Browser does not support it');
-            }
-        });
-
-        const auth = firebase.auth();
-        const storage = firebase.storage();
-
-        // App State
-        let mindARScene = null;
-        let activeTargetEl = null; // Track which target is currently active
-        let roomRecognized = false; // Track if room has been scanned
-        let targetLostHistory = []; // Track lost events for frequency analysis
-
-        // Exit AR and return to dashboard
         function exitAR() {
-            // Stop MindAR if running
-            const scene = document.querySelector('a-scene');
-            if (scene && scene.systems && scene.systems['mindar-image']) {
-                scene.systems['mindar-image'].stop();
-            }
-            // Send message to React Native to navigate back
             if (window.ReactNativeWebView) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'exit' }));
-            } else {
-                // Fallback for web
-                window.location.href = '/dashboard';
             }
         }
-        window.exitAR = exitAR; // Expose to global scope for onclick
+
+        // --- Core AR Logic ---
+        let roomRecognized = false;
+        let activeTargetEl = null;
+        let lastTimestamp = 0;
+        const pointBuffer = [];
+
+        window.receiveNativeAuth = function (userId, petId, idToken) {
+            log("Auth received: " + userId);
+            window.AR_USER_ID = userId;
+            window.AR_PET_ID = petId;
+            
+            document.getElementById('loading-text').innerText = 'Loading AR Assets...';
+            document.getElementById('status-chip').innerText = window.STATUS_MESSAGE || 'Ready';
+            
+            initAR(userId, petId);
+        };
 
         async function initAR(userId, petId) {
             const loadingText = document.getElementById('loading-text');
+            const zoneId = window.AR_ZONE_ID || '';
+            const mode = window.AR_MODE || 'view';
 
-            // Use injected globals from React Native, fallback to URL params for web
-            const urlParams = new URLSearchParams(window.location.search);
-            const zoneId = window.AR_ZONE_ID || urlParams.get('zoneId') || null;
-            const mode = window.AR_MODE || urlParams.get('mode') || 'view';
-
-            log('AR Mode: ' + mode + ', Zone ID: ' + (zoneId || 'none'));
-
-            // Set global pet ID for scanner uploader
-            window.AR_PET_ID = petId;
-
-            // Handle scan mode - show room scanner interface
-            if (mode === 'scan') {
-                log('Starting Room Scanner...');
-                loadingText.innerText = 'Initializing Room Scanner...';
-                startScanner();
-                return;
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                    action: 'getZoneData', userId, petId, zoneId 
+                }));
             }
 
-            // View mode - Start data subscription (now filtered by zone)
-            subscribeToHeatmap(userId, petId, zoneId);
-            loadingText.innerText = 'Loading Safe Zones...';
-
-            try {
-                // Get Safe Zone Data
-                let snapshot;
-
-                if (zoneId) {
-                    // console.log('Loading specific zone:', zoneId);
-                    const docRef = db.collection('users').doc(userId)
-                        .collection('pets').doc(petId)
-                        .collection('safeZones').doc(zoneId);
-                    const docSnap = await docRef.get();
-                    if (!docSnap.exists) {
-                        loadingText.innerText = 'Safe Zone not found.';
-                        return;
-                    }
-                    snapshot = { empty: false, docs: [docSnap] };
-                } else {
-                    // console.log('Loading latest safe zone...');
-                    snapshot = await db.collection('users').doc(userId)
-                        .collection('pets').doc(petId)
-                        .collection('safeZones')
-                        .where('type', '==', 'mindar')
-                        .orderBy('createdAt', 'desc')
-                        .limit(1)
-                        .get();
-                }
-
-                if (snapshot.empty) {
-                    loadingText.innerText = 'No Safe Zones found. Please scan your room first.';
+            window.loadZoneData = function(zoneData) {
+                if (!zoneData || !zoneData.fileUrl) {
+                    loadingText.innerText = 'Safe Zone data issue.';
                     return;
                 }
+                startARScene(zoneData);
+            };
+        }
 
-                const zoneData = snapshot.docs[0].data();
-                if (!zoneData.fileUrl) {
-                    throw new Error('Missing .mind file URL in Safe Zone record');
-                }
+        function startARScene(zoneData) {
+            const sceneHTML = `
+                <a-scene mindar-image="imageTargetSrc: ${zoneData.fileUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;" 
+                         embedded vr-mode-ui="enabled: false"
+                         device-orientation-permission-ui="enabled: false">
+                    
+                    <a-camera position="0 0 0" look-controls="enabled: false">
+                         <a-entity raycaster="objects: .hit-plane; showLine: false; far: 10" position="0 0 0"></a-entity>
+                    </a-camera>
 
-                loadingText.innerText = 'Downloading Target Data...';
-
-                // Construct scene with multi-target support
-                // Add heatmap container entity
-                let sceneHTML = `
-                    <a-scene mindar-image="imageTargetSrc: ${zoneData.fileUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no; maxTrack: 2" 
-                             embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false"
-                             device-orientation-permission-ui="enabled: false">
-                        
-                        <a-assets>
-                            <a-asset-item id="calming-model" src="https://cdn.aframe.io/examples/ar/models/triceratops/triceratops.gltf"></a-asset-item>
-                        </a-assets>
-
-                        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-                        
-                        <!-- Heatmap Container (World Space) -->
-                        <a-entity id="heatmap-container"></a-entity>
-                `;
-
-                // Display thumbnails if available
-                if (zoneData.thumbnails && zoneData.thumbnails.length > 0) {
-                    const thumbContainer = document.createElement('div');
-                    thumbContainer.id = 'thumb-container';
-                    thumbContainer.style.cssText = 'position:fixed;bottom:100px;left:20px;display:flex;gap:10px;overflow-x:auto;padding:10px;background:rgba(0,0,0,0.5);border-radius:10px;pointer-events:auto;max-width:90%;z-index:90;';
-
-                    zoneData.thumbnails.forEach((url, i) => {
-                        const img = document.createElement('img');
-                        img.src = url;
-                        img.style.cssText = 'width:60px;height:45px;object-fit:cover;border-radius:5px;border:2px solid white;';
-                        img.onclick = () => {
-                            // Highlight corresponding target logic could go here
-                            log('Target hint clicked: ' + i);
-                        };
-                        thumbContainer.appendChild(img);
-                    });
-                    document.body.appendChild(thumbContainer);
-
-                    // Add label
-                    const label = document.createElement('div');
-                    label.innerText = 'Scan these spots:';
-                    label.style.cssText = 'color:white;font-size:12px;margin-bottom:5px;width:100%;';
-                    thumbContainer.insertBefore(label, thumbContainer.firstChild);
-                    thumbContainer.style.flexWrap = 'wrap';
-                }
-
-                // Generate entities for targets 0-5
-                for (let i = 0; i < 6; i++) {
-                    sceneHTML += `
-                        <a-entity mindar-image-target="targetIndex: ${i}" id="target-${i}" data-index="${i}">
-                             <!-- Hit Plane for Raycasting -->
+                    ${[0,1,2,3,4,5].map(i => `
+                        <a-entity mindar-image-target="targetIndex: ${i}" id="target-${i}">
                             <a-plane class="hit-plane" color="white" rotation="0 0 0" width="10" height="10" opacity="0.01" visible="false"></a-plane>
-                            
-                            <a-sphere color="#4CC3D9" radius="0.3" opacity="0.5" animation="property: scale; to: 1.1 1.1 1.1; dir: alternate; loop: true"></a-sphere>
-                            <a-text value="Safe Zone Point ${i + 1}" position="0 0.5 0" align="center"></a-text>
+                            <a-sphere color="#38bdf8" radius="0.1" opacity="0.6"></a-sphere>
                         </a-entity>
-                    `;
-                }
+                    `).join('')}
+                    
+                    <a-entity id="heatmap-container"></a-entity>
+                </a-scene>
+            `;
 
-                sceneHTML += `</a-scene>`;
-                document.body.insertAdjacentHTML('beforeend', sceneHTML);
+            document.body.insertAdjacentHTML('beforeend', sceneHTML);
+            const scene = document.querySelector('a-scene');
 
-                const scene = document.querySelector('a-scene');
-
-                // --- Room Recognition Logic ---
-                const foundTargets = new Set();
-                const REQUIRED_TARGETS = 1; // Lowered for easier testing
-                // roomRecognized is now global
-                // activeTargetEl is now module-scoped
-
-                const statusChip = document.getElementById('status-chip');
-                const rescanBtn = document.getElementById('rescan-btn');
-                rescanBtn.onclick = () => {
-                    window.location.href = `/scan-room?userId=${userId}&petId=${petId}`; // ToDo: Add roomId when available
-                };
-
-                scene.addEventListener('arReady', () => {
-                    document.getElementById('loading-screen').classList.add('hidden');
-                    statusChip.innerText = 'Scanning... Point at any recorded spot.';
-
-                    // Start Video Loop for Pose
-                    log("AR Ready. Starting detection loop.");
-                    // Select the MindAR video, NOT our hidden scanner-video
-                    const video = document.querySelector('video:not(#scanner-video)');
-                    if (video) startPoseLoop(video, scene);
-                    else log("Video element not found!");
-
-                    // Suggest Rescan if not recognized after 30s
-                    setTimeout(() => {
-                        if (!roomRecognized) {
-                            statusChip.innerText = "Room not recognized? Try rescanning.";
-                            statusChip.style.backgroundColor = "#ff9800"; // Orange warning
-                            rescanBtn.classList.remove('hidden');
-                        }
-                    }, 30000);
-                });
-
-                scene.addEventListener('arError', (event) => {
-                    loadingText.innerText = 'AR Error: ' + event.detail.error;
-                });
-
-                // Add listeners
-                setTimeout(() => {
-                    log('Attaching target listeners...');
-                    for (let i = 0; i < 6; i++) {
-                        const target = document.getElementById(`target-${i}`);
-                        if (!target) {
-                            log(`Target ${i} DOM not found`);
-                            continue;
-                        }
-
-                        target.addEventListener('targetFound', () => {
-                            log(`Target ${i} found`);
-                            foundTargets.add(i);
-                            activeTargetEl = target; // Track active target for raycasting base
-
-                            // Initialize Heatmap Mesh on Target (loads any pre-fetched history)
-                            ensureHeatmapAttached(activeTargetEl);
-                            if (heatmapPoints) heatmapPoints.visible = true;
-
-                            // Always update UI on find, even if re-finding
-                            statusChip.innerText = 'Target Found!';
-                            statusChip.style.backgroundColor = 'rgba(0, 0, 0, 0.6)'; // Reset color
-                            rescanBtn.classList.add('hidden'); // Hide rescan if found
-
-                            if (roomRecognized) return;
-                            roomRecognized = true;
-                        });
-
-                        target.addEventListener('targetLost', () => {
-                            // log(`Target ${i} lost`); // Optional log
-                            if (activeTargetEl === target) {
-                                activeTargetEl = null; // Stop collection
-                                if (heatmapPoints) heatmapPoints.visible = false;
-                                statusChip.innerText = 'Target Lost - Scanning...';
-                            }
-
-                            // Check for frequent loss (>=3 times per second)
-                            const now = Date.now();
-                            targetLostHistory.push(now);
-                            // Keep only last 1 second history
-                            targetLostHistory = targetLostHistory.filter(t => now - t <= 1000);
-
-                            if (targetLostHistory.length >= 3) {
-                                statusChip.innerText = "Tracking unstable. Consider rescanning.";
-                                statusChip.style.backgroundColor = "#ff5722"; // Red/Orange warning
-                                rescanBtn.classList.remove('hidden');
-                            }
-                        });
-
-
-                    }
-                }, 1000);
-
-            } catch (err) {
-                console.error(err);
-                loadingText.innerText = 'Error: ' + err.message;
-            }
-        }
-
-        // Raycasting Logic
-        const raycaster = new THREE.Raycaster();
-        const tempVec = new THREE.Vector2();
-
-        // Canvas-based 2D Heatmap
-        let heatmapCanvas = null;
-        let heatmapCtx = null;
-        const canvasPoints = []; // {x, y, age}
-
-        function initHeatmapCanvas() {
-            heatmapCanvas = document.getElementById('heatmap-canvas');
-            if (heatmapCanvas) {
-                // Set canvas resolution to match screen
-                heatmapCanvas.width = window.innerWidth;
-                heatmapCanvas.height = window.innerHeight;
-                heatmapCtx = heatmapCanvas.getContext('2d');
-                log("Heatmap canvas initialized");
-            }
-        }
-
-        function drawCanvasHeatmap() {
-            if (!heatmapCtx) return;
-            // Only show points if room is recognized (Bug fix: prevent showing before scan)
-            // Only show points if room is recognized AND target is tracked
-            if (!roomRecognized || !activeTargetEl) {
-                heatmapCtx.clearRect(0, 0, heatmapCanvas.width, heatmapCanvas.height);
-                return;
-            }
-
-            // Clear canvas (transparent, not black fade)
-            heatmapCtx.clearRect(0, 0, heatmapCanvas.width, heatmapCanvas.height);
-
-            // Draw points
-            canvasPoints.forEach((pt, i) => {
-                pt.age = (pt.age || 0) + 1;
-
-                // Historical points NEVER fade (permanent), current session fades after 5s
-                let alpha;
-                if (pt.historical) {
-                    alpha = 0.7; // Permanent visibility for historical
-                } else {
-                    alpha = Math.max(0, 1 - pt.age / 300); // 5 sec fade for current
-                    if (alpha <= 0) return;
-                }
-
-                heatmapCtx.beginPath();
-                heatmapCtx.arc(pt.x * heatmapCanvas.width, pt.y * heatmapCanvas.height, pt.historical ? 6 : 8, 0, Math.PI * 2);
-
-                // Color based on Intensity (if available) or historical status
-                let r, g, b;
-                if (pt.intensity !== undefined) {
-                    if (pt.intensity <= 0.3) { r = 0; g = 100; b = 255; }       // Low/Calm = Blue
-                    else if (pt.intensity >= 0.7) { r = 255; g = 0; b = 0; }   // High/Anxious = Red
-                    else { r = 0; g = 255; b = 0; }                            // Med/Neutral = Green
-                } else {
-                    // Fallback
-                    if (pt.historical) { r = 255; g = 165; b = 0; } // Orange
-                    else { r = 255; g = 50; b = 50; } // Red
-                }
-
-                heatmapCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha * (pt.historical ? 0.6 : 0.7)})`;
-                heatmapCtx.fill();
+            scene.addEventListener('arReady', () => {
+                document.getElementById('loading-screen').classList.add('hidden');
+                startMainLoop();
             });
 
-
-            // No client-side cleanup - keep ALL points forever
-            // Server-side aggregation (Cloud Function) handles 5000+ points
+            for (let i = 0; i < 6; i++) {
+                const target = document.getElementById(`target-${i}`);
+                target.addEventListener('targetFound', () => {
+                    activeTargetEl = target;
+                    roomRecognized = true;
+                });
+                target.addEventListener('targetLost', () => {
+                    if (activeTargetEl === target) activeTargetEl = null;
+                });
+            }
         }
 
-        function startPoseLoop(video, scene) {
-            let lastTime = 0;
-            let frameCount = 0;
-
-            // Init canvas
-            initHeatmapCanvas();
-
+        function startMainLoop() {
             function loop(t) {
-                frameCount++;
-
-                // Always draw heatmap
-                drawCanvasHeatmap();
-
-                if (!poseLandmarker) {
-                    if (frameCount % 60 === 0) log("Waiting for poseLandmarker...");
+                // Throttling: 12 FPS (approx 83ms) to prevent thermal issues
+                if (t - lastTimestamp < 83) {
                     requestAnimationFrame(loop);
                     return;
                 }
+                lastTimestamp = t;
 
-                if (video.readyState < 2) {
-                    if (frameCount % 60 === 0) log("Video not ready: state=" + video.readyState);
-                    requestAnimationFrame(loop);
-                    return;
-                }
-
-                // Throttle detection to ~12 FPS
-                const now = performance.now();
-                if (now - lastTime < 80) {
-                    requestAnimationFrame(loop);
-                    return;
-                }
-                lastTime = now;
-
-                try {
-                    const result = poseLandmarker.detectForVideo(video, now);
-
-                    if (result.landmarks && result.landmarks.length > 0) {
-                        const lm = result.landmarks[0][0]; // Nose
-
-                        // Log detection (throttled)
-                        if (frameCount % 30 === 0) log(`Pose: (${lm.x.toFixed(2)}, ${lm.y.toFixed(2)})`);
-
-                        // === ALWAYS: Add to 2D Canvas (ONLY IF TRACKING) ===
-                        if (activeTargetEl && roomRecognized) {
-                            canvasPoints.push({ x: lm.x, y: lm.y, age: 0 });
-                        }
-
-                        // === OPTIONAL: 3D Raycast if marker visible ===
-                        if (activeTargetEl && scene.camera) {
-                            tempVec.x = (lm.x - 0.5) * 2;
-                            tempVec.y = -(lm.y - 0.5) * 2;
-                            raycaster.setFromCamera(tempVec, scene.camera);
-
-                            const hitPlaneEntity = activeTargetEl.querySelector('.hit-plane');
-                            if (hitPlaneEntity) {
-                                const mesh = hitPlaneEntity.getObject3D('mesh');
-                                if (mesh) {
-                                    const intersects = raycaster.intersectObject(mesh);
-                                    if (intersects.length > 0) {
-                                        addHeatmapPoint(intersects[0].point, activeTargetEl);
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        if (frameCount % 120 === 0) log("No pose landmarks detected");
+                if (activeTargetEl) {
+                    // Interaction: Automated 3D point placement based on center reticle hit
+                    const raycaster = document.querySelector('[raycaster]').components.raycaster;
+                    const intersections = raycaster.intersections;
+                    
+                    if (intersections && intersections.length > 0) {
+                        const hit = intersections[0];
+                        const localPos = activeTargetEl.object3D.worldToLocal(hit.point.clone());
+                        
+                        pointBuffer.push({
+                            x: localPos.x, y: localPos.y, z: localPos.z,
+                            timestamp: { __type: 'serverTimestamp' },
+                            mode: 'lite_ar'
+                        });
                     }
-                } catch (e) {
-                    if (frameCount % 60 === 0) log("Detection error: " + e.message);
+                }
+
+                if (pointBuffer.length >= 20) {
+                    sendPoints();
                 }
 
                 requestAnimationFrame(loop);
             }
-            loop();
+            requestAnimationFrame(loop);
         }
 
-        // Efficient Heatmap & Persistence
-        const MAX_POINTS = 20000; // Increased for persistence
-        const pointBuffer = [];
-        let heatmapGeometry = null;
-        let heatmapPoints = null; // THREE.Points
-        let localHeatmapData = new Float32Array(MAX_POINTS * 3); // x,y,z
-        let localHeatmapColors = new Float32Array(MAX_POINTS * 3); // r,g,b
-        let pointCount = 0;
-        let isHeatmapVisible = true;
-
-        // Behavioral Analytics Globals
-        let lastLocalPos = null; // Vector3
-        let lastTrackTime = 0;
-        const POS_HISTORY = []; // For variance (optional future)
-
-        // Toggle UI
-        document.getElementById('toggle-heatmap-btn').onclick = () => {
-            isHeatmapVisible = !isHeatmapVisible;
-            document.getElementById('toggle-heatmap-btn').innerText = isHeatmapVisible ? "Hide Heatmap" : "Show Heatmap";
-            if (heatmapPoints) heatmapPoints.visible = isHeatmapVisible;
-            if (heatmapCanvas) heatmapCanvas.style.display = isHeatmapVisible ? 'block' : 'none';
-        };
-
-        function ensureHeatmapAttached(targetEl) {
-            const container = targetEl.querySelector('#heatmap-container-3d');
-            if (!container) {
-                // Create container if missing
-                const ent = document.createElement('a-entity');
-                ent.id = 'heatmap-container-3d';
-                targetEl.appendChild(ent);
-            }
-
-            const targetObj = targetEl.object3D;
-            if (!heatmapPoints) {
-                heatmapGeometry = new THREE.BufferGeometry();
-                heatmapGeometry.setAttribute('position', new THREE.BufferAttribute(localHeatmapData, 3));
-                heatmapGeometry.setAttribute('color', new THREE.BufferAttribute(localHeatmapColors, 3));
-
-                const material = new THREE.PointsMaterial({
-                    size: 0.15, // Larger for visibility
-                    vertexColors: true,
-                    transparent: true,
-                    opacity: 0.8,
-                    depthWrite: false
-                });
-
-                heatmapPoints = new THREE.Points(heatmapGeometry, material);
-                targetObj.add(heatmapPoints);
-                updateHeatmapVisuals(); // Ensure pre-loaded points are drawn
-                log("3D Heatmap attached to target");
-            }
-        }
-
-        function updateHeatmapVisuals() {
-            if (heatmapGeometry) {
-                heatmapGeometry.attributes.position.needsUpdate = true;
-                heatmapGeometry.attributes.color.needsUpdate = true;
-                heatmapGeometry.setDrawRange(0, pointCount);
-            }
-        }
-
-        function add3DPoint(x, y, z, intensity = 0.5) {
-            if (pointCount >= MAX_POINTS) return; // Cap at max
-
-            const idx = pointCount * 3;
-            localHeatmapData[idx] = x;
-            localHeatmapData[idx + 1] = y;
-            localHeatmapData[idx + 2] = z;
-
-            // Coloring based on Intensity (0.0=Calm/Blue, 1.0=Anxious/Red)
-            // Blue (0,0,1) -> Green (0,1,0) -> Red (1,0,0)
-            let r, g, b;
-            if (intensity < 0.5) {
-                // Blue to Green
-                const t = intensity * 2; // 0 to 1
-                r = 0;
-                g = t;
-                b = 1 - t;
-            } else {
-                // Green to Red
-                const t = (intensity - 0.5) * 2; // 0 to 1
-                r = t;
-                g = 1 - t * 0.5; // Keep some green for orange?
-                b = 0;
-            }
-
-            // Simplified Gradient:
-            // Low (<0.3) = Blue
-            // Med (0.3-0.7) = Green/Yellow
-            // High (>0.7) = Red
-            if (intensity <= 0.3) {
-                r = 0; g = 0; b = 1; // Blue
-            } else if (intensity >= 0.7) {
-                r = 1; g = 0; b = 0; // Red
-            } else {
-                r = 0; g = 1; b = 0; // Green (Neutral)
-            }
-
-            localHeatmapColors[idx] = r;
-            localHeatmapColors[idx + 1] = g;
-            localHeatmapColors[idx + 2] = b;
-
-            pointCount++;
-            updateHeatmapVisuals();
-
-            // 2D Canvas Fallback
-            const screenX = 0.5 + (x * 0.2);
-            const screenY = 0.5 - (y * 0.2);
-            if (screenX >= 0 && screenX <= 1 && screenY >= 0 && screenY <= 1) {
-                // Pass color info to canvas point?
-                canvasPoints.push({
-                    x: screenX, y: screenY,
-                    age: 0,
-                    historical: true,
-                    intensity: intensity
-                });
-            }
-        }
-
-        // Firestore Subscription
-        let unsubscribeHeatmap = null;
-        function subscribeToHeatmap(userId, petId, zoneId) {
-            if (unsubscribeHeatmap) unsubscribeHeatmap();
-
-            log("Subscribing to Activity Points for Zone: " + (zoneId || 'All'));
-
-            let query = db.collection('users').doc(userId)
-                .collection('pets').doc(petId)
-                .collection('activityPoints');
-
-            if (zoneId) {
-                query = query.where('zoneId', '==', zoneId);
-            }
-
-            unsubscribeHeatmap = query
-                .orderBy('timestamp', 'desc')
-                .limit(2000) // Load last 2k points
-                .onSnapshot((snapshot) => {
-                    snapshot.docChanges().forEach((change) => {
-                        if (change.type === "added") {
-                            // Reverted pending check to ensure offline/unsynced data loads
-                            // if (change.doc.metadata.hasPendingWrites) return;
-
-                            const data = change.doc.data();
-                            // Don't add if z is 0 (2D canvas point) unless we want to project it?
-                            // For now, only visualize points with 3D depth or accept all if consistent
-                            if (data.x !== undefined && data.y !== undefined && data.z !== undefined) {
-                                // Convert back to local space if needed?? 
-                                // Actually, we store LOCAL coordinates relative to target in addHeatmapPoint
-                                // So we can just plot them directly.
-                                add3DPoint(data.x, data.y, data.z, data.intensity || 0.5);
-                            }
-                        }
-                    });
-                    log(`Loaded ${snapshot.size} activity points.`);
-                }, (error) => {
-                    console.error("Heatmap subscription error:", error);
-                });
-        }
-
-        // Restore addHeatmapPoint and Batch Saving
-        function addHeatmapPoint(worldPoint, targetEl) {
-            ensureHeatmapAttached(targetEl);
-            const targetObj = targetEl.object3D;
-            const localPoint = targetObj.worldToLocal(worldPoint.clone());
-            const now = Date.now();
-
-            // === Velocity & Intensity Calculation ===
-            let velocity = 0;
-            let intensity = 0.5; // Default Neutral
-
-            if (lastLocalPos) {
-                const dt = (now - lastTrackTime) / 1000; // seconds
-                if (dt > 0.05 && dt < 2.0) { // Valid tracking window
-                    const dist = localPoint.distanceTo(lastLocalPos);
-
-                    // Noise Filter: Ignore small jitter (< 2cm approx)
-                    if (dist < 0.02) {
-                        velocity = 0;
-                    } else {
-                        velocity = dist / dt; // units/sec
-                    }
-
-                    // Thresholds: Higher maxV to require real running/pacing for Red
-                    const minV = 0.1;
-                    const maxV = 1.0;
-                    intensity = (velocity - minV) / (maxV - minV);
-                    intensity = Math.max(0, Math.min(1, intensity));
-                }
-            }
-            lastLocalPos = localPoint.clone();
-            lastTrackTime = now;
-
-            // Add to 3D visual immediately (optimistic)
-            add3DPoint(localPoint.x, localPoint.y, localPoint.z, intensity);
-
-            // Add to persistence buffer
-            pointBuffer.push({
-                x: localPoint.x, y: localPoint.y, z: localPoint.z,
-                t: now,
-                intensity: intensity, // Save for analysis
-                velocity: velocity,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-
-        // Initialize Batch Saving (New Implementation)
-        setInterval(async () => {
+        function sendPoints() {
             if (pointBuffer.length === 0) return;
-
-            const batch = db.batch();
-            const user = auth.currentUser;
-            if (!user) return; // Should be logged in
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const petId = urlParams.get('petId');
-            if (!petId) return;
-
-            // Take chunk
-            const chunk = pointBuffer.splice(0, 20); // max 20 per flush
-
-            const colRef = db.collection('users').doc(user.uid)
-                .collection('pets').doc(petId)
-                .collection('activityPoints');
-
-            const zoneId = urlParams.get('zoneId'); // Get current zone
-
-            chunk.forEach(pt => {
-                const docRef = colRef.doc();
-                // Attach zoneId to point
-                if (zoneId) pt.zoneId = zoneId;
-                batch.set(docRef, pt);
-            });
-
-            try {
-                await batch.commit();
-                log(`Saved ${chunk.length} points.`);
-            } catch (e) {
-                console.error("Save error", e);
-                log("Save Error: " + e.message);
-                // Return points to buffer? Nah, simplistic retry logic omitted for now
-            }
-        }, 2000);
-
-        // Start subscription when active (called in initAR)
-
-        // Auth & Bootstrap
-        // Check for injected auth from React Native WebView
-        let authInitialized = false;
-
-        // Listen for injected credentials from React Native
-        window.receiveNativeAuth = async function (userId, petId, idToken) {
-            console.log("Received native auth:", userId, petId);
-            log("Native Auth received: " + userId);
-            if (authInitialized) return;
-            authInitialized = true;
-
-            // Authenticate as the REAL user using custom token from Cloud Function
-            if (idToken && idToken.length > 0) {
-                try {
-                    log("Exchanging token via Cloud Function...");
-
-                    // Call the Cloud Function to exchange ID token for custom token
-                    const exchangeToken = firebase.functions().httpsCallable('exchangeToken');
-                    const result = await exchangeToken({ idToken: idToken });
-                    const customToken = result.data.customToken;
-
-                    log("Got custom token, signing in...");
-
-                    // Sign in with the custom token (as the real user!)
-                    await auth.signInWithCustomToken(customToken);
-                    log("Signed in as real user: " + auth.currentUser?.uid);
-
-                } catch (e) {
-                    log("Custom token auth failed: " + e.message);
-                    console.error("Custom token auth error:", e);
-
-                    // Fallback to anonymous auth if custom token fails
-                    log("Falling back to anonymous auth...");
-                    try {
-                        await auth.signInAnonymously();
-                        log("Fallback: Signed in anonymously");
-                    } catch (anonError) {
-                        log("Anonymous fallback failed: " + anonError.message);
-                    }
-                }
-            } else {
-                // No ID token provided - use anonymous as fallback
-                log("No ID token, using anonymous auth");
-                try {
-                    await auth.signInAnonymously();
-                    log("Signed in anonymously (no token provided)");
-                } catch (e) {
-                    log("Anonymous sign-in failed: " + e.message);
-                }
-            }
-
-            document.getElementById('loading-text').innerText = 'Loading AR...';
-            initAR(userId, petId);
-        };
-
-        // Fallback to regular Firebase auth (for web usage)
-        auth.onAuthStateChanged(user => {
-            if (authInitialized) return; // Skip if already initialized by native
-            console.log("Auth State Changed:", user ? "User Logged In" : "No User");
-            if (user) {
-                authInitialized = true;
-                console.log("User ID:", user.uid);
-                const urlParams = new URLSearchParams(window.location.search);
-                const petId = urlParams.get('petId');
-                if (petId) {
-                    console.log("Pet ID found:", petId);
-                    initAR(user.uid, petId);
-                } else {
-                    console.warn("No Pet ID in URL");
-                    document.getElementById('loading-text').innerText = 'Missing Pet ID';
-                }
-            } else {
-                console.warn("User not logged in");
-                document.getElementById('loading-text').innerText = 'Please log in';
-            }
-        });
-
-        // === ROOM SCANNER LOGIC ===
-
-        // 1. Embedded Worker Code (avoid external file issues)
-        const workerCode = `
-            self.window = self;
-            self.document = {
-                createElement: (tag) => {
-                    if (tag === 'canvas') {
-                        return new OffscreenCanvas(1, 1);
-                    }
-                    return {};
-                }
-            };
-
-            self.onmessage = async (e) => {
-                const { images } = e.data;
-                if (e.data.type === 'compile') {
-                    try {
-                        postMessage({ type: 'progress', percent: 5, status: 'Loading compiler...' });
-                        await import('https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image.prod.js');
-                        
-                        const MindARImage = self.window.MINDAR?.IMAGE;
-                        if (!MindARImage) throw new Error('MINDAR.IMAGE not found');
-                        
-                        const Compiler = MindARImage.Compiler;
-                        const compiler = new Compiler();
-                        postMessage({ type: 'progress', percent: 10, status: 'Processing images...' });
-
-                        const imageBitmaps = [];
-                        for (let i = 0; i < images.length; i++) {
-                            const response = await fetch(images[i]);
-                            const blob = await response.blob();
-                            const bitmap = await createImageBitmap(blob);
-                            imageBitmaps.push(bitmap);
-                            const pct = 10 + ((i + 1) / images.length) * 20;
-                            postMessage({ type: 'progress', percent: Math.round(pct), status: \`Loading image \${i + 1}/\${images.length}\` });
-                        }
-
-                        postMessage({ type: 'progress', percent: 35, status: 'Extracting features...' });
-                        await compiler.compileImageTargets(imageBitmaps, (progress) => {
-                            const pct = 35 + (progress * 0.55);
-                            postMessage({ type: 'progress', percent: Math.round(pct), status: \`Building features... \${Math.round(progress)}%\` });
-                        });
-
-                        const dataBuffer = compiler.exportData();
-                        const blob = new Blob([dataBuffer]);
-                        postMessage({ type: 'complete', blob: blob });
-
-                    } catch (err) {
-                        postMessage({ type: 'error', error: err.message });
-                    }
-                }
-            };
-        `;
-        const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
-        const workerUrl = URL.createObjectURL(workerBlob);
-
-        // 2. Scanner State & Elements
-        let capturedImages = [];
-        let videoStream = null;
-        let isCompiling = false;
-
-        // Create Scanner UI dynamically
-        const scannerUI = document.createElement('div');
-        scannerUI.id = 'scanner-ui';
-        scannerUI.style.display = 'none';
-        scannerUI.innerHTML = `
-            <video id="scanner-video" autoplay playsinline muted style="position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1000;"></video>
-            <div id="scanner-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:1001;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:20px;padding-top:env(safe-area-inset-top, 20px);padding-bottom:env(safe-area-inset-bottom, 20px);">
-                <div class="top-bar">
-                    <div style="background:rgba(0,0,0,0.5);padding:10px;border-radius:15px;color:white;">
-                        <span id="photo-count">0</span>/3+ Photos
-                    </div>
-                    <button onclick="exitAR()" class="exit-btn">Cancel</button>
-                </div>
-                
-                <div id="naming-modal" style="display:none;pointer-events:auto;background:rgba(0,0,0,0.8);padding:20px;border-radius:15px;text-align:center;">
-                    <h3 style="color:white;margin-top:0;">Name Safe Zone</h3>
-                    <input type="text" id="room-name" placeholder="e.g. Living Room" style="padding:10px;border-radius:5px;border:none;width:80%;margin-bottom:10px;">
-                    <br>
-                    <button onclick="confirmCompile()" style="background:#4CAF50;color:white;border:none;padding:10px 20px;border-radius:5px;font-weight:bold;">Start Compiling</button>
-                </div>
-
-                <div id="progress-card" style="display:none;">
-                    <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);z-index:2000;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-                        <div style="text-align:center;max-width:300px;color:white;">
-                            <div style="font-size:48px;margin-bottom:20px;">🐾</div>
-                            <h3 id="progress-status" style="margin:0 0 20px 0;font-size:18px;">Initializing...</h3>
-                            <div style="background:#555;height:10px;border-radius:5px;overflow:hidden;width:100%;">
-                                <div id="progress-bar" style="background:#4CAF50;width:0%;height:100%;transition:width 0.3s;"></div>
-                            </div>
-                            <p style="margin-top:15px;opacity:0.7;font-size:14px;">Creating your pet's safe zone...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="controls" style="text-align:center;pointer-events:auto;">
-                    <button id="capture-btn" onclick="capturePhoto()" style="width:70px;height:70px;border-radius:50%;background:white;border:4px solid rgba(255,255,255,0.5);margin-bottom:20px;"></button>
-                    <button id="compile-btn" onclick="showNaming()" style="display:none;background:linear-gradient(45deg, #6200EA, #9D00FF);color:white;border:none;padding:15px 30px;border-radius:25px;font-weight:bold;font-size:16px;box-shadow:0 4px 15px rgba(0,0,0,0.3);">
-                        Compile & Save
-                    </button>
-                </div>
-            </div>
-            <canvas id="capture-canvas" style="display:none;"></canvas>
-        `;
-        document.body.appendChild(scannerUI);
-
-        // 3. Scanner Functions
-        async function startScanner() {
-            log('startScanner: Beginning...');
-
-            // Hide AR scene if it exists (it might not in scan mode)
-            const scene = document.querySelector('a-scene');
-            if (scene) {
-                scene.style.display = 'none';
-                log('startScanner: Hid a-scene');
-            } else {
-                log('startScanner: No a-scene to hide');
-            }
-
-            // Show scanner UI, hide loading screen
-            const scannerEl = document.getElementById('scanner-ui');
-            if (scannerEl) {
-                scannerEl.style.display = 'block';
-                log('startScanner: Showed scanner-ui');
-            } else {
-                log('startScanner: ERROR - scanner-ui not found!');
-                return;
-            }
-
-            const loadingEl = document.getElementById('loading-screen');
-            if (loadingEl) {
-                loadingEl.style.display = 'none';
-                log('startScanner: Hid loading-screen');
-            }
-
-            log('startScanner: Requesting camera...');
-            try {
-                // Stop any existing stream first
-                if (videoStream) {
-                    videoStream.getTracks().forEach(track => track.stop());
-                    log('startScanner: Stopped existing stream');
-                }
-
-                const constraints = {
-                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-                };
-                log('startScanner: Calling getUserMedia...');
-                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                log('startScanner: Got video stream!');
-
-                const video = document.getElementById('scanner-video');
-                if (video) {
-                    video.srcObject = videoStream;
-                    video.onloadedmetadata = () => {
-                        video.play();
-                        log('startScanner: Video playing!');
-                    };
-                } else {
-                    log('startScanner: ERROR - scanner-video not found!');
-                }
-            } catch (err) {
-                log('Camera Error: ' + err.message);
-                alert('Camera access denied: ' + err.message);
+            const points = pointBuffer.splice(0, pointBuffer.length);
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                    action: 'savePoints', 
+                    points,
+                    userId: window.AR_USER_ID,
+                    petId: window.AR_PET_ID,
+                    zoneId: window.AR_ZONE_ID
+                }));
             }
         }
-
-        window.capturePhoto = function () {
-            const video = document.getElementById('scanner-video');
-            const canvas = document.getElementById('capture-canvas');
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                capturedImages.push(dataUrl);
-
-                // Update UI
-                updateScannerUI();
-            }
-        };
-
-        function updateScannerUI() {
-            document.getElementById('photo-count').innerText = capturedImages.length;
-            const compileBtn = document.getElementById('compile-btn');
-            const captureBtn = document.getElementById('capture-btn');
-
-            if (capturedImages.length >= 3) {
-                compileBtn.style.display = 'inline-block';
-            }
-
-            if (capturedImages.length >= 8) {
-                captureBtn.style.display = 'none';
-            }
-        }
-
-        window.showNaming = function () {
-            document.getElementById('controls').style.display = 'none';
-            document.getElementById('naming-modal').style.display = 'block';
-        };
-
-        window.confirmCompile = async function () {
-            const name = document.getElementById('room-name').value || 'My Room';
-            document.getElementById('naming-modal').style.display = 'none';
-            document.getElementById('progress-card').style.display = 'block';
-
-            // Hide scanner during compilation
-            const scannerVideo = document.getElementById('scanner-video');
-            if (scannerVideo) scannerVideo.style.display = 'none';
-
-            // Hide capture controls
-            const controls = document.getElementById('controls');
-            if (controls) controls.style.display = 'none';
-
-            // Stop camera to save resources
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                document.getElementById('scanner-video').srcObject = null;
-            }
-
-            // Start Worker
-            const worker = new Worker(workerUrl);
-            worker.onmessage = handleWorkerMessage;
-            worker.postMessage({ type: 'compile', images: capturedImages });
-
-            // Store name for later
-            window.tempRoomName = name;
-        };
-
-        async function handleWorkerMessage(e) {
-            const { type, percent, status, blob, error } = e.data;
-
-            if (type === 'progress') {
-                document.getElementById('progress-status').innerText = status;
-                document.getElementById('progress-bar').style.width = percent + '%';
-            } else if (type === 'error') {
-                alert('Compilation failed: ' + error);
-                // Reset UI?
-            } else if (type === 'complete') {
-                uploadCompiledTarget(blob);
-            }
-        }
-
-        async function uploadCompiledTarget(mindBlob) {
-            document.getElementById('progress-status').innerText = 'Uploading...';
-            const userId = auth.currentUser.uid;
-            // Get petId from global or URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const petId = window.AR_PET_ID || urlParams.get('petId'); // Verify this global exists
-            const timestamp = Date.now();
-
-            try {
-                // 1. Upload .mind file
-                const mindPath = `mind-targets/${userId}/${petId}/${timestamp}.mind`;
-                const mindRef = storage.ref(mindPath);
-                await mindRef.put(mindBlob);
-                const mindUrl = await mindRef.getDownloadURL();
-
-                // 2. Upload Thumbnails
-                const thumbnailUrls = [];
-                for (let i = 0; i < capturedImages.length; i++) {
-                    // Upload dataURL directly
-                    const thumbPath = `mind-targets/${userId}/${petId}/${timestamp}_thumb_${i}.jpg`;
-                    const thumbRef = storage.ref(thumbPath);
-                    await thumbRef.putString(capturedImages[i], 'data_url');
-                    const thumbUrl = await thumbRef.getDownloadURL();
-                    thumbnailUrls.push(thumbUrl);
-                }
-
-                // 3. Save to Firestore
-                await db.collection('users').doc(userId)
-                    .collection('pets').doc(petId)
-                    .collection('safeZones').add({
-                        type: 'mindar',
-                        name: window.tempRoomName,
-                        fileUrl: mindUrl,
-                        storagePath: mindPath,
-                        thumbnails: thumbnailUrls, // Save thumbnail URLs
-                        targetCount: capturedImages.length,
-                        markerStatus: 'ready',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                document.getElementById('progress-status').innerText = 'Success! Returning to Dashboard...';
-
-                // Navigate back to dashboard using postMessage
-                setTimeout(() => {
-                    // Use exitAR which sends postMessage to React Native
-                    exitAR();
-                }, 1500);
-
-            } catch (err) {
-                alert('Upload failed: ' + err.message);
-                log('Upload Error: ' + err.message);
-            }
-        }
-
     </script>
 </body>
-
 </html>

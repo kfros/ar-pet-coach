@@ -15,8 +15,16 @@ const API_KEYS = {
 // Track if SDK was successfully configured
 let isConfigured = false;
 
+// Pre-flight key validation log (first 4 and last 4 chars)
+const maskKey = (key: string | undefined) => {
+    if (!key) return "MISSING";
+    if (key.length <= 8) return "****";
+    return `${key.slice(0, 4)}...${key.slice(-4)}`;
+};
+
 class RevenueCatService {
     static async configure() {
+        if (isConfigured) return;
         try {
             // In Expo Go, use the Test Store API Key
             if (isExpoGo) {
@@ -30,6 +38,8 @@ class RevenueCatService {
             } else {
                 // In native builds, use platform-specific keys
                 const apiKey = Platform.OS === 'ios' ? API_KEYS.ios : API_KEYS.android;
+
+                console.log(`[Pre-flight] RevenueCat ${Platform.OS} Key:`, maskKey(apiKey));
 
                 if (!apiKey) {
                     console.warn(`RevenueCat: No API Key found for ${Platform.OS}. Skipping configuration.`);
@@ -121,6 +131,28 @@ class RevenueCatService {
         } catch (e) {
             console.error("Error syncing purchases", e);
         }
+    }
+
+    static async getSubscriptionStatus(): Promise<{
+        isPremium: boolean;
+        isTrial: boolean;
+        expirationDate: string | null;
+    }> {
+        const info = await this.getCustomerInfo();
+        if (!info) return { isPremium: false, isTrial: false, expirationDate: null };
+
+        const entitlement = info.entitlements.active['ar-pet-coach-premium'];
+        if (!entitlement) return { isPremium: false, isTrial: false, expirationDate: null };
+
+        return {
+            isPremium: true,
+            isTrial: entitlement.periodType === 'TRIAL',
+            expirationDate: entitlement.expirationDate,
+        };
+    }
+
+    static isReady(): boolean {
+        return isConfigured;
     }
 }
 
