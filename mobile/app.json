@@ -2,6 +2,7 @@
   "expo": {
     "name": "mobile",
     "slug": "mobile",
+    "platforms": ["ios", "android"],
     "version": "1.0.0",
     "scheme": "ar-pet-coach",
     "orientation": "portrait",
@@ -63,9 +64,6 @@
           ]
         }
       ]
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
