@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "293725153990",
+    "project_id": "ar-pet-coach",
+    "storage_bucket": "ar-pet-coach.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:293725153990:android:0c1057beb241e9ae0d05c7",
+        "android_client_info": {
+          "package_name": "com.kfsoftware.chillpup"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "293725153990-hm4jc29v4438lqq66b59gamqu6nmi1g3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTmnydQ7X_sRC5tZe5R2yV7fvi3zllEME"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "293725153990-hm4jc29v4438lqq66b59gamqu6nmi1g3.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "293725153990-959g9r4c0avflot1j522m6p7o6r7e0kl.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.kfros.mobile"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
