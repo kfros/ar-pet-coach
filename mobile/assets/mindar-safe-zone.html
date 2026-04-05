@@ -2,9 +2,9 @@
 <html>
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Calm Space</title>
 
     <style>
         html,
@@ -14,14 +14,17 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background: #000;
         }
 
-        a-scene {
-            position: fixed !important;
+        #camera-feed {
+            position: fixed;
             top: 0;
             left: 0;
-            width: 100vw !important;
-            height: 100vh !important;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
         }
 
         #overlay {
@@ -35,10 +38,11 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 20px;
-            padding-top: env(safe-area-inset-top, 20px);
-            padding-bottom: env(safe-area-inset-bottom, 20px);
+            padding: 24px;
+            padding-top: env(safe-area-inset-top, 24px);
+            padding-bottom: env(safe-area-inset-bottom, 24px);
             box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         .top-bar {
@@ -47,30 +51,67 @@
             align-items: flex-start;
         }
 
-        .status {
-            background: rgba(15, 23, 42, 0.8);
+        .status-container {
+            background: rgba(15, 23, 42, 0.85);
             color: #f1f5f9;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-family: sans-serif;
+            padding: 14px 28px;
+            border-radius: 32px;
             text-align: center;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(56, 189, 248, 0.3);
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            max-width: 80%;
+            transition: opacity 0.4s ease;
         }
 
         .exit-btn {
             pointer-events: auto;
             background: rgba(255, 255, 255, 0.1);
             color: white;
-            border: 1px solid rgba(255,255,255,0.2);
-            padding: 10px 16px;
-            border-radius: 20px;
-            font-family: sans-serif;
-            font-size: 14px;
-            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 16px;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
             cursor: pointer;
+            font-size: 20px;
+        }
+
+        .cta-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .cta-btn {
+            pointer-events: auto;
+            background: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 18px 40px;
+            border-radius: 40px;
+            font-size: 18px;
+            font-weight: 700;
+            box-shadow: 0 8px 32px rgba(56, 189, 248, 0.35);
+            transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+        }
+
+        .cta-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* Post-detection: reduce CTA visual dominance */
+        .cta-btn.subdued {
+            opacity: 0.70;
+            transform: scale(0.95);
+            filter: saturate(0.8) brightness(0.92);
         }
 
         .loading-screen {
@@ -86,190 +127,480 @@
             align-items: center;
             justify-content: center;
             color: white;
-            font-family: sans-serif;
-        }
-
-        /* Reticle for center-screen interaction */
-        #reticle {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            transform: translate(-50%, -50%);
-            border: 2px solid #38bdf8;
-            border-radius: 50%;
-            z-index: 200;
-            pointer-events: none;
-            background: rgba(56, 189, 248, 0.1);
+            transition: opacity 0.5s ease;
         }
 
         .hidden {
             display: none !important;
         }
+
+        /* ===== RETICLE =====
+           Soft radial gradient circle, no border, no dot.
+           Screen-center locked pre-detection.
+           140px with subtle pulse. */
+        #reticle-ui {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 140px;
+            height: 140px;
+
+            margin-left: -70px;
+            margin-top: -70px;
+
+            z-index: 150;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+
+            /* Гарантированное центрирование всего, что внутри */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .reticle-glow {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                    rgba(56, 189, 248, 0.40) 0%,
+                    rgba(56, 189, 248, 0.18) 40%,
+                    rgba(56, 189, 248, 0.05) 65%,
+                    transparent 100%);
+            animation: reticlePulse 3s ease-in-out infinite;
+            transform-origin: center center;
+        }
+
+        @keyframes reticlePulse {
+
+            0%,
+            100% {
+                transform: scale(0.95);
+                opacity: 0.85;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+        }
+
+        /* ===== BREATHING PULSE =====
+           Fixed-size centered circle (300px), NOT fullscreen.
+           Appears only when "Breathe with the circle" message shows. */
+        #active-pulse {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 300px;
+            height: 300px;
+            margin-left: -150px;
+            margin-top: -150px;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                    rgba(56, 189, 248, 0.45) 0%,
+                    rgba(56, 189, 248, 0.20) 40%,
+                    rgba(56, 189, 248, 0.08) 70%,
+                    transparent 50%);
+            z-index: 150;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            animation: breathe 5s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+
+            0%,
+            100% {
+                transform: scale(0.9);
+                opacity: 0.35;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+        }
+
+        #active-pulse.visible {
+            opacity: 1;
+        }
+
+        #confirmation-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            z-index: 200;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        #confirmation-glow.visible {
+            opacity: 1;
+        }
+
+        /* ===== FOCUS DIMMING =====
+           Subtle radial vignette that darkens edges, keeps center clear.
+           Activated on placement, stable after. No visible hard edges. */
+        #focus-dim {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 40;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+            background: radial-gradient(circle at 50% 50%,
+                    rgba(0, 0, 0, 0.0) 0%,
+                    rgba(0, 0, 0, 0.25) 40%,
+                    rgba(0, 0, 0, 0.32) 65%,
+                    rgba(0, 0, 0, 0.67) 100%);
+        }
+
+        #focus-dim.visible {
+            opacity: 1;
+        }
+
+        /* ===== SEQUENCE MESSAGES ===== */
+        #sequence-overlay {
+            position: fixed;
+            top: 35%;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 300;
+            pointer-events: none;
+            min-height: 80px;
+            display: flex;
+        }
+
+        .sequence-msg {
+            position: absolute;
+            left: 0;
+            right: 0;
+            color: white;
+            font-size: 26px;
+            font-weight: 500;
+            line-height: 1.4;
+            letter-spacing: -0.3px;
+            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+            opacity: 0;
+            transform: translateY(10px) scale(0.95);
+            transition: opacity 1s ease-in-out, transform 1s ease-in-out;
+            padding: 0 30px;
+        }
+
+        .sequence-msg.visible {
+            opacity: 1;
+            transform: translateY(0px) scale(1);
+        }
     </style>
 </head>
 
 <body>
+    <video id="camera-feed" autoplay playsinline muted></video>
+
+    <div id="focus-dim"></div>
+    <div id="active-pulse"></div>
+    <div id="confirmation-glow"></div>
+    <div id="sequence-overlay"></div>
+
     <div id="loading-screen" class="loading-screen">
-        <h2 id="loading-header">Initializing Calm Space...</h2>
-        <p id="loading-text">Authenticating...</p>
+        <h2 style="font-weight: 300;">Calm Spot</h2>
+        <p id="loading-text" style="color: #94a3b8; font-size: 14px;">Preparing session...</p>
     </div>
 
-    <div id="reticle"></div>
+    <!-- Reticle: soft gradient circle, no border, no dot -->
+    <div id="reticle-ui">
+        <div class="reticle-glow"></div>
+    </div>
 
-    <div id="overlay">
+    <div id="overlay" class="hidden">
         <div class="top-bar">
-            <div id="status-chip" class="status">Loading...</div>
-            <button class="exit-btn" onclick="exitAR()">✕ Exit</button>
+            <div id="status-chip" class="status-container">Point at the floor to begin</div>
+            <button class="exit-btn" onclick="exitSession()">✕</button>
         </div>
-        <div></div>
+        <div id="cta-area" class="cta-container">
+            <button id="start-btn" class="cta-btn hidden">Set calm spot</button>
+        </div>
     </div>
-
-    <canvas id="heatmap-canvas"
-        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50;"></canvas>
 
     <script>
-        // Use Global Logger
+        // --- DOM ---
+        var cameraFeed = document.getElementById('camera-feed');
+        var reticleUI = document.getElementById('reticle-ui');
+        var startBtn = document.getElementById('start-btn');
+        var statusChip = document.getElementById('status-chip');
+        var overlay = document.getElementById('overlay');
+        var loadingScreen = document.getElementById('loading-screen');
+        var activePulse = document.getElementById('active-pulse');
+        var confirmationGlow = document.getElementById('confirmation-glow');
+        var sequenceOverlay = document.getElementById('sequence-overlay');
+        var focusDim = document.getElementById('focus-dim');
+
+        // --- State ---
+        var sessionState = 'ENTRY';
+        var lastReportTime = 0;
+        var cameraStream = null;
+        var pointBuffer = [];
+
+
+        // Lerp (smoothed follow for post-detection surface tracking)
+        var currentX = window.innerWidth / 2;
+        var currentY = window.innerHeight / 2;
+        var targetX = currentX;
+        var targetY = currentY;
+        var LERP = 0.12;
+
         function log(msg) {
-            console.log("[AR Engine]", msg);
-            if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'log', message: msg }));
-            }
+            console.log("[Calm AR]", msg);
+            try {
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'log', message: msg }));
+                }
+            } catch (e) { }
         }
 
-        function exitAR() {
-            if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'exit' }));
+        function exitSession() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(function (track) { track.stop(); });
+                cameraStream = null;
             }
+            try {
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'exit' }));
+                }
+            } catch (e) { }
         }
 
-        // --- Core AR Logic ---
-        let roomRecognized = false;
-        let activeTargetEl = null;
-        let lastTimestamp = 0;
-        const pointBuffer = [];
+        // --- Reticle positioning ---
+        // Pre-detection: screen center (CSS handles this via top:50% left:50% margin)
+        // Post-detection: lerp follow toward simulated surface point
+        function updateMotion() {
+            if (sessionState === 'PLACEMENT') {
+                currentX += (targetX - currentX) * LERP;
+                currentY += (targetY - currentY) * LERP;
 
+                // Offset from CSS center: reticle is at 50%/50% via margin,
+                // so we express the delta from screen center
+                var dx = currentX - (window.innerWidth / 2);
+                var dy = currentY - (window.innerHeight / 2);
+                reticleUI.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+            }
+            requestAnimationFrame(updateMotion);
+        }
+
+
+
+        // --- Camera ---
+        function startCamera() {
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+                audio: false
+            }).then(function (stream) {
+                cameraStream = stream;
+                cameraFeed.srcObject = stream;
+                cameraFeed.play();
+
+                loadingScreen.classList.add('hidden');
+                overlay.classList.remove('hidden');
+
+                // Show reticle + button after 1s camera warm-up
+                setTimeout(function () {
+                    sessionState = 'PLACEMENT';
+                    statusChip.innerText = "Point at the floor to begin";
+
+                    // Fade reticle in (centered by CSS, opacity transition)
+                    reticleUI.style.opacity = '1';
+
+                    startBtn.classList.remove('hidden');
+
+                    // De-emphasize CTA after reticle is visible
+                    // (shift visual priority to calm zone)
+                    setTimeout(function () {
+                        //startBtn.classList.add('subdued');
+                    }, 600);
+                }, 1000);
+
+            }).catch(function (err) {
+                log("Camera access error: " + err.message);
+            });
+        }
+
+        // --- Auth Entry ---
         window.receiveNativeAuth = function (userId, petId, idToken) {
-            log("Auth received: " + userId);
             window.AR_USER_ID = userId;
             window.AR_PET_ID = petId;
-            
-            document.getElementById('loading-text').innerText = 'Loading AR Assets...';
-            document.getElementById('status-chip').innerText = window.STATUS_MESSAGE || 'Ready';
-            
-            initAR(userId, petId);
+            startCamera();
+            updateMotion();
         };
 
-        async function initAR(userId, petId) {
-            const loadingText = document.getElementById('loading-text');
-            const zoneId = window.AR_ZONE_ID || '';
-            const mode = window.AR_MODE || 'view';
+        // --- Placement Handler ---
+        startBtn.addEventListener('click', function () {
+            if (sessionState !== 'PLACEMENT') return;
 
-            if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ 
-                    action: 'getZoneData', userId, petId, zoneId 
-                }));
-            }
+            // Lock placement
+            sessionState = 'CONFIRM';
+            startBtn.classList.add('subdued');
+            statusChip.innerText = "Good. Stay here with your pet";
 
-            window.loadZoneData = function(zoneData) {
-                if (!zoneData || !zoneData.fileUrl) {
-                    loadingText.innerText = 'Safe Zone data issue.';
-                    return;
-                }
-                startARScene(zoneData);
-            };
-        }
+            // Activate focus dimming (stable after activation)
+            focusDim.classList.add('visible');
 
-        function startARScene(zoneData) {
-            const sceneHTML = `
-                <a-scene mindar-image="imageTargetSrc: ${zoneData.fileUrl}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;" 
-                         embedded vr-mode-ui="enabled: false"
-                         device-orientation-permission-ui="enabled: false">
-                    
-                    <a-camera position="0 0 0" look-controls="enabled: false">
-                         <a-entity raycaster="objects: .hit-plane; showLine: false; far: 10" position="0 0 0"></a-entity>
-                    </a-camera>
+            // Brief confirmation flash
+            confirmationGlow.classList.add('visible');
+            setTimeout(function () {
+                confirmationGlow.classList.remove('visible');
+            }, 250);
 
-                    ${[0,1,2,3,4,5].map(i => `
-                        <a-entity mindar-image-target="targetIndex: ${i}" id="target-${i}">
-                            <a-plane class="hit-plane" color="white" rotation="0 0 0" width="10" height="10" opacity="0.01" visible="false"></a-plane>
-                            <a-sphere color="#38bdf8" radius="0.1" opacity="0.6"></a-sphere>
-                        </a-entity>
-                    `).join('')}
-                    
-                    <a-entity id="heatmap-container"></a-entity>
-                </a-scene>
-            `;
+            // --- Transition: Hide reticle ---
+            // Start fading reticle out shortly after confirmation
+            setTimeout(function () {
+                reticleUI.style.opacity = '0';
+            }, 400);
 
-            document.body.insertAdjacentHTML('beforeend', sceneHTML);
-            const scene = document.querySelector('a-scene');
+            // Transition to ACTIVE after 1.5s
+            setTimeout(function () {
+                sessionState = 'ACTIVE';
 
-            scene.addEventListener('arReady', () => {
-                document.getElementById('loading-screen').classList.add('hidden');
-                startMainLoop();
-            });
+                // Hide status chip during message sequence
+                statusChip.style.opacity = '0';
 
-            for (let i = 0; i < 6; i++) {
-                const target = document.getElementById(`target-${i}`);
-                target.addEventListener('targetFound', () => {
-                    activeTargetEl = target;
-                    roomRecognized = true;
-                });
-                target.addEventListener('targetLost', () => {
-                    if (activeTargetEl === target) activeTargetEl = null;
-                });
-            }
-        }
+                log("Session active and grounded.");
 
-        function startMainLoop() {
-            function loop(t) {
-                // Throttling: 12 FPS (approx 83ms) to prevent thermal issues
-                if (t - lastTimestamp < 83) {
-                    requestAnimationFrame(loop);
-                    return;
-                }
-                lastTimestamp = t;
-
-                if (activeTargetEl) {
-                    // Interaction: Automated 3D point placement based on center reticle hit
-                    const raycaster = document.querySelector('[raycaster]').components.raycaster;
-                    const intersections = raycaster.intersections;
-                    
-                    if (intersections && intersections.length > 0) {
-                        const hit = intersections[0];
-                        const localPos = activeTargetEl.object3D.worldToLocal(hit.point.clone());
-                        
-                        pointBuffer.push({
-                            x: localPos.x, y: localPos.y, z: localPos.z,
-                            timestamp: { __type: 'serverTimestamp' },
-                            mode: 'lite_ar'
-                        });
+                // Upload anchor
+                try {
+                    if (window.ReactNativeWebView) {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                            action: 'uploadSafeZone',
+                            name: window.SPOT_NAME || "Calm Spot",
+                            anchorData: { x: currentX, y: currentY }
+                        }));
                     }
+                } catch (e) { }
+
+                // Start tracking
+                lastReportTime = performance.now();
+                requestAnimationFrame(trackActivityPoints);
+
+                // Run calming message sequence
+                runSequence();
+
+            }, 1500);
+        });
+
+        // --- Message Sequence ---
+        function runSequence() {
+            var messages = [
+                "Good. Just stay here with your pet.",
+                "Your calm helps your pet calm down.",
+                "Breathe with the circle.",
+                "Give a treat when your pet relaxes."
+            ];
+
+            var index = 0;
+            var FADE_IN = 1000;
+            var VISIBLE = 2500;
+            var FADE_OUT = 1000;
+            var OVERLAP = 400; // next starts fading in before previous fully gone
+
+            function showNext() {
+                if (index >= messages.length) {
+                    // Sequence complete — show breathing prompt
+                    setTimeout(function () {
+                        statusChip.innerText = "Follow the rhythm";
+                        statusChip.style.opacity = '1';
+                    }, 500);
+                    return;
                 }
 
-                if (pointBuffer.length >= 20) {
-                    sendPoints();
+                // Show breathing pulse when "Breathe with the circle" appears
+                if (index === 2) {
+                    activePulse.classList.add('visible');
                 }
 
-                requestAnimationFrame(loop);
+                var msg = messages[index];
+                var el = document.createElement('div');
+                el.className = 'sequence-msg';
+                el.textContent = msg;
+                sequenceOverlay.appendChild(el);
+
+                // Force layout reflow
+                el.offsetHeight;
+
+                // Fade in
+                el.classList.add('visible');
+
+                // Schedule fade out
+                setTimeout(function () {
+                    el.classList.remove('visible');
+
+                    // Start next before this one fully disappears
+                    setTimeout(function () {
+                        index++;
+                        showNext();
+                    }, FADE_OUT - OVERLAP);
+
+                    // Clean up DOM element after transition completes
+                    setTimeout(function () {
+                        if (el.parentNode) el.parentNode.removeChild(el);
+                    }, FADE_OUT + 200);
+
+                }, FADE_IN + VISIBLE);
             }
-            requestAnimationFrame(loop);
+
+            // Small initial delay for user to settle
+            setTimeout(showNext, 400);
+        }
+
+        // --- Activity Tracking ---
+        function trackActivityPoints(t) {
+            if (sessionState !== 'ACTIVE') return;
+
+            if (t - lastReportTime >= 100) {
+                lastReportTime = t;
+                pointBuffer.push({
+                    x: 0, y: 0, z: 0,
+                    timestamp: { __type: 'serverTimestamp' },
+                    mode: 'interactive_session'
+                });
+
+                if (pointBuffer.length >= 10) sendPoints();
+            }
+            requestAnimationFrame(trackActivityPoints);
         }
 
         function sendPoints() {
             if (pointBuffer.length === 0) return;
-            const points = pointBuffer.splice(0, pointBuffer.length);
-            if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ 
-                    action: 'savePoints', 
-                    points,
-                    userId: window.AR_USER_ID,
-                    petId: window.AR_PET_ID,
-                    zoneId: window.AR_ZONE_ID
-                }));
-            }
+            var points = pointBuffer.splice(0, pointBuffer.length);
+            try {
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        action: 'savePoints',
+                        points: points,
+                        userId: window.AR_USER_ID,
+                        petId: window.AR_PET_ID
+                    }));
+                }
+            } catch (e) { }
         }
+
+        // Fallback for browser testing
+        setTimeout(function () {
+            if (!window.AR_USER_ID && !loadingScreen.classList.contains('hidden')) {
+                startCamera();
+                updateMotion();
+            }
+        }, 3000);
     </script>
 </body>
+
 </html>

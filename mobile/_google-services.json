@@ -14,6 +14,38 @@
       },
       "oauth_client": [
         {
+          "client_id": "293725153990-96c65gfpmbj74omjik4f0mapfiruj14s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kfsoftware.chillpup",
+            "certificate_hash": "a5b4f4b46287fc7f34d5e9eb5a57e0a6770268bf"
+          }
+        },
+        {
+          "client_id": "293725153990-9v4m7jkr5q0kn65sj75ua62le6epbu11.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kfsoftware.chillpup",
+            "certificate_hash": "f7834f7dfcb26396b861771206d941f4ef88b783"
+          }
+        },
+        {
+          "client_id": "293725153990-sppd0h2qgusdodt8d6mfvvkrqvttv12f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kfsoftware.chillpup",
+            "certificate_hash": "6bd1cf3a7c5de5d7c267b21e9e28f2bd65965228"
+          }
+        },
+        {
+          "client_id": "293725153990-tfn4s5gl1thsp5nlln9lih85c6256o6m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kfsoftware.chillpup",
+            "certificate_hash": "7ad87b0a204d351ba4ac980bfb9e3a1d55a6da5f"
+          }
+        },
+        {
           "client_id": "293725153990-hm4jc29v4438lqq66b59gamqu6nmi1g3.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -10,7 +10,16 @@ import {
     Dimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { auth, db } from '../services/firebaseConfig';
+import {
+    auth,
+    db,
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    query,
+    limit
+} from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
@@ -38,19 +47,29 @@ export default function DashboardScreen({ navigation }: any) {
 
     const { isPremium, checkPaywallTrigger, trackARSession } = useSubscription();
 
+    const anxietyScore = petData?.anxietyScore ?? 0;
+    const anxietyColor = getAnxietyColor(anxietyScore);
+    const anxietyLabel = getAnxietyLabel(anxietyScore);
+    const anxietyDesc = getAnxietyDescription(anxietyScore);
+
     const fetchData = async () => {
+
         const user = auth().currentUser;
         if (!user) { navigation.replace('Login'); return; }
         try {
-            const userDoc = await db.collection('users').doc(user.uid).get();
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (userDoc.exists()) {
                 setProfile(userDoc.data());
-                const querySnapshot = await db.collection('users').doc(user.uid).collection('pets').limit(1).get();
-                if (!querySnapshot.empty) {
-                    const petDoc = querySnapshot.docs[0];
+                const petsCol = collection(db, 'users', user.uid, 'pets');
+                const petsSnap = await getDocs(query(petsCol, limit(1)));
+
+                if (!petsSnap.empty) {
+                    const petDoc = petsSnap.docs[0];
                     setPetId(petDoc.id);
                     setPetData(petDoc.data());
-                    const zSnap = await db.collection('users').doc(user.uid).collection('pets').doc(petDoc.id).collection('safeZones').get();
+
+                    const zonesCol = collection(db, 'users', user.uid, 'pets', petDoc.id, 'safeZones');
+                    const zSnap = await getDocs(zonesCol);
                     const zones = zSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
                     zones.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                     setSafeZones(zones);
@@ -66,6 +85,7 @@ export default function DashboardScreen({ navigation }: any) {
         }
     };
 
+
     useFocusEffect(useCallback(() => { fetchData(); }, []));
     const onRefresh = () => { setRefreshing(true); fetchData(); };
 
@@ -74,23 +94,27 @@ export default function DashboardScreen({ navigation }: any) {
             navigation.navigate('Paywall', { warning: 'Add pet for precise analysis.' });
             return;
         }
-        const shouldTrigger = await checkPaywallTrigger();
-        if (shouldTrigger) { navigation.navigate('Paywall'); return; }
+        //         const shouldTrigger = await checkPaywallTrigger();
+        //         if (shouldTrigger) { navigation.navigate('Paywall'); return; }
+
+        const navParams = {
+            userId: auth().currentUser?.uid,
+            petId,
+            anxietyBefore: anxietyScore
+        };
+
         if (safeZones.length === 0) {
-            navigation.navigate('ARSafeZones', { mode: 'scan', userId: auth().currentUser?.uid, petId });
+            navigation.navigate('ARSafeZones', { ...navParams, mode: 'scan' });
         } else if (safeZones.length === 1) {
-            navigation.navigate('ARSafeZones', { mode: 'view', userId: auth().currentUser?.uid, petId, zoneId: safeZones[0].id });
+            navigation.navigate('ARSafeZones', { ...navParams, mode: 'view', zoneId: safeZones[0].id });
         } else {
             setRoomSelectorVisible(true);
         }
     };
 
-    const anxietyScore = petData?.anxietyScore ?? 0;
-    const anxietyColor = getAnxietyColor(anxietyScore);
-    const anxietyLabel = getAnxietyLabel(anxietyScore);
-    const anxietyDesc = getAnxietyDescription(anxietyScore);
 
     if (loading) {
+
         return <View style={styles.center}><Text style={{ color: COLORS.textSecondary }}>Loading...</Text></View>;
     }
     if (!profile) return null;
@@ -280,8 +304,15 @@ export default function DashboardScreen({ navigation }: any) {
                     navigation.navigate('ARSafeZones', { mode: 'view', userId: auth().currentUser?.uid, petId, zoneId });
                 }}
                 onZoneDeleted={(zoneId) => {
-                    setSafeZones(prev => prev.filter(z => z.id !== zoneId));
-                    if (safeZones.length <= 2) setRoomSelectorVisible(false);
+                    setSafeZones(prev => {
+                        const updatedZones = prev.filter(z => z.id !== zoneId);
+
+                        if (updatedZones.length <= 1) {
+                            setRoomSelectorVisible(false);
+                        }
+
+                        return updatedZones;
+                    });
                 }}
             />
         </ScrollView>

@@ -42,7 +42,7 @@ function AppNavigatorStack() {
             <AppStack.Screen name="Analysis" component={AnalysisScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Privacy" component={PrivacyScreen} />
             <AppStack.Screen name="Terms" component={TermsScreen} />
-            <AppStack.Screen name="ARSafeZones" component={ARSafeZonesScreen} options={{ title: 'Scan Room' }} />
+            <AppStack.Screen name="ARSafeZones" component={ARSafeZonesScreen} options={{ title: 'Set calm spot' }} />
             <AppStack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
         </AppStack.Navigator>
     );

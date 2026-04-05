@@ -9,7 +9,9 @@ interface SmartARContainerProps {
   userId: string;
   mode: 'scan' | 'view';
   zoneId?: string;
+  spotName?: string;
   onExit: () => void;
+
   // Adaptive strings from Screen level
   nativeMsg: string;
   liteMsg: string;
@@ -24,10 +26,12 @@ const SmartARContainer: React.FC<SmartARContainerProps> = ({
   userId,
   mode,
   zoneId,
+  spotName,
   onExit,
   nativeMsg,
   liteMsg,
 }) => {
+
   const [arMode, setArMode] = useState<ARMode | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [isInitializing, setIsInitializing] = useState(true);
@@ -113,6 +117,7 @@ const SmartARContainer: React.FC<SmartARContainerProps> = ({
           petId={petId}
           mode={mode}
           zoneId={zoneId}
+          spotName={spotName}
           onExit={onExit}
           statusMessage={liteMsg}
         />
