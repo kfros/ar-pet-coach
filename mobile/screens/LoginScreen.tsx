@@ -76,6 +76,7 @@ export default function LoginScreen({ navigation }: any) {
             }
         } catch (err: any) {
             console.error('Google Sign-In Error:', err);
+            console.log('Error code for GOOGLE: ', err.code);
             if (err.code === statusCodes.SIGN_IN_CANCELLED) {
                 // Cancelled silently
             } else if (err.code === statusCodes.IN_PROGRESS) {
