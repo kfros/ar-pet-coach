@@ -227,11 +227,11 @@ export default function DashboardScreen({ navigation }: any) {
 
             {/* Central Session CTA */}
             <View style={styles.sessionCard}>
-                <Text style={styles.sessionTitle}>Current Session Status</Text>
+                <Text style={styles.sessionTitle}>Get ready for a calming session</Text>
                 <Text style={styles.sessionSubtitle}>
                     {safeZones.length === 0
-                        ? 'Scan your first room to create an AR safe zone for your pet.'
-                        : `${safeZones.length} safe zone${safeZones.length > 1 ? 's' : ''} configured. Ready for a calming session.`}
+                        ? 'Set up your first calm spot.'
+                        : `${safeZones.length} calm spot${safeZones.length > 1 ? 's' : ''} configured. Ready for a calming session.`}
                 </Text>
                 <Pressable
                     style={({ pressed }) => [styles.sessionButton, pressed && styles.primaryButtonPressed]}
@@ -239,7 +239,7 @@ export default function DashboardScreen({ navigation }: any) {
                 >
                     <Ionicons name={safeZones.length === 0 ? 'scan-outline' : 'play-circle-outline'} size={22} color="#fff" />
                     <Text style={styles.sessionButtonText}>
-                        {safeZones.length === 0 ? 'Scan AR Zone' : 'Start Calming Session'}
+                        {safeZones.length === 0 ? 'Set calm spot' : 'Start Calming Session'}
                     </Text>
                 </Pressable>
             </View>
