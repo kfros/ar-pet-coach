@@ -1,14 +1,17 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
-    "platforms": ["ios", "android"],
+    "name": "ChillPup",
+    "slug": "chillpup-ar",
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "version": "1.0.0",
     "scheme": "ar-pet-coach",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -19,7 +22,16 @@
       "@react-native-google-signin/google-signin",
       "expo-apple-authentication",
       "@react-native-firebase/app",
-      "@viro-community/react-viro"
+      "@viro-community/react-viro",
+      "expo-dev-client",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
     ],
     "ios": {
       "buildNumber": "3",
@@ -28,9 +40,11 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera for AR visualization of pet safe zones.",
         "NSMicrophoneUsageDescription": "This app uses the microphone to analyze your pet's vocalizations.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos",
+        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos"
       },
-      "bundleIdentifier": "com.kfros.mobile",
+      "bundleIdentifier": "com.kfsoftware.chillpup",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
@@ -47,14 +61,14 @@
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.kfsoftware.chillpup",
+      "package": "com.kfsotware.chillpup",
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
           "data": [
             {
-              "scheme": "com.kfsoftware.chillpup",
+              "scheme": "com.kfsotware.chillpup",
               "host": "oauthredirect"
             }
           ],
@@ -67,7 +81,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "34c395c5-dc34-4fd9-98d6-57c5eb34841e"
+        "projectId": "23bbaadb-97bf-42a2-abe1-a2d1ea6e4061"
       }
     },
     "owner": "kfros"

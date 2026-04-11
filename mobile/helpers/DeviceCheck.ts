@@ -49,3 +49,22 @@ export const getBestARMode = async (): Promise<ARMode> => {
     return ARMode.CALM;
   }
 };
+/**
+ * Identifies budget or legacy hardware that should receive truncated animations/messages
+ * to preserve session stability.
+ */
+export const isLowPerformanceDevice = async (): Promise<boolean> => {
+  try {
+    const apiLevel = await DeviceInfo.getApiLevel();
+    const ram = await DeviceInfo.getTotalMemory(); // in bytes
+    
+    // Thresholds for "budget" devices: 
+    // Android < 10 (API 29) OR < 3GB RAM
+    const isOldAndroid = Platform.OS === 'android' && apiLevel < 29;
+    const isLowRam = ram < 3 * 1024 * 1024 * 1024;
+
+    return isOldAndroid || isLowRam;
+  } catch (e) {
+    return true; // Default to safe (low) if check fails
+  }
+};
