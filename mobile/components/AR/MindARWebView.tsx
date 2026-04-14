@@ -1,26 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAssets } from 'expo-asset';
-import { 
-  auth, 
-  db, 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  onSnapshot, 
-  writeBatch, 
-  serverTimestamp,
-  firestore 
+import {
+  auth,
+  db,
+  collection,
+  doc,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  writeBatch,
+  serverTimestamp
 } from '../../services/firebaseConfig';
 import ARViewErrorBoundary from './ErrorBoundary';
+import { useCalmAudio } from '../../hooks/useCalmAudio';
+import CalmHUD from './CalmHUD';
 
 interface MindARWebViewProps {
   userId: string;
@@ -33,7 +31,7 @@ interface MindARWebViewProps {
   onCrash?: () => void;
 }
 
-const MindARWebView: React.FC<MindARWebViewProps> = ({
+const MindARWebView = ({
   userId,
   petId,
   mode,
@@ -42,37 +40,105 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
   onExit,
   statusMessage,
   onCrash,
-}) => {
+}: MindARWebViewProps) => {
   const [assets, error] = useAssets([require('../../assets/mindar-safe-zone.html')]);
   const webViewRef = useRef<WebView>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
   const heatmapUnsubscribe = useRef<(() => void) | null>(null);
+  const [isPlaced, setIsPlaced] = useState(false);
+  const [sessionTime, setSessionTime] = useState(0);
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
+  const [lowLight, setLowLight] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isExiting = useRef(false);
 
-  // Cleanup on unmount
+  // Persistence Refs (Mirror state for safe access during unmount cleanup)
+  const finalSessionTime = useRef(0);
+  const currentTrackIdRef = useRef<string | null>(null);
+  const hasSaved = useRef(false);
+
+  // Unified Audio
+  const { currentTrackId, playRandomTrack, stopAudio } = useCalmAudio();
+
+  // 1. Session Lifecycle
+  useEffect(() => {
+    console.log('[MindARWebView] useEffect SessionLifecycle MOUNT/UPDATE isPlaced:', isPlaced);
+    if (isPlaced && !isExiting.current) {
+      timerRef.current = setInterval(() => {
+        if (!isExiting.current) setSessionTime(prev => prev + 1);
+      }, 1000);
+      playRandomTrack();
+    }
+    return () => {
+      console.log('[MindARWebView] useEffect SessionLifecycle UNMOUNT/CLEANUP');
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isPlaced]);
+
+  // 2. Mirroring Side Effects (State to Ref Sync)
+  useEffect(() => {
+    finalSessionTime.current = sessionTime;
+    currentTrackIdRef.current = currentTrackId;
+  }, [sessionTime, currentTrackId]);
+
+  // 3. Atomic Save-on-Exit
   useEffect(() => {
     return () => {
-      if (heatmapUnsubscribe.current) heatmapUnsubscribe.current();
+      // Threshold check: only save if session lasted at least 15 seconds
+      if (!hasSaved.current && finalSessionTime.current >= 15) {
+        hasSaved.current = true;
+        
+        console.log('[MindARWebView] Performing atomic save-on-exit:', finalSessionTime.current);
+        
+        addDoc(collection(db, 'users', userId, 'pets', petId, 'activityPoints'), {
+          type: 'calm_session_complete',
+          timestamp: serverTimestamp(),
+          durationSeconds: finalSessionTime.current,
+          mode: 'lite_ar',
+          trackId: currentTrackIdRef.current
+        }).catch((err) => {
+          console.error('[MindARWebView] Exit save failed:', err);
+        });
+      }
     };
-  }, []);
+  }, []); // Empty dependencies ensure this only runs on unmount
 
-  // Fetch ID Token for WebView authentication
+  // Fetch ID Token
   useEffect(() => {
+    console.log('[MindARWebView] useEffect FetchToken MOUNT');
     const fetchToken = async () => {
       const user = auth().currentUser;
       if (user) {
         try {
           const token = await user.getIdToken();
           setIdToken(token);
-        } catch (e) {
-          console.error('[MindARWebView] Token error:', e);
-        }
+        } catch (e) { }
       }
     };
     fetchToken();
   }, []);
 
+  // 4. Simulated Detection Phase & Low Light Heuristic
+  useEffect(() => {
+    if (!isPlaced && !isExiting.current) {
+      // Logic for "Ready" state simulation (MindAR needs time to boot)
+      const readyTimer = setTimeout(() => {
+        setSurfaceStatus('ready');
+      }, 2000);
+
+      // Logic for Low Light Hint (if no success after 10s)
+      const lowLightTimer = setTimeout(() => {
+        if (!isPlaced) setLowLight(true);
+      }, 10000);
+
+      return () => {
+        clearTimeout(readyTimer);
+        clearTimeout(lowLightTimer);
+      };
+    }
+  }, [isPlaced]);
+
   if (error) {
-    console.error('[MindARWebView] Asset Load Error:', error);
     onCrash?.();
     return null;
   }
@@ -80,89 +146,81 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
   if (!assets || !assets[0]) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4CC3D9" />
+        <ActivityIndicator size="large" color="#38BDF8" />
       </View>
     );
   }
 
   const handleMessage = async (event: any) => {
+    if (isExiting.current) return;
     try {
       const data = JSON.parse(event.nativeEvent.data);
       const { action } = data;
 
       switch (action) {
-        case 'log':
-          console.log('[MindAR Log]', data.message);
-          break;
-
         case 'exit':
-          onExit();
-          break;
-
-        case 'getZoneData':
-          webViewRef.current?.injectJavaScript(`window.loadZoneData(null);`);
-          break;
-
-        case 'subscribeHeatmap':
-          if (heatmapUnsubscribe.current) heatmapUnsubscribe.current();
-          
-          const pointsCol = collection(db, 'users', userId, 'pets', petId, 'activityPoints');
-          let q = query(pointsCol, orderBy('timestamp', 'desc'), limit(1000));
-          if (zoneId) q = query(pointsCol, where('zoneId', '==', zoneId), orderBy('timestamp', 'desc'), limit(1000));
-          
-          heatmapUnsubscribe.current = onSnapshot(q, (snap: any) => {
-            const points = snap.docChanges()
-              .filter((change: any) => change.type === 'added')
-              .map((change: any) => change.doc.data());
-            
-            if (points.length > 0) {
-              webViewRef.current?.injectJavaScript(`window.addHistoricalPoints(${JSON.stringify(points)});`);
-            }
-          }, (err: any) => console.error('Heatmap sub error:', err));
+          handleExit();
           break;
 
         case 'savePoints':
-          try {
-            const batch = writeBatch(db);
-            const colRef = collection(db, 'users', userId, 'pets', petId, 'activityPoints');
-            
-            data.points.forEach((pt: any) => {
-              const docRef = doc(colRef);
-              const finalPt = { ...pt };
-              if (finalPt.timestamp && finalPt.timestamp.__type === 'serverTimestamp') {
-                finalPt.timestamp = serverTimestamp();
-              }
-              if (zoneId) finalPt.zoneId = zoneId;
-              batch.set(docRef, finalPt);
-            });
-            await batch.commit();
-          } catch (e) {
-            console.error('Error saving batched points:', e);
-          }
+          // Legacy check for HTML internal tracking
           break;
 
         case 'uploadSafeZone':
+          setIsPlaced(true);
           try {
             const { name, anchorData } = data;
-            // Frictionless mode: User selected or entered spot name. 
-            // We only save safeZones as a master list for selection.
             await addDoc(collection(db, 'users', userId, 'pets', petId, 'safeZones'), {
               type: 'unified_placement',
               name: name || 'Modern Calm Space',
               anchorData: anchorData || {},
               createdAt: serverTimestamp()
             });
-
             webViewRef.current?.injectJavaScript(`window.onUploadSuccess();`);
-          } catch (e: any) {
-            console.error('Upload error (Lite):', e);
-            webViewRef.current?.injectJavaScript(`window.onUploadError("${e.message}");`);
-          }
+          } catch (e) { }
           break;
       }
+    } catch (e) { }
+  };
+
+  const handleExit = async () => {
+    if (isExiting.current) return;
+    isExiting.current = true;
+
+    try {
+      // Clear timer immediately
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      // Fade out audio (awaits completion)
+      if (isPlaced) {
+        console.log('[MindARWebView] handleExit calling stopAudio');
+        await stopAudio();
+        console.log('[MindARWebView] stopAudio completed');
+      }
     } catch (e) {
-      console.error('[MindARWebView] onMessage parsing error:', e);
+      console.error('[MindARWebView] Error during handleExit cleanup:', e);
+    } finally {
+      // Let navigation.replace() handle the teardown
+      console.log('[MindARWebView] handleExit calling onExit (navigation.replace)');
+      onExit();
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handlePlaceTap = () => {
+    // Trigger WebView placement logic
+    webViewRef.current?.injectJavaScript(`
+      const btn = document.getElementById('start-btn');
+      if (btn) btn.click();
+    `);
   };
 
   const getInjectedJS = () => `
@@ -171,21 +229,14 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
       window.AR_ZONE_ID = '${zoneId || ''}';
       window.STATUS_MESSAGE = '${statusMessage}';
       window.SPOT_NAME = '${spotName || ''}';
+      window.HIDE_INTERNAL_UI = true;
       
       if (window.receiveNativeAuth) {
         window.receiveNativeAuth('${userId}', '${petId}', '${idToken || ''}');
-      } else {
-        setTimeout(function() {
-          if (window.receiveNativeAuth) {
-            window.receiveNativeAuth('${userId}', '${petId}', '${idToken || ''}');
-          }
-        }, 1000);
       }
     })();
     true;
   `;
-
-
 
   return (
     <ARViewErrorBoundary fallback={() => { onCrash?.(); return null; }}>
@@ -205,6 +256,21 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
           injectedJavaScript={getInjectedJS()}
           onMessage={handleMessage}
         />
+
+        {/* Shared Timer Layer */}
+        <View style={styles.timerContainer} pointerEvents="none">
+          <Text style={styles.timerText}>{formatTime(sessionTime)}</Text>
+        </View>
+
+        {/* Unified HUD */}
+        <CalmHUD 
+          isPlaced={isPlaced}
+          onPlaceTap={handlePlaceTap}
+          onExit={handleExit}
+          showReticle={!isPlaced}
+          surfaceStatus={surfaceStatus}
+          lowLight={lowLight}
+        />
       </View>
     </ARViewErrorBoundary>
   );
@@ -218,6 +284,21 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  timerContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  timerText: {
+    fontSize: 28,
+    fontWeight: '300',
+    color: '#38BDF8',
+    opacity: 0.7,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace'
   },
 });
 

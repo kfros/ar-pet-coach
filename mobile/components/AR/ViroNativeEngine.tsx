@@ -1,36 +1,37 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, Text, Platform } from 'react-native';
 import {
   ViroARScene,
   ViroARSceneNavigator,
-  ViroARPlaneSelector,
   ViroSphere,
-  ViroText,
   ViroMaterials,
   ViroAnimations,
   ViroNode,
   ViroAmbientLight,
   ViroSpotLight,
 } from '@viro-community/react-viro';
-import { db, firestore } from '../../services/firebaseConfig';
+import {
+  db,
+  collection,
+  addDoc,
+  serverTimestamp
+} from '../../services/firebaseConfig';
+import { useCalmAudio } from '../../hooks/useCalmAudio';
+import CalmHUD from './CalmHUD';
 
-// Define Materials & Animations for Viro
+// Define Materials & Animations
 ViroMaterials.createMaterials({
   calmSphere: {
     diffuseColor: '#38BDF8AA',
     lightingModel: 'PBR',
     shininess: 0.8,
-  },
-  grid: {
-    diffuseColor: 'rgba(255,255,255,0.2)',
   }
 });
 
 ViroAnimations.registerAnimations({
   pulse: {
-    properties: { scaleX: 1.1, scaleY: 1.1, scaleZ: 1.1 },
-    duration: 2000,
+    properties: { scaleX: 1.15, scaleY: 1.15, scaleZ: 1.15 },
+    duration: 2500, // Matches 5s cycle (2.5s in, 2.5s out)
     easing: 'EaseInEaseOut',
   }
 });
@@ -38,110 +39,179 @@ ViroAnimations.registerAnimations({
 interface ViroNativeEngineProps {
   userId: string;
   petId: string;
-  mode: 'scan' | 'view';
+  mode?: 'scan' | 'view';
   zoneId?: string;
   onExit: () => void;
   statusMessage: string;
 }
 
 /**
- * Premium Native AR Engine using ViroReact.
- * Focused on stability, environment placement, and high-performance rendering.
+ * AR Scene Component — defined OUTSIDE the engine to prevent
+ * ViroARSceneNavigator from losing its scene reference on re-render.
+ * Receives state via viroAppProps (injected by Viro at runtime).
  */
-const ViroNativeEngine: React.FC<ViroNativeEngineProps> = ({
+const CalmScene = (props: any) => {
+  const isPlaced = props?.sceneNavigator?.viroAppProps?.isPlaced ?? false;
+  const onTrackingUpdate = props?.sceneNavigator?.viroAppProps?.onTrackingUpdate;
+
+  return (
+    <ViroARScene onTrackingUpdated={onTrackingUpdate}>
+      <ViroAmbientLight color="#ffffff" intensity={200} />
+      <ViroSpotLight
+        innerAngle={5}
+        outerAngle={45}
+        direction={[0, -1, -0.2]}
+        position={[0, 3, 0]}
+        color="#ffffff"
+        castsShadow={true}
+      />
+
+      {isPlaced && (
+        <ViroNode position={[0, -0.5, -1.2]}>
+          <ViroSphere
+            heightSegmentCount={20}
+            widthSegmentCount={20}
+            radius={0.15}
+            materials={['calmSphere']}
+            animation={{ name: 'pulse', run: true, loop: true }}
+          />
+        </ViroNode>
+      )}
+    </ViroARScene>
+  );
+};
+
+/**
+ * Premium Native AR Engine.
+ * Unified with Fallback/Lite modes via shared logic and HUD.
+ */
+const ViroNativeEngine = ({
   userId,
   petId,
   mode,
   zoneId,
   onExit,
   statusMessage,
-}) => {
-  const [anchors, setAnchors] = useState<any[]>([]);
+}: ViroNativeEngineProps) => {
+  const [isPlaced, setIsPlaced] = useState(false);
+  const [sessionTime, setSessionTime] = useState(0);
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isExiting = useRef(false);
 
-  // The AR Scene Component
-  const CalmScene = () => {
-    
-    // Logic for placing an anchor via raycasting (Center-Screen)
-    const onSceneClick = useCallback(async () => {
-      // In a real Viro environment, we'd use the navigator's performARHitTest
-      // but here we simplify for the proof of concept as requested.
-      console.log('[Viro] Scene clicked - attempting to place calming anchor');
-    }, []);
+  // Persistence Refs (Mirror state for safe access during unmount cleanup)
+  const finalSessionTime = useRef(0);
+  const currentTrackIdRef = useRef<string | null>(null);
+  const hasSaved = useRef(false);
 
-    return (
-      <ViroARScene onClick={onSceneClick}>
-        <ViroAmbientLight color="#ffffff" intensity={200} />
-        <ViroSpotLight
-          innerAngle={5}
-          outerAngle={45}
-          direction={[0, -1, -0.2]}
-          position={[0, 3, 0]}
-          color="#ffffff"
-          castsShadow={true}
-          influenceBitMask={2}
-          shadowMapSize={2048}
-          shadowNearZ={2}
-          shadowFarZ={5}
-          shadowOpacity={0.7}
-        />
+  // Unified Audio
+  const { currentTrackId, playRandomTrack, stopAudio } = useCalmAudio();
 
-        <ViroARPlaneSelector minHeight={0.1} minWidth={0.1} alignment="Horizontal">
-          <ViroNode position={[0, 0, 0]}>
-             <ViroSphere
-              heightSegmentCount={20}
-              widthSegmentCount={20}
-              radius={0.1}
-              position={[0, 0.1, 0]}
-              materials={['calmSphere']}
-              animation={{ name: 'pulse', run: true, loop: true }}
-            />
-            <ViroText
-              text="Calming Zone"
-              scale={[0.2, 0.2, 0.2]}
-              position={[0, 0.25, 0]}
-              style={styles.viroText}
-              extrusionDepth={1}
-            />
-          </ViroNode>
-        </ViroARPlaneSelector>
+  // 1. Session Lifecycle
+  useEffect(() => {
+    console.log('[ViroNativeEngine] useEffect SessionLifecycle MOUNT/UPDATE isPlaced:', isPlaced);
+    if (isPlaced && !isExiting.current) {
+      timerRef.current = setInterval(() => {
+        if (!isExiting.current) setSessionTime(prev => prev + 1);
+      }, 1000);
+      playRandomTrack();
+    }
+    return () => {
+      console.log('[ViroNativeEngine] useEffect SessionLifecycle UNMOUNT/CLEANUP');
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isPlaced]);
 
-        {/* Render existing anchors from Firestore if in 'view' mode */}
-        {anchors.map((anchor, i) => (
-          <ViroNode key={anchor.id || i} position={[anchor.x, anchor.y, anchor.z]}>
-             <ViroSphere
-              radius={0.05}
-              materials={['calmSphere']}
-              opacity={0.6}
-            />
-          </ViroNode>
-        ))}
-      </ViroARScene>
-    );
+  // 2. Mirroring Side Effects (State to Ref Sync)
+  useEffect(() => {
+    finalSessionTime.current = sessionTime;
+    currentTrackIdRef.current = currentTrackId;
+  }, [sessionTime, currentTrackId]);
+
+  // 3. Atomic Save-on-Exit
+  useEffect(() => {
+    return () => {
+      // Threshold check: only save if session lasted at least 15 seconds
+      if (!hasSaved.current && finalSessionTime.current >= 15) {
+        hasSaved.current = true;
+        
+        console.log('[ViroNativeEngine] Performing atomic save-on-exit:', finalSessionTime.current);
+        
+        addDoc(collection(db, 'users', userId, 'pets', petId, 'activityPoints'), {
+          type: 'calm_session_complete',
+          timestamp: serverTimestamp(),
+          durationSeconds: finalSessionTime.current,
+          mode: 'native_ar',
+          trackId: currentTrackIdRef.current
+        }).catch((err) => {
+          console.error('[ViroNativeEngine] Exit save failed:', err);
+        });
+      }
+    };
+  }, []); // Empty dependencies ensure this only runs on unmount
+
+  const handleTrackingUpdate = (state: any, reason: any) => {
+    // Viro tracking states: 1: Unavailable, 2: Limited, 3: Normal
+    if (state === 3) {
+      setSurfaceStatus('ready');
+    } else if (state === 2) {
+      setSurfaceStatus('unstable');
+    } else {
+      setSurfaceStatus('detecting');
+    }
+  };
+
+  const handleExit = async () => {
+    if (isExiting.current) return;
+    isExiting.current = true;
+
+    try {
+      // Clear timer immediately
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      // Fade out audio (awaits completion)
+      console.log('[ViroNativeEngine] handleExit calling stopAudio');
+      await stopAudio();
+      console.log('[ViroNativeEngine] handleExit stopAudio completed');
+    } catch (e) {
+      console.error('[ViroNativeEngine] Error during handleExit cleanup:', e);
+    }
+
+    console.log('[ViroNativeEngine] handleExit calling onExit');
+    onExit();
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
     <View style={styles.container}>
       <ViroARSceneNavigator
         autofocus={true}
-        initialScene={{ scene: CalmScene }}
+        initialScene={{ scene: CalmScene as any }}
+        viroAppProps={{ isPlaced, onTrackingUpdate: handleTrackingUpdate }}
         style={styles.viroContainer}
       />
-      
-      {/* HUD Layer */}
-      <SafeAreaView style={styles.hudOverlay} pointerEvents="none">
-        <View style={styles.statusBox}>
-          <Text style={styles.statusText}>{statusMessage}</Text>
-        </View>
-        
-        {/* Reticle / Crosshair for interaction */}
-        <View style={styles.reticleContainer}>
-          <View style={styles.reticle} />
-        </View>
-      </SafeAreaView>
 
-      <TouchableOpacity style={styles.exitButton} onPress={onExit}>
-        <Text style={styles.exitText}>✕ Exit</Text>
-      </TouchableOpacity>
+      {/* Shared Timer Overlay */}
+      <View style={styles.timerContainer} pointerEvents="none">
+        <Text style={styles.timerText}>{formatTime(sessionTime)}</Text>
+      </View>
+
+      {/* Unified HUD */}
+      <CalmHUD
+        isPlaced={isPlaced}
+        onPlaceTap={() => setIsPlaced(true)}
+        onExit={handleExit}
+        showReticle={!isPlaced}
+        surfaceStatus={surfaceStatus}
+      />
     </View>
   );
 };
@@ -154,66 +224,20 @@ const styles = StyleSheet.create({
   viroContainer: {
     flex: 1,
   },
-  hudOverlay: {
+  timerContainer: {
     position: 'absolute',
-    top: 0,
+    top: 60,
     left: 0,
     right: 0,
-    bottom: 0,
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    zIndex: 5,
   },
-  statusBox: {
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.4)',
-    marginTop: 20,
-  },
-  statusText: {
-    color: '#F1F5F9',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  reticleContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reticle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#38BDF8',
-    backgroundColor: 'rgba(56, 189, 248, 0.2)',
-  },
-  exitButton: {
-    position: 'absolute',
-    bottom: 40,
-    right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  exitText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  viroText: {
-    fontFamily: 'Arial',
-    fontSize: 30,
-    color: '#ffffff',
-    textAlignVertical: 'center',
-    textAlign: 'center',
+  timerText: {
+    fontSize: 28,
+    fontWeight: '300',
+    color: '#38BDF8',
+    opacity: 0.7,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace'
   },
 });
 

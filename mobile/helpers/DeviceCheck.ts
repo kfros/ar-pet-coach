@@ -16,11 +16,19 @@ export const getBestARMode = async (): Promise<ARMode> => {
     // 1. Hardware Capability Detection (Native AR)
     // We try/catch this as the native module might not be initialized in some edge cases
     try {
-      const { ViroARSceneNavigator } = require('@viro-community/react-viro');
-      // This is a fast native call
-      const supportStatus = await ViroARSceneNavigator.isARSupportedOnDevice();
-      
-      if (supportStatus === 'SUPPORTED') {
+      const { isARSupportedOnDevice } = require('@viro-community/react-viro');
+      // This is a fast native call to check ARCore/ARKit support
+      const supportStatus = await isARSupportedOnDevice();
+
+      if (supportStatus && supportStatus.isARSupported) {
+        // CRITICAL: ViroARSceneNavigator has a confirmed native dealloc bug on iOS
+        // that causes EXC_BAD_ACCESS on ANY unmount. Route iOS to CALM mode which
+        // uses pure React Native components and achieves visual parity without Viro.
+        // Viro is still used on Android where the dealloc is stable.
+        if (Platform.OS === 'ios') {
+          console.log('[DeviceCheck] iOS detected — bypassing Viro (native dealloc bug). Using CALM mode.');
+          return ARMode.LITE;
+        }
         return ARMode.NATIVE;
       }
     } catch (viroError) {
@@ -30,9 +38,9 @@ export const getBestARMode = async (): Promise<ARMode> => {
     // 2. WebView Resilience Check (Avoid PacProcessor crashes on older Android)
     const apiLevel = await DeviceInfo.getApiLevel();
     const brand = (await DeviceInfo.getBrand()).toLowerCase();
-    
+
     // Older Android (API < 29 / Android 10) on specific brands often have WebView bugs
-    const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 && 
+    const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 &&
       (brand === 'xiaomi' || brand === 'redmi' || brand === 'oppo');
 
     if (isVulnerableWebView) {
@@ -57,7 +65,7 @@ export const isLowPerformanceDevice = async (): Promise<boolean> => {
   try {
     const apiLevel = await DeviceInfo.getApiLevel();
     const ram = await DeviceInfo.getTotalMemory(); // in bytes
-    
+
     // Thresholds for "budget" devices: 
     // Android < 10 (API 29) OR < 3GB RAM
     const isOldAndroid = Platform.OS === 'android' && apiLevel < 29;

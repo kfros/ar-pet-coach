@@ -352,6 +352,17 @@
         var cameraStream = null;
         var pointBuffer = [];
 
+        // Global UI Toggle for Unified UX
+        function applyUIVisibility() {
+            if (window.HIDE_INTERNAL_UI) {
+                if (reticleUI) reticleUI.style.display = 'none';
+                if (overlay) overlay.style.display = 'none';
+                if (activePulse) activePulse.style.display = 'none';
+                if (sequenceOverlay) sequenceOverlay.style.display = 'none';
+                if (loadingScreen) loadingScreen.style.display = 'none';
+                // We keep focusDim and confirmationGlow as they add "vibe" without being functional UI
+            }
+        }
 
         // Lerp (smoothed follow for post-detection surface tracking)
         var currentX = window.innerWidth / 2;
@@ -393,12 +404,10 @@
                 // so we express the delta from screen center
                 var dx = currentX - (window.innerWidth / 2);
                 var dy = currentY - (window.innerHeight / 2);
-                reticleUI.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+                if (reticleUI) reticleUI.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
             }
             requestAnimationFrame(updateMotion);
         }
-
-
 
         // --- Camera ---
         function startCamera() {
@@ -410,6 +419,7 @@
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
 
+                applyUIVisibility();
                 loadingScreen.classList.add('hidden');
                 overlay.classList.remove('hidden');
 
@@ -419,15 +429,9 @@
                     statusChip.innerText = "Point at the floor to begin";
 
                     // Fade reticle in (centered by CSS, opacity transition)
-                    reticleUI.style.opacity = '1';
+                    if (reticleUI) reticleUI.style.opacity = '1';
 
                     startBtn.classList.remove('hidden');
-
-                    // De-emphasize CTA after reticle is visible
-                    // (shift visual priority to calm zone)
-                    setTimeout(function () {
-                        //startBtn.classList.add('subdued');
-                    }, 600);
                 }, 1000);
 
             }).catch(function (err) {
@@ -439,6 +443,7 @@
         window.receiveNativeAuth = function (userId, petId, idToken) {
             window.AR_USER_ID = userId;
             window.AR_PET_ID = petId;
+            applyUIVisibility();
             startCamera();
             updateMotion();
         };
@@ -464,7 +469,7 @@
             // --- Transition: Hide reticle ---
             // Start fading reticle out shortly after confirmation
             setTimeout(function () {
-                reticleUI.style.opacity = '0';
+                if (reticleUI) reticleUI.style.opacity = '0';
             }, 400);
 
             // Transition to ACTIVE after 1.5s
@@ -491,8 +496,10 @@
                 lastReportTime = performance.now();
                 requestAnimationFrame(trackActivityPoints);
 
-                // Run calming message sequence
-                runSequence();
+                // Run calming message sequence (only if UI is not hidden)
+                if (!window.HIDE_INTERNAL_UI) {
+                    runSequence();
+                }
 
             }, 1500);
         });
@@ -570,7 +577,7 @@
                 pointBuffer.push({
                     x: 0, y: 0, z: 0,
                     timestamp: { __type: 'serverTimestamp' },
-                    mode: 'interactive_session'
+                    mode: 'lite_ar_unified'
                 });
 
                 if (pointBuffer.length >= 10) sendPoints();
@@ -601,6 +608,7 @@
             }
         }, 3000);
     </script>
+
 </body>
 
 </html>
