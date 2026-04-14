@@ -2,22 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSubscription } from '../components/SubscriptionManager';
 import PaywallModal from '../components/PaywallModal';
-import { 
-    auth, 
-    db, 
-    collection, 
-    doc, 
-    getDocs, 
-    getDoc,
-    updateDoc,
-    query, 
+import {
+    auth,
+    db,
+    collection,
+    getDocs,
+    query,
     limit,
-    serverTimestamp,
-    addDoc 
 } from '../services/firebaseConfig';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import SmartARContainer from '../components/AR/SmartARContainer';
-import { Pressable, TouchableOpacity, Modal } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 
@@ -30,18 +25,18 @@ const ARSafeZonesScreen = ({ route, navigation }: any) => {
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [petId, setPetId] = useState<string | null>(route?.params?.petId || null);
     const [loading, setLoading] = useState(true);
-    
-    // State Machine
-    const [phase, setPhase] = useState<'selection' | 'session' | 'feedback' | 'micro'>('selection');
+
+    // State Machine (feedback/micro phases now live in ARFeedbackScreen)
+    const [phase, setPhase] = useState<'selection' | 'session'>('selection');
     const [safeSpots, setSafeSpots] = useState<any[]>([]);
     const [selectedSpot, setSelectedSpot] = useState<any>(null);
     const [anxietyBefore] = useState(route?.params?.anxietyBefore || 5);
-    const [feedbackMsg, setFeedbackMsg] = useState('');
 
     const mode = route?.params?.mode || 'view';
     const zoneId = route?.params?.zoneId || null;
 
     useEffect(() => {
+        console.log('[ARSafeZonesScreen] useEffect init MOUNT/UPDATE petId:', petId);
         const init = async () => {
             const user = auth().currentUser;
             if (!user) { setLoading(false); return; }
@@ -65,7 +60,7 @@ const ARSafeZonesScreen = ({ route, navigation }: any) => {
                     const spots = spotSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
                     setSafeSpots(spots);
 
-                    
+
                     // If only one spot exists and we are in 'view' mode, auto-select it
                     if (spots.length === 1 && mode === 'view') {
                         setSelectedSpot(spots[0]);
@@ -90,58 +85,7 @@ const ARSafeZonesScreen = ({ route, navigation }: any) => {
         setPhase('session');
     };
 
-    const SCORING_WEIGHTS = {
-        calm: -1.8,
-        better: -0.7,
-        worse: 1.0,
-        same: 0,
-        skip: 0
-    };
-
-    const handleFeedback = async (choice: keyof typeof SCORING_WEIGHTS) => {
-        const user = auth().currentUser;
-        if (!user || !petId) return;
-
-        // Internal weighted adjustment
-        const weight = SCORING_WEIGHTS[choice] || 0;
-
-        // Calculate and round for display consistency on dashboard
-        const anxietyAfter = Math.max(1, Math.min(10, Math.round(anxietyBefore + weight)));
-        const delta = anxietyAfter - anxietyBefore;
-
-        setFeedbackMsg("Got it. We'll adjust your plan.");
-        setPhase('micro');
-
-        try {
-            // 1. Save Session Summary (includes silent delta for future analysis)
-            await addDoc(collection(db, 'users', user.uid, 'pets', petId, 'calm_sessions'), {
-                spot_id: selectedSpot?.id || 'new_spot',
-                spot_name: selectedSpot?.name || 'Interactive Space',
-                timestamp: serverTimestamp(),
-                anxiety_before: anxietyBefore,
-                anxiety_after: anxietyAfter,
-                delta,
-                choice
-            });
-
-            // 2. Update Pet Anxiety Score (silently reflected on Dashboard)
-            await updateDoc(doc(db, 'users', user.uid, 'pets', petId), {
-                anxietyScore: anxietyAfter,
-                lastSessionAt: serverTimestamp()
-            });
-
-        } catch (e) {
-            console.error('Error saving session feedback:', e);
-        }
-
-        // Wait 1.2s and return
-        setTimeout(() => {
-            navigation.goBack();
-        }, 1200);
-    };
-
     const handleSkip = () => {
-        // Skip goes back immediately — no confirmation screen
         navigation.goBack();
     };
 
@@ -174,8 +118,8 @@ const ARSafeZonesScreen = ({ route, navigation }: any) => {
                 </View>
                 <View style={styles.spotGrid}>
                     {safeSpots.map((spot) => (
-                        <TouchableOpacity 
-                            key={spot.id} 
+                        <TouchableOpacity
+                            key={spot.id}
                             style={styles.spotItem}
                             onPress={() => handleSpotSelection(spot)}
                         >
@@ -185,7 +129,7 @@ const ARSafeZonesScreen = ({ route, navigation }: any) => {
                             <Text style={styles.spotName}>{spot.name}</Text>
                         </TouchableOpacity>
                     ))}
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.spotItem}
                         onPress={() => setPhase('session')}
                     >
@@ -199,46 +143,6 @@ const ARSafeZonesScreen = ({ route, navigation }: any) => {
         );
     }
 
-    // Post-Session Feedback View
-    if (phase === 'feedback') {
-        return (
-            <View style={[styles.container, { backgroundColor: COLORS.backgroundLight, justifyContent: 'center', padding: 30 }]}>
-                <Text style={styles.feedbackTitle}>How is your pet now?</Text>
-                
-                <View style={styles.feedbackGrid}>
-                    {[
-                        { id: 'calm', label: 'Calm', icon: 'leaf' },
-                        { id: 'better', label: 'Better', icon: 'sunny' },
-                        { id: 'same', label: 'Same', icon: 'remove' },
-                        { id: 'worse', label: 'Worse', icon: 'cloud' }
-                    ].map((f) => (
-                        <TouchableOpacity 
-                            key={f.id} 
-                            style={styles.feedbackBtn}
-                            onPress={() => handleFeedback(f.id as any)}
-                        >
-                            <Text style={styles.feedbackBtnText}>{f.label}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                
-                <TouchableOpacity onPress={handleSkip} style={{ marginTop: 30 }}>
-                    <Text style={styles.skipText}>Skip</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
-    // Micro-Feedback Message
-    if (phase === 'micro') {
-        return (
-            <View style={[styles.container, { backgroundColor: COLORS.backgroundLight, justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="checkmark-circle" size={80} color={COLORS.primary} />
-                <Text style={styles.feedbackTitle}>{feedbackMsg}</Text>
-            </View>
-        );
-    }
-
     return (
         <View style={styles.container}>
             <SmartARContainer
@@ -248,9 +152,28 @@ const ARSafeZonesScreen = ({ route, navigation }: any) => {
                 zoneId={selectedSpot?.id || zoneId}
                 nativeMsg="Point camera at floor"
                 liteMsg="Point camera at floor"
-                onExit={async () => {
-                    await trackARSession();
-                    setPhase('feedback');
+                onExit={() => {
+                    try {
+                        trackARSession();
+                        // CRITICAL: Use push() not replace().
+                        // push() keeps this screen MOUNTED in the background stack,
+                        // so ViroARSceneNavigator is never deallocated during transition.
+                        // replace() destroys the current screen during transition → EXC_BAD_ACCESS.
+                        // The AR screen is cleaned up later via navigation.reset() from
+                        // ARFeedbackScreen, which is a non-animated stack wipe.
+                        console.log('[ARSafeZonesScreen] Navigating to ARFeedback');
+                        navigation.push('ARFeedback', {
+                            petId,
+                            selectedSpotId: selectedSpot?.id,
+                            selectedSpotName: selectedSpot?.name,
+                            anxietyBefore,
+                        });
+                    }
+                    catch (error) {
+                        console.error('Error navigating to ARFeedback:', error);
+                        // Fallback: navigate to home or previous screen
+                        // navigation.goBack();
+                    }
                 }}
             />
 
@@ -314,33 +237,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: COLORS.text
     },
-    feedbackTitle: {
-        ...FONTS.h2,
-        color: COLORS.text,
-        textAlign: 'center',
-        marginBottom: 40
-    },
-    feedbackGrid: {
-        gap: 15
-    },
-    feedbackBtn: {
-        backgroundColor: '#fff',
-        borderRadius: SIZES.radius,
-        padding: 24,
-        alignItems: 'center',
-        ...SHADOWS.small
-    },
-    feedbackBtnText: {
-        ...FONTS.h3,
-        color: COLORS.text,
-        fontWeight: 'bold'
-    },
-    skipText: {
-        ...FONTS.body,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-        textDecorationLine: 'underline'
-    }
 });
 
 

@@ -12,6 +12,7 @@ import PrivacyScreen from '../screens/PrivacyScreen';
 import TermsScreen from '../screens/TermsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ARSafeZonesScreen from '../screens/ARSafeZonesScreen';
+import ARFeedbackScreen from '../screens/ARFeedbackScreen';
 import AnalysisScreen from '../screens/AnalysisScreen';
 import PaywallScreen from '../screens/PaywallScreen';
 import SplashAnimation from '../screens/SplashAnimation';
@@ -43,6 +44,7 @@ function AppNavigatorStack() {
             <AppStack.Screen name="Privacy" component={PrivacyScreen} />
             <AppStack.Screen name="Terms" component={TermsScreen} />
             <AppStack.Screen name="ARSafeZones" component={ARSafeZonesScreen} options={{ title: 'Set calm spot' }} />
+            <AppStack.Screen name="ARFeedback" component={ARFeedbackScreen} options={{ headerShown: false, animation: 'fade' }} />
             <AppStack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
         </AppStack.Navigator>
     );
