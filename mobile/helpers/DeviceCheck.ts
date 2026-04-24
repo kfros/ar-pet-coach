@@ -13,12 +13,13 @@ export enum ARMode {
 export const getBestARMode = async (): Promise<ARMode> => {
   try {
     // 1. WebView Resilience Check (Avoid PacProcessor crashes on older Android)
+    // 1. WebView Resilience Check (Avoid PacProcessor crashes on older Android)
     const apiLevel = await DeviceInfo.getApiLevel();
     const brand = (await DeviceInfo.getBrand()).toLowerCase();
 
 
+
     // Older Android (API < 29 / Android 10) on specific brands often have WebView bugs
-    const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 &&
     const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 &&
       (brand === 'xiaomi' || brand === 'redmi' || brand === 'oppo');
 
@@ -28,6 +29,7 @@ export const getBestARMode = async (): Promise<ARMode> => {
     }
 
     // 2. Default to MindAR (LITE) for stable environments
+    // 2. Default to MindAR (LITE) for stable environments
     return ARMode.LITE;
 
   } catch (globalError) {
@@ -35,6 +37,7 @@ export const getBestARMode = async (): Promise<ARMode> => {
     return ARMode.CALM;
   }
 };
+
 
 /**
  * Identifies budget or legacy hardware that should receive truncated animations/messages
@@ -44,6 +47,7 @@ export const isLowPerformanceDevice = async (): Promise<boolean> => {
   try {
     const apiLevel = await DeviceInfo.getApiLevel();
     const ram = await DeviceInfo.getTotalMemory(); // in bytes
+
 
     // Thresholds for "budget" devices: 
     // Android < 10 (API 29) OR < 3GB RAM

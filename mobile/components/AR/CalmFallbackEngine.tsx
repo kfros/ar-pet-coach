@@ -11,6 +11,7 @@ import {
 } from '../../services/firebaseConfig';
 import { getBestARMode, ARMode, isLowPerformanceDevice } from '../../helpers/DeviceCheck';
 import { useCalmAudio } from '../../hooks/useCalmAudio';
+import CalmHUD from './CalmHUD';
 
 const { width } = Dimensions.get('window');
 
@@ -99,17 +100,18 @@ const CalmFallbackEngine = ({
   const [sessionState, setSessionState] = useState<SessionState>(SessionState.INIT);
   const [sessionTime, setSessionTime] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [pulseAnim] = useState(new Animated.Value(1));
 
   // Audio Hook Integration
-  const { currentTrackId } = useCalmAudio(sessionState === SessionState.ACTIVE_SESSION);
+  const { currentTrackId, stopAudio } = useCalmAudio(sessionState === SessionState.ACTIVE_SESSION);
 
   // Refs for Save-on-Exit pattern preventing stale closures
   const finalSessionTime = useRef(0);
   const finalTrackId = useRef<string | null>(null);
-  const isExitingData = useRef(false);
+  const isExiting = useRef(false);
 
   useEffect(() => {
     finalSessionTime.current = sessionTime;
@@ -119,7 +121,6 @@ const CalmFallbackEngine = ({
     finalTrackId.current = currentTrackId;
   }, [currentTrackId]);
 
-
   // 1. Initial Capability Detection
   useEffect(() => {
     console.log('[CalmFallbackEngine] useEffect CapabilityDetection MOUNT/UPDATE sessionState:', sessionState);
@@ -128,6 +129,8 @@ const CalmFallbackEngine = ({
         const bestMode = await getBestARMode();
         if (bestMode === ARMode.LITE) {
           setSessionState(SessionState.AR_AVAILABLE_NO_ZONE);
+          // Simulate surface detection for HUD feedback
+          setTimeout(() => setSurfaceStatus('ready'), 2000);
         } else {
           setSessionState(SessionState.NON_AR_MODE);
         }
@@ -138,7 +141,6 @@ const CalmFallbackEngine = ({
     if (sessionState === SessionState.INIT) detectCapabilities();
   }, [sessionState]);
 
-  // 2. Lifecycle Management
   // 2. Lifecycle Management
   useEffect(() => {
     if (sessionState === SessionState.ACTIVE_SESSION) {
@@ -165,8 +167,8 @@ const CalmFallbackEngine = ({
   // 4. Persistence (Atomic Save-on-Exit)
   useEffect(() => {
     return () => {
-      if (isExitingData.current) return;
-      isExitingData.current = true;
+      if (isExiting.current) return;
+      isExiting.current = true;
 
       const latestTime = finalSessionTime.current;
       if (latestTime >= 10) {
