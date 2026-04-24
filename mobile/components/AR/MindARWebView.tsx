@@ -18,7 +18,6 @@ import {
 } from '../../services/firebaseConfig';
 import { useCalmAudio } from '../../hooks/useCalmAudio';
 import ARViewErrorBoundary from './ErrorBoundary';
-import { useCalmAudio } from '../../hooks/useCalmAudio';
 import CalmHUD from './CalmHUD';
 
 interface MindARWebViewProps {
@@ -323,6 +322,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.5,
     textAlign: 'center',
+  },
+  timerContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  timerText: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: '#38BDF8',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
 });
 
