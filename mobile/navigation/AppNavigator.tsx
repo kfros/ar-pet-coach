@@ -17,6 +17,7 @@ import PaywallScreen from '../screens/PaywallScreen';
 import SplashAnimation from '../screens/SplashAnimation';
 import OnboardingCarousel from '../screens/OnboardingCarousel';
 import PetProfileStepper from '../screens/PetProfileStepper';
+import AccountScreen from '../screens/AccountScreen';
 
 const AuthStack = createNativeStackNavigator();
 const AppStack = createNativeStackNavigator();
@@ -39,6 +40,7 @@ function AppNavigatorStack() {
             <AppStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="PetProfileStepper" component={PetProfileStepper} options={{ headerShown: false }} />
             <AppStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+            <AppStack.Screen name="Account" component={AccountScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Analysis" component={AnalysisScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Privacy" component={PrivacyScreen} />
             <AppStack.Screen name="Terms" component={TermsScreen} />

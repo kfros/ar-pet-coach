@@ -5,6 +5,54 @@ import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 
+const PAYWALL_FALLBACK_CONFIG = {
+    mode: 'fallback_if_no_offerings',
+    fallback_products: [
+        {
+            identifier: 'yearly_plan',
+            packageType: 'ANNUAL' as any,
+            product: {
+                identifier: 'yearly_plan',
+                title: 'Annual Plan',
+                price: 99,
+                priceString: '$99/year',
+                currencyCode: 'USD',
+                description: '7-day free trial',
+                introPrice: { price: 0 } as any // Trigger trial detection
+            },
+            highlight: true,
+            badge: "Best Value"
+        },
+        {
+            identifier: 'monthly_plan',
+            packageType: 'MONTHLY' as any,
+            product: {
+                identifier: 'monthly_plan',
+                title: 'Monthly Plan',
+                price: 12.99,
+                priceString: '$12.99/month',
+                currencyCode: 'USD',
+                description: '',
+                introPrice: null
+            },
+            highlight: false
+        }
+    ],
+    ui_mapping: {
+        show_products: true,
+        allow_selection: true,
+        default_selected: 'yearly_plan'
+    },
+    cta: {
+        text: "Get Full Access",
+    },
+    disclaimer: {
+        restore_purchases_visible: true,
+        footer_text: "Cancel anytime • No commitment • Secure payment",
+        price_note: "Prices may vary by region"
+    }
+};
+
 export default function PaywallScreen({ navigation }: any) {
     const [packages, setPackages] = useState<PurchasesPackage[]>([]);
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
@@ -13,6 +61,11 @@ export default function PaywallScreen({ navigation }: any) {
 
     const [subscriptionStatus, setSubscriptionStatus] = useState<{ isPremium: boolean, isTrial: boolean, daysLeft: number | null } | null>(null);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+
+    // Fallback states
+    const [isFallback, setIsFallback] = useState(false);
+    const [fallbackLoadingMessage, setFallbackLoadingMessage] = useState<string | null>(null);
+    const [fallbackError, setFallbackError] = useState<string | null>(null);
 
     useEffect(() => {
         loadOfferings();
@@ -95,20 +148,63 @@ export default function PaywallScreen({ navigation }: any) {
                 } else if (filtered.length > 0) {
                     setSelectedPackage(filtered[0]);
                 }
+                setIsFallback(false);
             } else {
-                console.warn("No packages found in offering:", currentOffering);
-                Alert.alert('Error', 'No subscriptions found. Please try again later.');
+                console.log("Triggering fallback: No real offerings found.");
+                triggerFallback();
             }
         } catch (e) {
             console.error("RC Load Error:", e);
-            Alert.alert('Error', 'Failed to load offerings.');
+            triggerFallback();
         } finally {
             setLoading(false);
         }
     };
 
+    const triggerFallback = () => {
+        setIsFallback(true);
+        const fallbackPackages = PAYWALL_FALLBACK_CONFIG.fallback_products as any as PurchasesPackage[];
+        setPackages(fallbackPackages);
+
+        const defaultSelectedId = PAYWALL_FALLBACK_CONFIG.ui_mapping.default_selected;
+        const defaultPackage = fallbackPackages.find(p => p.identifier === defaultSelectedId);
+        if (defaultPackage) {
+            setSelectedPackage(defaultPackage);
+        } else if (fallbackPackages.length > 0) {
+            setSelectedPackage(fallbackPackages[0]);
+        }
+    };
+
+    const handleSimulatedPurchase = async () => {
+        setPurchasing(true);
+        setFallbackError(null);
+        console.log("Analytics: fallback_flow_started");
+
+        // Step 1: Initial Loading
+        setFallbackLoadingMessage("Connecting to App Store...");
+        console.log("Analytics: fallback_loading_shown (Connecting)");
+        await new Promise(resolve => setTimeout(resolve, 1200));
+
+        // Step 2: Retry Loading
+        setFallbackLoadingMessage("Still trying...");
+        console.log("Analytics: fallback_loading_shown (Retrying)");
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Step 3: Failed
+        setFallbackLoadingMessage(null);
+        setFallbackError("Unable to connect to App Store");
+        setPurchasing(false);
+        console.log("Analytics: fallback_failed");
+    };
+
     const handlePurchase = async () => {
         if (!selectedPackage) return;
+
+        if (isFallback) {
+            handleSimulatedPurchase();
+            return;
+        }
+
         setPurchasing(true);
         try {
             const customerInfo = await RevenueCatService.purchasePackage(selectedPackage);
@@ -182,9 +278,9 @@ export default function PaywallScreen({ navigation }: any) {
                 onPress={() => setSelectedPackage(pack)}
             >
                 {/* Badges (Chips) */}
-                {isAnnual && (
+                {(isAnnual || (pack as any).badge) && (
                     <View style={styles.bestValueBadge}>
-                        <Text style={styles.bestValueText}>BEST VALUE</Text>
+                        <Text style={styles.bestValueText}>{(pack as any).badge || 'BEST VALUE'}</Text>
                     </View>
                 )}
 
@@ -313,19 +409,35 @@ export default function PaywallScreen({ navigation }: any) {
 
                 <View style={styles.ctaSection}>
                     <Text style={styles.preCtaText}>Start improving your dog’s behavior today</Text>
+
+                    {/* Inline Feedback Message */}
+                    {(fallbackLoadingMessage || fallbackError) && (
+                        <View style={styles.inlineFeedbackContainer}>
+                            {fallbackLoadingMessage ? (
+                                <View style={styles.inlineLoadingRow}>
+                                    <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 8 }} />
+                                    <Text style={styles.inlineLoadingText}>{fallbackLoadingMessage}</Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.inlineErrorText}>{fallbackError}</Text>
+                            )}
+                        </View>
+                    )}
+
                     <Pressable
                         style={({ pressed }) => [
                             styles.ctaButton,
-                            pressed && styles.ctaButtonPressed
+                            (pressed || purchasing) && styles.ctaButtonPressed,
+                            purchasing && { opacity: 0.8 }
                         ]}
                         onPress={handlePurchase}
                         disabled={purchasing}
                     >
-                        {purchasing ? (
+                        {purchasing && !isFallback ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
                             <Text style={styles.ctaButtonText}>
-                                {hasSelectedTrial ? 'Start 7-day free trial' : 'Get Full Access'}
+                                {isFallback ? PAYWALL_FALLBACK_CONFIG.cta.text : (hasSelectedTrial ? 'Start 7-day free trial' : 'Get Full Access')}
                             </Text>
                         )}
                     </Pressable>
@@ -337,12 +449,21 @@ export default function PaywallScreen({ navigation }: any) {
                     )}
 
                     <View style={styles.trustSignals}>
-                        <Text style={styles.trustSignalText}>Cancel anytime</Text>
+                        <Text style={styles.trustSignalText}>
+                            {isFallback ? PAYWALL_FALLBACK_CONFIG.disclaimer.footer_text.split(' • ')[0] : 'Cancel anytime'}
+                        </Text>
                         <View style={styles.dotSeparator} />
-                        <Text style={styles.trustSignalText}>No commitment</Text>
+                        <Text style={styles.trustSignalText}>
+                            {isFallback ? PAYWALL_FALLBACK_CONFIG.disclaimer.footer_text.split(' • ')[1] : 'No commitment'}
+                        </Text>
                         <View style={styles.dotSeparator} />
-                        <Text style={styles.trustSignalText}>Secure payment</Text>
+                        <Text style={styles.trustSignalText}>
+                            {isFallback ? PAYWALL_FALLBACK_CONFIG.disclaimer.footer_text.split(' • ')[2] : 'Secure payment'}
+                        </Text>
                     </View>
+                    {isFallback && (
+                        <Text style={styles.priceNoteText}>{PAYWALL_FALLBACK_CONFIG.disclaimer.price_note}</Text>
+                    )}
                 </View>
 
                 <View style={styles.footer}>
@@ -693,5 +814,32 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         lineHeight: 18,
         fontStyle: 'italic',
+    },
+    inlineFeedbackContainer: {
+        width: '100%',
+        paddingVertical: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    inlineLoadingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    inlineLoadingText: {
+        fontSize: 14,
+        color: COLORS.text,
+        fontWeight: '500',
+    },
+    inlineErrorText: {
+        fontSize: 14,
+        color: '#8e8e93', // Red-600
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    priceNoteText: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+        marginTop: 8,
+        opacity: 0.7,
     },
 });

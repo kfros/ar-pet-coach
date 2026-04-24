@@ -61,7 +61,7 @@ export default function SettingsScreen({ navigation }: any) {
         { icon: 'gift-outline', label: 'Refer', onPress: () => Alert.alert('Refer', 'Coming Soon!') },
         { icon: 'location-outline', label: 'Addresses', onPress: () => Alert.alert('Addresses', 'Coming Soon!') },
         { icon: 'cube-outline', label: 'Orders', onPress: () => Alert.alert('Orders', 'Coming Soon!') },
-        { icon: 'person-outline', label: 'Account', onPress: () => Alert.alert('Account', 'Coming Soon!') },
+        { icon: 'person-outline', label: 'Account', onPress: () => navigation.navigate('Account') },
         { icon: 'settings-outline', label: 'Settings', onPress: () => Alert.alert('Settings', 'Coming Soon!') },
         { icon: 'information-circle-outline', label: 'About Us', onPress: () => Alert.alert('About Us', 'Coming Soon!') },
     ];

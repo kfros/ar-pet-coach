@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     feedbackBtnText: {
         ...FONTS.h3,
         color: COLORS.text,
-        fontWeight: 'bold'
+        fontWeight: '700'
     },
     skipText: {
         ...FONTS.body,
