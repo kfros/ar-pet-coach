@@ -1,21 +1,26 @@
 {
-    "build": {
-        "development": {
-            "developmentClient": true,
-            "distribution": "internal",
-            "android": {
-                "buildType": "apk"
-            },
-            "ios": {
-                "resourceClass": "m-medium",
-                "distribution": "internal"
-            }
-        },
-        "production": {
-            "distribution": "store"
-        }
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "resourceClass": "m-medium",
+        "distribution": "internal"
+      }
     },
-    "submit": {
-        "production": {}
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {}
     }
+  },
+  "submit": {
+    "production": {}
+  },
+  "cli": {
+    "appVersionSource": "remote"
+  }
 }

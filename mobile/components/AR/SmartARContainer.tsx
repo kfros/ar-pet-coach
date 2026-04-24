@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
 import { getBestARMode, ARMode } from '../../helpers/DeviceCheck';
-import { ViroNativeEngine, MindARWebView, CalmFallbackEngine } from './index';
+import { MindARWebView, CalmFallbackEngine } from './index';
 
 interface SmartARContainerProps {
   petId: string;
@@ -45,7 +45,7 @@ const SmartARContainer: React.FC<SmartARContainerProps> = ({
       try {
         // 1. Hardware/Environment Check (< 500ms)
         const bestMode = await getBestARMode();
-        
+
         // 2. Permission Management (Centralized)
         // Only request if not in CALM mode (which doesn't need camera)
         if (bestMode !== ARMode.CALM) {
@@ -68,8 +68,8 @@ const SmartARContainer: React.FC<SmartARContainerProps> = ({
               return;
             }
           } else if (!permission) {
-             // Still loading permission status, wait for next effect run
-             return;
+            // Still loading permission status, wait for next effect run
+            return;
           }
         }
 
@@ -98,18 +98,6 @@ const SmartARContainer: React.FC<SmartARContainerProps> = ({
 
   // Render Engine based on Silent Guard Resolution
   switch (arMode) {
-    case ARMode.NATIVE:
-      return (
-        <ViroNativeEngine
-          userId={userId}
-          petId={petId}
-          mode={mode}
-          zoneId={zoneId}
-          onExit={onExit}
-          statusMessage={nativeMsg}
-        />
-      );
-
     case ARMode.LITE:
       return (
         <MindARWebView

@@ -1,25 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAssets } from 'expo-asset';
 import { 
   auth, 
   db, 
-  getFirestore, 
   collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
+  doc,
   addDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  onSnapshot, 
-  writeBatch, 
-  serverTimestamp,
-  firestore 
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  writeBatch,
+  serverTimestamp
 } from '../../services/firebaseConfig';
+import { useCalmAudio } from '../../hooks/useCalmAudio';
 import ARViewErrorBoundary from './ErrorBoundary';
 
 interface MindARWebViewProps {
@@ -33,6 +30,10 @@ interface MindARWebViewProps {
   onCrash?: () => void;
 }
 
+/**
+ * MindAR Lite Engine.
+ * Implements session tracking parity with the Fallback Engine.
+ */
 const MindARWebView: React.FC<MindARWebViewProps> = ({
   userId,
   petId,
@@ -48,14 +49,57 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
   const [idToken, setIdToken] = useState<string | null>(null);
   const heatmapUnsubscribe = useRef<(() => void) | null>(null);
 
-  // Cleanup on unmount
+  // Session State tracking
+  const [sessionTime, setSessionTime] = useState(0);
+  const [isAudioActive, setIsAudioActive] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Audio Hook integration (Triggered on placement)
+  const { currentTrackId } = useCalmAudio(isAudioActive);
+
+  // Refs for Save-on-Exit pattern preventing stale closures during unmount
+  const finalSessionTime = useRef(0);
+  const finalTrackId = useRef<string | null>(null);
+  const isExitingData = useRef(false);
+
   useEffect(() => {
+    finalSessionTime.current = sessionTime;
+  }, [sessionTime]);
+
+  useEffect(() => {
+    finalTrackId.current = currentTrackId;
+  }, [currentTrackId]);
+
+  // Lifecycle & Timer
+  useEffect(() => {
+    timerRef.current = setInterval(() => setSessionTime(prev => prev + 1), 1000);
+
     return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
       if (heatmapUnsubscribe.current) heatmapUnsubscribe.current();
     };
   }, []);
 
-  // Fetch ID Token for WebView authentication
+  // Atomic Persistence (Matches Fallback Engine behavior)
+  useEffect(() => {
+    return () => {
+      if (isExitingData.current) return;
+      isExitingData.current = true;
+
+      const latestTime = finalSessionTime.current;
+      if (latestTime >= 10) {
+        addDoc(collection(db, 'users', userId, 'pets', petId, 'activityPoints'), {
+          type: 'calm_session_complete',
+          timestamp: serverTimestamp(),
+          durationSeconds: latestTime,
+          mode: 'lite',
+          trackId: finalTrackId.current
+        }).catch(err => console.warn('[MindARWebView] Atomic save error:', err));
+      }
+    };
+  }, []);
+
+  // Auth token for bridge
   useEffect(() => {
     const fetchToken = async () => {
       const user = auth().currentUser;
@@ -71,16 +115,25 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
     fetchToken();
   }, []);
 
+  // Manual injection triggered on token availability to prevent race conditions
+  useEffect(() => {
+    if (idToken && webViewRef.current && assets && assets[0]) {
+      webViewRef.current.injectJavaScript(getInjectedJS());
+    }
+  }, [idToken, assets]);
+
   if (error) {
     console.error('[MindARWebView] Asset Load Error:', error);
     onCrash?.();
     return null;
   }
 
+  // Loading State (Visual alignment with Fallback Engine)
   if (!assets || !assets[0]) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4CC3D9" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#38BDF8" />
+        <Text style={styles.loadingText}>{statusMessage || 'Initializing...'}</Text>
       </View>
     );
   }
@@ -95,8 +148,16 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
           console.log('[MindAR Log]', data.message);
           break;
 
+        case 'startAudio':
+          setIsAudioActive(true);
+          break;
+
         case 'exit':
-          onExit();
+          setIsAudioActive(false);
+          // Allow for smooth 800ms fade out before unmounting
+          setTimeout(() => {
+            onExit();
+          }, 1000);
           break;
 
         case 'getZoneData':
@@ -144,8 +205,6 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
         case 'uploadSafeZone':
           try {
             const { name, anchorData } = data;
-            // Frictionless mode: User selected or entered spot name. 
-            // We only save safeZones as a master list for selection.
             await addDoc(collection(db, 'users', userId, 'pets', petId, 'safeZones'), {
               type: 'unified_placement',
               name: name || 'Modern Calm Space',
@@ -185,8 +244,6 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
     true;
   `;
 
-
-
   return (
     <ARViewErrorBoundary fallback={() => { onCrash?.(); return null; }}>
       <View style={styles.container}>
@@ -213,13 +270,27 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000', // Solid black for AR continuity
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   webview: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#000000',
+  },
+  loadingText: {
+    color: '#94A3B8',
+    marginTop: 20,
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
 });
 
 export default MindARWebView;
-

@@ -69,3 +69,4 @@ ios/*.xcodeproj/xcshareddata
 mobile/eas — копия.json
 mobile/clear.ps1
 mobile/rm.ps1
+*.ipa

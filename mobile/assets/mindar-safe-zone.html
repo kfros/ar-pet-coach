@@ -2,10 +2,8 @@
 <html>
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>Calm Space</title>
-
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <style>
         html,
         body {
@@ -15,6 +13,8 @@
             height: 100%;
             overflow: hidden;
             background: #000;
+            /* Native iOS/System stack for premium feel */
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
         }
 
         #camera-feed {
@@ -27,6 +27,23 @@
             z-index: 0;
         }
 
+        #focus-dim {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 40;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            background: radial-gradient(circle at 50% 50%,
+                    rgba(0, 0, 0, 0.0) 0%,
+                    rgba(0, 0, 0, 0.1) 40%,
+                    rgba(0, 0, 0, 0.15) 65%,
+                    rgba(0, 0, 0, 0.35) 100%);
+        }
+
         #overlay {
             position: fixed;
             top: 0;
@@ -37,50 +54,38 @@
             z-index: 100;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: flex-end;
+            /* Push CTA to bottom */
             padding: 24px;
-            padding-top: env(safe-area-inset-top, 24px);
-            padding-bottom: env(safe-area-inset-bottom, 24px);
+            padding-bottom: env(safe-area-inset-bottom, 32px);
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         .top-bar {
+            position: fixed;
+            top: env(safe-area-inset-top, 24px);
+            left: 0;
+            width: 100%;
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
         }
 
         .status-container {
-            background: rgba(15, 23, 42, 0.85);
+            background: rgba(15, 23, 42, 0.75);
             color: #f1f5f9;
-            padding: 14px 28px;
+            padding: 12px 24px;
             border-radius: 32px;
             text-align: center;
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            font-size: 16px;
-            font-weight: 600;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: -0.2px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             max-width: 80%;
             transition: opacity 0.4s ease;
-        }
-
-        .exit-btn {
-            pointer-events: auto;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 12px 16px;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(8px);
-            cursor: pointer;
-            font-size: 20px;
         }
 
         .cta-container {
@@ -97,21 +102,30 @@
             border: none;
             padding: 18px 40px;
             border-radius: 40px;
-            font-size: 18px;
-            font-weight: 700;
-            box-shadow: 0 8px 32px rgba(56, 189, 248, 0.35);
-            transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+            font-size: 17px;
+            font-weight: 600;
+            box-shadow: 0 8px 32px rgba(56, 189, 248, 0.3);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .cta-btn:active {
-            transform: scale(0.92);
+            transform: scale(0.95);
         }
 
-        /* Post-detection: reduce CTA visual dominance */
-        .cta-btn.subdued {
-            opacity: 0.70;
-            transform: scale(0.95);
-            filter: saturate(0.8) brightness(0.92);
+        /* Active Phase: White X on Transparent background */
+        .cta-btn.active-x {
+            background: rgba(255, 255, 255, 0);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: none;
+            font-size: 24px;
+            padding: 12px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .loading-screen {
@@ -134,26 +148,19 @@
             display: none !important;
         }
 
-        /* ===== RETICLE =====
-           Soft radial gradient circle, no border, no dot.
-           Screen-center locked pre-detection.
-           140px with subtle pulse. */
+        /* ===== RETICLE ===== */
         #reticle-ui {
             position: fixed;
             top: 50%;
             left: 50%;
             width: 140px;
             height: 140px;
-
             margin-left: -70px;
             margin-top: -70px;
-
             z-index: 150;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s ease;
-
-            /* Гарантированное центрирование всего, что внутри */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -169,7 +176,6 @@
                     rgba(56, 189, 248, 0.05) 65%,
                     transparent 100%);
             animation: reticlePulse 3s ease-in-out infinite;
-            transform-origin: center center;
         }
 
         @keyframes reticlePulse {
@@ -184,89 +190,6 @@
                 transform: scale(1.05);
                 opacity: 1;
             }
-        }
-
-        /* ===== BREATHING PULSE =====
-           Fixed-size centered circle (300px), NOT fullscreen.
-           Appears only when "Breathe with the circle" message shows. */
-        #active-pulse {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 300px;
-            height: 300px;
-            margin-left: -150px;
-            margin-top: -150px;
-            border-radius: 50%;
-            background: radial-gradient(circle,
-                    rgba(56, 189, 248, 0.45) 0%,
-                    rgba(56, 189, 248, 0.20) 40%,
-                    rgba(56, 189, 248, 0.08) 70%,
-                    transparent 50%);
-            z-index: 150;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            animation: breathe 5s ease-in-out infinite;
-        }
-
-        @keyframes breathe {
-
-            0%,
-            100% {
-                transform: scale(0.9);
-                opacity: 0.35;
-            }
-
-            50% {
-                transform: scale(1.1);
-                opacity: 1;
-            }
-        }
-
-        #active-pulse.visible {
-            opacity: 1;
-        }
-
-        #confirmation-glow {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.15);
-            z-index: 200;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        #confirmation-glow.visible {
-            opacity: 1;
-        }
-
-        /* ===== FOCUS DIMMING =====
-           Subtle radial vignette that darkens edges, keeps center clear.
-           Activated on placement, stable after. No visible hard edges. */
-        #focus-dim {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 40;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.6s ease;
-            background: radial-gradient(circle at 50% 50%,
-                    rgba(0, 0, 0, 0.0) 0%,
-                    rgba(0, 0, 0, 0.25) 40%,
-                    rgba(0, 0, 0, 0.32) 65%,
-                    rgba(0, 0, 0, 0.67) 100%);
-        }
-
-        #focus-dim.visible {
-            opacity: 1;
         }
 
         /* ===== SEQUENCE MESSAGES ===== */
@@ -287,20 +210,19 @@
             left: 0;
             right: 0;
             color: white;
-            font-size: 26px;
-            font-weight: 500;
+            font-size: 24px;
+            font-weight: 400;
             line-height: 1.4;
-            letter-spacing: -0.3px;
             text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
             opacity: 0;
-            transform: translateY(10px) scale(0.95);
-            transition: opacity 1s ease-in-out, transform 1s ease-in-out;
+            transform: translateY(10px);
+            transition: opacity 1s ease, transform 1s ease;
             padding: 0 30px;
         }
 
         .sequence-msg.visible {
             opacity: 1;
-            transform: translateY(0px) scale(1);
+            transform: translateY(0px);
         }
     </style>
 </head>
@@ -309,24 +231,24 @@
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <div id="focus-dim"></div>
-    <div id="active-pulse"></div>
-    <div id="confirmation-glow"></div>
-    <div id="sequence-overlay"></div>
+    <div id="active-pulse"
+        style="position:fixed; top:50%; left:50%; width:300px; height:300px; margin:-150px; border-radius:50%; background:radial-gradient(circle, rgba(56,189,248,0.3) 0%, transparent 70%); z-index:150; opacity:0; pointer-events:none; transition:opacity 1s; animation: breathe 5s infinite;">
+    </div>
 
     <div id="loading-screen" class="loading-screen">
         <h2 style="font-weight: 300;">Calm Spot</h2>
-        <p id="loading-text" style="color: #94a3b8; font-size: 14px;">Preparing session...</p>
+        <p style="color: #94a3b8; font-size: 14px;">Preparing session...</p>
     </div>
 
-    <!-- Reticle: soft gradient circle, no border, no dot -->
     <div id="reticle-ui">
         <div class="reticle-glow"></div>
     </div>
 
+    <div id="sequence-overlay"></div>
+
     <div id="overlay" class="hidden">
         <div class="top-bar">
             <div id="status-chip" class="status-container">Point at the floor to begin</div>
-            <button class="exit-btn" onclick="exitSession()">✕</button>
         </div>
         <div id="cta-area" class="cta-container">
             <button id="start-btn" class="cta-btn hidden">Set calm spot</button>
@@ -334,7 +256,6 @@
     </div>
 
     <script>
-        // --- DOM ---
         var cameraFeed = document.getElementById('camera-feed');
         var reticleUI = document.getElementById('reticle-ui');
         var startBtn = document.getElementById('start-btn');
@@ -342,65 +263,18 @@
         var overlay = document.getElementById('overlay');
         var loadingScreen = document.getElementById('loading-screen');
         var activePulse = document.getElementById('active-pulse');
-        var confirmationGlow = document.getElementById('confirmation-glow');
-        var sequenceOverlay = document.getElementById('sequence-overlay');
         var focusDim = document.getElementById('focus-dim');
-
-        // --- State ---
-        var sessionState = 'ENTRY';
-        var lastReportTime = 0;
         var cameraStream = null;
-        var pointBuffer = [];
+        var sessionState = 'ENTRY';
 
-
-        // Lerp (smoothed follow for post-detection surface tracking)
-        var currentX = window.innerWidth / 2;
-        var currentY = window.innerHeight / 2;
-        var targetX = currentX;
-        var targetY = currentY;
-        var LERP = 0.12;
-
-        function log(msg) {
-            console.log("[Calm AR]", msg);
+        function post(action, data) {
             try {
                 if (window.ReactNativeWebView) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'log', message: msg }));
+                    window.ReactNativeWebView.postMessage(JSON.stringify(Object.assign({ action: action }, data || {})));
                 }
             } catch (e) { }
         }
 
-        function exitSession() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(function (track) { track.stop(); });
-                cameraStream = null;
-            }
-            try {
-                if (window.ReactNativeWebView) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'exit' }));
-                }
-            } catch (e) { }
-        }
-
-        // --- Reticle positioning ---
-        // Pre-detection: screen center (CSS handles this via top:50% left:50% margin)
-        // Post-detection: lerp follow toward simulated surface point
-        function updateMotion() {
-            if (sessionState === 'PLACEMENT') {
-                currentX += (targetX - currentX) * LERP;
-                currentY += (targetY - currentY) * LERP;
-
-                // Offset from CSS center: reticle is at 50%/50% via margin,
-                // so we express the delta from screen center
-                var dx = currentX - (window.innerWidth / 2);
-                var dy = currentY - (window.innerHeight / 2);
-                reticleUI.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
-            }
-            requestAnimationFrame(updateMotion);
-        }
-
-
-
-        // --- Camera ---
         function startCamera() {
             navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -409,198 +283,80 @@
                 cameraStream = stream;
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
-
                 loadingScreen.classList.add('hidden');
                 overlay.classList.remove('hidden');
-
-                // Show reticle + button after 1s camera warm-up
                 setTimeout(function () {
                     sessionState = 'PLACEMENT';
                     statusChip.innerText = "Point at the floor to begin";
-
-                    // Fade reticle in (centered by CSS, opacity transition)
                     reticleUI.style.opacity = '1';
-
                     startBtn.classList.remove('hidden');
-
-                    // De-emphasize CTA after reticle is visible
-                    // (shift visual priority to calm zone)
-                    setTimeout(function () {
-                        //startBtn.classList.add('subdued');
-                    }, 600);
                 }, 1000);
-
             }).catch(function (err) {
-                log("Camera access error: " + err.message);
+                post("log", { message: "Camera error: " + err.message });
             });
         }
 
-        // --- Auth Entry ---
-        window.receiveNativeAuth = function (userId, petId, idToken) {
-            window.AR_USER_ID = userId;
-            window.AR_PET_ID = petId;
+        window.receiveNativeAuth = function (userId, petId) {
             startCamera();
-            updateMotion();
         };
 
-        // --- Placement Handler ---
         startBtn.addEventListener('click', function () {
+            if (sessionState === 'ACTIVE') {
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                }
+                post("exit");
+                return;
+            }
+
             if (sessionState !== 'PLACEMENT') return;
 
-            // Lock placement
-            sessionState = 'CONFIRM';
-            startBtn.classList.add('subdued');
-            statusChip.innerText = "Good. Stay here with your pet";
+            sessionState = 'ACTIVE';
 
-            // Activate focus dimming (stable after activation)
-            focusDim.classList.add('visible');
+            // Audio trigger
+            post("startAudio");
 
-            // Brief confirmation flash
-            confirmationGlow.classList.add('visible');
-            setTimeout(function () {
-                confirmationGlow.classList.remove('visible');
-            }, 250);
+            // Dimmer effect
+            focusDim.style.opacity = '1';
 
-            // --- Transition: Hide reticle ---
-            // Start fading reticle out shortly after confirmation
-            setTimeout(function () {
-                reticleUI.style.opacity = '0';
-            }, 400);
+            // UI Refresh
+            startBtn.classList.add('active-x');
+            startBtn.innerText = "X";
+            statusChip.style.opacity = '0';
+            reticleUI.style.opacity = '0';
 
-            // Transition to ACTIVE after 1.5s
-            setTimeout(function () {
-                sessionState = 'ACTIVE';
-
-                // Hide status chip during message sequence
-                statusChip.style.opacity = '0';
-
-                log("Session active and grounded.");
-
-                // Upload anchor
-                try {
-                    if (window.ReactNativeWebView) {
-                        window.ReactNativeWebView.postMessage(JSON.stringify({
-                            action: 'uploadSafeZone',
-                            name: window.SPOT_NAME || "Calm Spot",
-                            anchorData: { x: currentX, y: currentY }
-                        }));
-                    }
-                } catch (e) { }
-
-                // Start tracking
-                lastReportTime = performance.now();
-                requestAnimationFrame(trackActivityPoints);
-
-                // Run calming message sequence
-                runSequence();
-
-            }, 1500);
-        });
-
-        // --- Message Sequence ---
-        function runSequence() {
-            var messages = [
-                "Good. Just stay here with your pet.",
-                "Your calm helps your pet calm down.",
-                "Breathe with the circle.",
-                "Give a treat when your pet relaxes."
-            ];
-
-            var index = 0;
-            var FADE_IN = 1000;
-            var VISIBLE = 2500;
-            var FADE_OUT = 1000;
-            var OVERLAP = 400; // next starts fading in before previous fully gone
-
-            function showNext() {
-                if (index >= messages.length) {
-                    // Sequence complete — show breathing prompt
-                    setTimeout(function () {
-                        statusChip.innerText = "Follow the rhythm";
-                        statusChip.style.opacity = '1';
-                    }, 500);
+            // Sequence
+            var messages = ["Good. Stay here with your pet.", "Your calm helps them calm down.", "Breathe with the circle.", "Give a treat when your pet relaxes."];
+            var idx = 0;
+            function run() {
+                if (idx >= messages.length) {
+                    activePulse.style.opacity = '1';
                     return;
                 }
-
-                // Show breathing pulse when "Breathe with the circle" appears
-                if (index === 2) {
-                    activePulse.classList.add('visible');
-                }
-
-                var msg = messages[index];
-                var el = document.createElement('div');
-                el.className = 'sequence-msg';
-                el.textContent = msg;
-                sequenceOverlay.appendChild(el);
-
-                // Force layout reflow
-                el.offsetHeight;
-
-                // Fade in
-                el.classList.add('visible');
-
-                // Schedule fade out
-                setTimeout(function () {
-                    el.classList.remove('visible');
-
-                    // Start next before this one fully disappears
-                    setTimeout(function () {
-                        index++;
-                        showNext();
-                    }, FADE_OUT - OVERLAP);
-
-                    // Clean up DOM element after transition completes
-                    setTimeout(function () {
-                        if (el.parentNode) el.parentNode.removeChild(el);
-                    }, FADE_OUT + 200);
-
-                }, FADE_IN + VISIBLE);
+                var m = document.createElement('div');
+                m.className = 'sequence-msg';
+                m.textContent = messages[idx++];
+                document.getElementById('sequence-overlay').appendChild(m);
+                setTimeout(() => { m.classList.add('visible'); setTimeout(() => { m.classList.remove('visible'); setTimeout(run, 1000); }, 3000); }, 100);
             }
-
-            // Small initial delay for user to settle
-            setTimeout(showNext, 400);
-        }
-
-        // --- Activity Tracking ---
-        function trackActivityPoints(t) {
-            if (sessionState !== 'ACTIVE') return;
-
-            if (t - lastReportTime >= 100) {
-                lastReportTime = t;
-                pointBuffer.push({
-                    x: 0, y: 0, z: 0,
-                    timestamp: { __type: 'serverTimestamp' },
-                    mode: 'interactive_session'
-                });
-
-                if (pointBuffer.length >= 10) sendPoints();
-            }
-            requestAnimationFrame(trackActivityPoints);
-        }
-
-        function sendPoints() {
-            if (pointBuffer.length === 0) return;
-            var points = pointBuffer.splice(0, pointBuffer.length);
-            try {
-                if (window.ReactNativeWebView) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                        action: 'savePoints',
-                        points: points,
-                        userId: window.AR_USER_ID,
-                        petId: window.AR_PET_ID
-                    }));
-                }
-            } catch (e) { }
-        }
-
-        // Fallback for browser testing
-        setTimeout(function () {
-            if (!window.AR_USER_ID && !loadingScreen.classList.contains('hidden')) {
-                startCamera();
-                updateMotion();
-            }
-        }, 3000);
+            run();
+        });
     </script>
+    <style>
+        @keyframes breathe {
+
+            0%,
+            100% {
+                transform: scale(0.9);
+                opacity: 0.3;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+        }
+    </style>
 </body>
 
 </html>

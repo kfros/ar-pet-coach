@@ -2,7 +2,6 @@ import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 
 export enum ARMode {
-  NATIVE = 'NATIVE', // Viro (ARKit/ARCore)
   LITE = 'LITE',     // MindAR WebView (Fallback)
   CALM = 'CALM'      // Non-AR Fallback (Stability focus)
 }
@@ -13,26 +12,12 @@ export enum ARMode {
  */
 export const getBestARMode = async (): Promise<ARMode> => {
   try {
-    // 1. Hardware Capability Detection (Native AR)
-    // We try/catch this as the native module might not be initialized in some edge cases
-    try {
-      const { ViroARSceneNavigator } = require('@viro-community/react-viro');
-      // This is a fast native call
-      const supportStatus = await ViroARSceneNavigator.isARSupportedOnDevice();
-      
-      if (supportStatus === 'SUPPORTED') {
-        return ARMode.NATIVE;
-      }
-    } catch (viroError) {
-      console.warn('[DeviceCheck] Viro support check error:', viroError);
-    }
-
-    // 2. WebView Resilience Check (Avoid PacProcessor crashes on older Android)
+    // 1. WebView Resilience Check (Avoid PacProcessor crashes on older Android)
     const apiLevel = await DeviceInfo.getApiLevel();
     const brand = (await DeviceInfo.getBrand()).toLowerCase();
-    
+
     // Older Android (API < 29 / Android 10) on specific brands often have WebView bugs
-    const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 && 
+    const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 &&
       (brand === 'xiaomi' || brand === 'redmi' || brand === 'oppo');
 
     if (isVulnerableWebView) {
@@ -40,8 +25,7 @@ export const getBestARMode = async (): Promise<ARMode> => {
       return ARMode.CALM;
     }
 
-    // 3. Fallback to MindAR (LITE) for mid-range devices without native ARCore/ARKit
-    // but with functional WebViews
+    // 2. Default to MindAR (LITE) for stable environments
     return ARMode.LITE;
 
   } catch (globalError) {
@@ -49,6 +33,7 @@ export const getBestARMode = async (): Promise<ARMode> => {
     return ARMode.CALM;
   }
 };
+
 /**
  * Identifies budget or legacy hardware that should receive truncated animations/messages
  * to preserve session stability.
@@ -57,7 +42,7 @@ export const isLowPerformanceDevice = async (): Promise<boolean> => {
   try {
     const apiLevel = await DeviceInfo.getApiLevel();
     const ram = await DeviceInfo.getTotalMemory(); // in bytes
-    
+
     // Thresholds for "budget" devices: 
     // Android < 10 (API 29) OR < 3GB RAM
     const isOldAndroid = Platform.OS === 'android' && apiLevel < 29;

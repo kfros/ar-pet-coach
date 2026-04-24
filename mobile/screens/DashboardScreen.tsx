@@ -9,6 +9,7 @@ import {
     RefreshControl,
     Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
     auth,
@@ -46,6 +47,7 @@ export default function DashboardScreen({ navigation }: any) {
     const [roomSelectorVisible, setRoomSelectorVisible] = useState(false);
 
     const { isPremium, checkPaywallTrigger, trackARSession } = useSubscription();
+    const insets = useSafeAreaInsets();
 
     const anxietyScore = petData?.anxietyScore ?? 0;
     const anxietyColor = getAnxietyColor(anxietyScore);
@@ -177,10 +179,19 @@ export default function DashboardScreen({ navigation }: any) {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
                 <Text style={styles.headerTitle}>Pet Anxiety Coach</Text>
-                <Pressable onPress={() => navigation.navigate('Settings')} style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
-                    <Ionicons name="settings-outline" size={24} color={COLORS.text} />
+                <Pressable 
+                    onPress={() => navigation.navigate('Settings')} 
+                    style={({ pressed }) => [
+                        styles.settingsButton,
+                        pressed && { opacity: 0.6 }
+                    ]}
+                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                    accessibilityLabel="Open Settings"
+                    accessibilityRole="button"
+                >
+                    <Ionicons name="settings-outline" size={26} color={COLORS.text} />
                 </Pressable>
             </View>
 
@@ -323,8 +334,19 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.backgroundLight },
     content: { padding: 20, paddingBottom: 40 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 10 },
+    header: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: 20, 
+        // paddingTop is handled dynamically via insets
+    },
     headerTitle: { ...FONTS.h2, color: COLORS.text },
+    settingsButton: {
+        padding: 4, // Slight internal padding to reach 44x44 easier
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     card: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, marginBottom: 16, ...SHADOWS.small },
     petHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', borderWidth: 2 },

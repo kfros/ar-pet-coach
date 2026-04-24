@@ -151,6 +151,21 @@ class RevenueCatService {
         };
     }
 
+    static async logOut(): Promise<void> {
+        if (!isConfigured) return;
+        try {
+            await Purchases.logOut();
+            console.log('RevenueCat: Logged out successfully');
+        } catch (e: any) {
+            // Ignore errors related to logging out anonymous users
+            if (e.message?.includes('anonymous') || e.code === '7') {
+                console.log('RevenueCat: Ignoring logout error for anonymous user');
+            } else {
+                console.error('RevenueCat: Error logging out', e);
+            }
+        }
+    }
+
     static isReady(): boolean {
         return isConfigured;
     }
