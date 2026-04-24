@@ -16,7 +16,9 @@ export const getBestARMode = async (): Promise<ARMode> => {
     const apiLevel = await DeviceInfo.getApiLevel();
     const brand = (await DeviceInfo.getBrand()).toLowerCase();
 
+
     // Older Android (API < 29 / Android 10) on specific brands often have WebView bugs
+    const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 &&
     const isVulnerableWebView = Platform.OS === 'android' && apiLevel < 29 &&
       (brand === 'xiaomi' || brand === 'redmi' || brand === 'oppo');
 

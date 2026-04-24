@@ -39,6 +39,7 @@ const SmartARContainer: React.FC<SmartARContainerProps> = ({
 
   // Silent Guard Capability Detection
   useEffect(() => {
+    console.log('[SmartARContainer] useEffect CapabilityDetection MOUNT/UPDATE permission:', permission?.status);
     if (initialCheckDone.current) return;
 
     const init = async () => {

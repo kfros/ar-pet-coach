@@ -69,4 +69,13 @@ ios/*.xcodeproj/xcshareddata
 mobile/eas — копия.json
 mobile/clear.ps1
 mobile/rm.ps1
+<<<<<<< HEAD
 *.ipa
+=======
+a5f9643b-501a-4a10-a819-37f28944eca8-run-fastlane.txt
+com.google.ar.core_1.39.232070563-232070563_minAPI24(x86_64)(nodpi)_apkmirror.com.apk
+com.google.ar.core_1.53.260340643-260340643_minAPI24(x86)(nodpi)_apkmirror.com.apk
+xcode-build-5ea1c9ad-528b-4df2-83c4-3c847b30bd5c.log
+xcode-build-a5f9643b-501a-4a10-a819-37f28944eca8.log
+Potwierdzenie_transakcji_nr_0235897253_130426.pdf
+>>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
