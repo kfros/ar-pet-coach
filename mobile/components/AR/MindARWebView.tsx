@@ -54,15 +54,18 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
   // Session State tracking
   const [sessionTime, setSessionTime] = useState(0);
   const [isAudioActive, setIsAudioActive] = useState(false);
+  const [isPlaced, setIsPlaced] = useState(false);
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
+  const [lowLight, setLowLight] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Audio Hook integration (Triggered on placement)
-  const { currentTrackId } = useCalmAudio(isAudioActive);
+  const { currentTrackId, stopAudio } = useCalmAudio(isAudioActive);
 
   // Refs for Save-on-Exit pattern preventing stale closures during unmount
   const finalSessionTime = useRef(0);
   const finalTrackId = useRef<string | null>(null);
-  const isExitingData = useRef(false);
+  const isExiting = useRef(false);
 
   useEffect(() => {
     finalSessionTime.current = sessionTime;
@@ -85,8 +88,8 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
   // Atomic Persistence (Matches Fallback Engine behavior)
   useEffect(() => {
     return () => {
-      if (isExitingData.current) return;
-      isExitingData.current = true;
+      if (isExiting.current) return;
+      isExiting.current = true;
 
       const latestTime = finalSessionTime.current;
       if (latestTime >= 10) {

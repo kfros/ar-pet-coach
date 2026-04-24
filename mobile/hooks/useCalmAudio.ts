@@ -164,6 +164,17 @@ export const useCalmAudio = (isActive: boolean) => {
   /**
    * Session Lifecycle Control
    */
+  const stopAudio = useCallback(async () => {
+    if (activeSound.current) {
+      const s = activeSound.current;
+      activeSound.current = null;
+      await fadeVolume(s, DEFAULT_VOLUME, 0, FADE_OUT_DURATION);
+      await s.stopAsync();
+      setIsPlaying(false);
+      setCurrentTrackId(null);
+    }
+  }, [fadeVolume]);
+
   useEffect(() => {
     let active = true;
 
@@ -184,26 +195,16 @@ export const useCalmAudio = (isActive: boolean) => {
       };
       start();
     } else {
-      // Fade out and stop
-      const stop = async () => {
-        if (activeSound.current) {
-          const s = activeSound.current;
-          activeSound.current = null;
-          await fadeVolume(s, DEFAULT_VOLUME, 0, FADE_OUT_DURATION);
-          await s.stopAsync();
-          setIsPlaying(false);
-          setCurrentTrackId(null);
-        }
-      };
-      stop();
+      stopAudio();
     }
 
     return () => { active = false; };
-  }, [isActive, fadeVolume, playTrack, selectNextTrackId]);
+  }, [isActive, fadeVolume, playTrack, selectNextTrackId, stopAudio]);
 
   return {
     currentTrackId,
     isPlaying,
-    handleNext
+    handleNext,
+    stopAudio
   };
 };
