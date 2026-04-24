@@ -1,175 +1,209 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const LAST_TRACK_KEY = 'chillpup_last_played_audio_track';
-
-export const CALM_TRACKS = [
+const CALM_TRACKS = [
   { id: 'calm_01', source: require('../assets/calm_01.mp3') },
   { id: 'calm_02', source: require('../assets/calm_02.mp3') },
   { id: 'calm_03', source: require('../assets/calm_03.mp3') },
   { id: 'calm_04', source: require('../assets/calm_04.mp3') },
 ];
 
-export interface UseCalmAudio {
-  currentTrackId: string | null;
-  playRandomTrack: () => Promise<void>;
-  stopAudio: () => Promise<void>;
-  isPlaying: boolean;
-}
+const LAST_TRACK_KEY = 'chillpup_last_played_audio_track';
+const DEFAULT_VOLUME = 0.25;
+const FADE_IN_DURATION = 1200;
+const FADE_OUT_DURATION = 800;
+const CROSSFADE_DURATION = 1500;
 
 /**
- * Standardized hook for calming audio playback across all engines.
- * Implements controlled random selection, crossfades, and volume ramping.
+ * Premium Audio Hook for the Calm AR session.
+ * Handles preloading, sequential randomization with cross-session memory,
+ * and smooth transitions using expo-av.
  */
-export const useCalmAudio = (): UseCalmAudio => {
+export const useCalmAudio = (isActive: boolean) => {
   const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const activeSound = useRef<Audio.Sound | null>(null);
   const fadingSound = useRef<Audio.Sound | null>(null);
-  const isMounted = useRef(true);
+  const soundsMap = useRef<Map<string, Audio.Sound>>(new Map());
+  const isTransitioning = useRef(false);
 
-  const selectNextTrackId = async () => {
-    try {
-      const lastTrackId = await AsyncStorage.getItem(LAST_TRACK_KEY);
-      const availableTracks = CALM_TRACKS.filter(t => t.id !== lastTrackId);
-      const selected = availableTracks[Math.floor(Math.random() * availableTracks.length)];
-      await AsyncStorage.setItem(LAST_TRACK_KEY, selected.id);
-      return selected;
-    } catch (e) {
-      return CALM_TRACKS[0];
-    }
-  };
+  // 1. Loading Strategy: Preload all tracks on session start
+  useEffect(() => {
+    let isMounted = true;
 
-  const fadeVolume = async (sound: Audio.Sound, from: number, to: number, duration: number) => {
-    const steps = 10;
+    const preload = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          playThroughEarpieceAndroid: false,
+        });
+
+        for (const track of CALM_TRACKS) {
+          const { sound } = await Audio.Sound.createAsync(
+            track.source,
+            { shouldPlay: false, volume: 0 },
+            undefined,
+            true
+          );
+          if (isMounted) {
+            soundsMap.current.set(track.id, sound);
+          } else {
+            sound.unloadAsync();
+          }
+        }
+      } catch (e) {
+        console.warn('[useCalmAudio] Preload error:', e);
+      }
+    };
+
+    preload();
+
+    return () => {
+      isMounted = false;
+      // Fade out and stop on exit
+      const unloadAll = async () => {
+        const cleanupPromises = Array.from(soundsMap.current.values()).map(async (sound) => {
+          try {
+            await sound.stopAsync();
+            await sound.unloadAsync();
+          } catch (e) { }
+        });
+        await Promise.all(cleanupPromises);
+        soundsMap.current.clear();
+      };
+      unloadAll();
+    };
+  }, []);
+
+  /**
+   * Linear Volume Fade helper
+   */
+  const fadeVolume = useCallback(async (sound: Audio.Sound, from: number, to: number, duration: number) => {
+    const steps = 15;
     const interval = duration / steps;
     const stepValue = (to - from) / steps;
 
     for (let i = 1; i <= steps; i++) {
-      if (!isMounted.current) break;
-      const vol = from + (stepValue * i);
-      try {
-        await sound.setStatusAsync({ volume: Math.max(0, Math.min(0.25, vol)) });
-      } catch (e) {
-        break;
-      }
+      const vol = Math.max(0, Math.min(1, from + (stepValue * i)));
+      await sound.setStatusAsync({ volume: vol });
       await new Promise(r => setTimeout(r, interval));
     }
-  };
+  }, []);
 
-  const playTrack = useCallback(async (track: typeof CALM_TRACKS[0], isCrossfade = false) => {
+  /**
+   * Core randomized selection with memory (no immediate repeat)
+   */
+  const selectNextTrackId = useCallback(async (lastPlayedId: string | null) => {
+    const available = CALM_TRACKS.filter(t => t.id !== lastPlayedId);
+    if (available.length === 0) return CALM_TRACKS[0].id;
+    const selected = available[Math.floor(Math.random() * available.length)];
+    return selected.id;
+  }, []);
+
+  /**
+   * Main Play Engine
+   */
+  const playTrack = useCallback(async (trackId: string, isCrossfade = false) => {
+    if (isTransitioning.current) return;
+
+    const sound = soundsMap.current.get(trackId);
+    if (!sound) return;
+
     try {
-      if (!isMounted.current) return;
-
-      const { sound } = await Audio.Sound.createAsync(
-        track.source,
-        {
-          shouldPlay: true,
-          volume: 0,
-          isLooping: false,
-        }
-      );
-
-      if (!isMounted.current) {
-        sound.unloadAsync();
-        return;
-      }
-
+      isTransitioning.current = true;
       const previousSound = activeSound.current;
-      activeSound.current = sound;
-      setCurrentTrackId(track.id);
-      setIsPlaying(true);
 
-      sound.setOnPlaybackStatusUpdate(status => {
-        if (status.isLoaded && status.didJustFinish && isMounted.current) {
-          handleTrackEnd();
+      // Setup next track
+      await sound.setPositionAsync(0);
+      await sound.setStatusAsync({ volume: 0, isLooping: false });
+
+      // Update state
+      activeSound.current = sound;
+      setCurrentTrackId(trackId);
+      setIsPlaying(true);
+      await AsyncStorage.setItem(LAST_TRACK_KEY, trackId);
+
+      // Handle track end loop
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          handleNext();
         }
       });
 
+      await sound.playAsync();
+
       if (isCrossfade && previousSound) {
         fadingSound.current = previousSound;
-        Promise.all([
-          fadeVolume(sound, 0, 0.25, 800),
-          fadeVolume(previousSound, 0.25, 0, 800).then(() => {
-            previousSound.unloadAsync();
-            if (fadingSound.current === previousSound) fadingSound.current = null;
+        await Promise.all([
+          fadeVolume(sound, 0, DEFAULT_VOLUME, CROSSFADE_DURATION),
+          fadeVolume(previousSound, DEFAULT_VOLUME, 0, CROSSFADE_DURATION).then(async () => {
+            await previousSound.stopAsync();
+            fadingSound.current = null;
           })
         ]);
       } else {
-        await fadeVolume(sound, 0, 0.25, 1200);
+        await fadeVolume(sound, 0, DEFAULT_VOLUME, FADE_IN_DURATION);
       }
+
+      isTransitioning.current = false;
     } catch (e) {
-      console.warn('[useCalmAudio] Audio play error:', e);
+      console.warn('[useCalmAudio] Play error:', e);
+      isTransitioning.current = false;
     }
-  }, []);
+  }, [fadeVolume]);
 
-  const handleTrackEnd = async () => {
-    if (!isMounted.current) return;
-    const nextTrack = await selectNextTrackId();
-    await playTrack(nextTrack, true);
-  };
+  const handleNext = useCallback(async () => {
+    const lastId = await AsyncStorage.getItem(LAST_TRACK_KEY);
+    const nextId = await selectNextTrackId(lastId);
+    await playTrack(nextId, true);
+  }, [selectNextTrackId, playTrack]);
 
-  const playRandomTrack = async () => {
-    const track = await selectNextTrackId();
-    await playTrack(track, false);
-  };
-
-  const stopAudio = async () => {
-    setIsPlaying(false);
-    if (activeSound.current) {
-      const s = activeSound.current;
-      activeSound.current = null;
-      s.setOnPlaybackStatusUpdate(null);
-      try {
-        if (isMounted.current) {
-          await fadeVolume(s, 0.25, 0, 800);
-        }
-        await s.unloadAsync();
-      } catch (e) {}
-    }
-
-    if (fadingSound.current) {
-      const f = fadingSound.current;
-      fadingSound.current = null;
-      try {
-        await f.unloadAsync();
-      } catch (e) {}
-    }
-  };
-
-  const hardCleanup = () => {
-    if (activeSound.current) {
-      const s = activeSound.current;
-      activeSound.current = null;
-      s.setOnPlaybackStatusUpdate(null);
-      s.unloadAsync().catch(() => {});
-    }
-    if (fadingSound.current) {
-      const f = fadingSound.current;
-      fadingSound.current = null;
-      f.unloadAsync().catch(() => {});
-    }
-  };
-
+  /**
+   * Session Lifecycle Control
+   */
   useEffect(() => {
-    isMounted.current = true;
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
-    });
-    return () => {
-      isMounted.current = false;
-      hardCleanup();
-    };
-  }, []);
+    let active = true;
+
+    if (isActive) {
+      const start = async () => {
+        // Wait a bit for preloading to finish if necessary
+        let attempts = 0;
+        while (soundsMap.current.size < 4 && attempts < 10 && active) {
+          await new Promise(r => setTimeout(r, 200));
+          attempts++;
+        }
+
+        if (!active) return;
+
+        const lastId = await AsyncStorage.getItem(LAST_TRACK_KEY);
+        const nextId = await selectNextTrackId(lastId);
+        await playTrack(nextId, false);
+      };
+      start();
+    } else {
+      // Fade out and stop
+      const stop = async () => {
+        if (activeSound.current) {
+          const s = activeSound.current;
+          activeSound.current = null;
+          await fadeVolume(s, DEFAULT_VOLUME, 0, FADE_OUT_DURATION);
+          await s.stopAsync();
+          setIsPlaying(false);
+          setCurrentTrackId(null);
+        }
+      };
+      stop();
+    }
+
+    return () => { active = false; };
+  }, [isActive, fadeVolume, playTrack, selectNextTrackId]);
 
   return {
     currentTrackId,
-    playRandomTrack,
-    stopAudio,
     isPlaying,
+    handleNext
   };
 };

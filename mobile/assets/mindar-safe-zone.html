@@ -267,31 +267,7 @@
         var cameraStream = null;
         var sessionState = 'ENTRY';
 
-<<<<<<< HEAD
         function post(action, data) {
-=======
-        // Global UI Toggle for Unified UX
-        function applyUIVisibility() {
-            if (window.HIDE_INTERNAL_UI) {
-                if (reticleUI) reticleUI.style.display = 'none';
-                if (overlay) overlay.style.display = 'none';
-                if (activePulse) activePulse.style.display = 'none';
-                if (sequenceOverlay) sequenceOverlay.style.display = 'none';
-                if (loadingScreen) loadingScreen.style.display = 'none';
-                // We keep focusDim and confirmationGlow as they add "vibe" without being functional UI
-            }
-        }
-
-        // Lerp (smoothed follow for post-detection surface tracking)
-        var currentX = window.innerWidth / 2;
-        var currentY = window.innerHeight / 2;
-        var targetX = currentX;
-        var targetY = currentY;
-        var LERP = 0.12;
-
-        function log(msg) {
-            console.log("[Calm AR]", msg);
->>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
             try {
                 if (window.ReactNativeWebView) {
                     window.ReactNativeWebView.postMessage(JSON.stringify(Object.assign({ action: action }, data || {})));
@@ -299,39 +275,6 @@
             } catch (e) { }
         }
 
-<<<<<<< HEAD
-=======
-        function exitSession() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(function (track) { track.stop(); });
-                cameraStream = null;
-            }
-            try {
-                if (window.ReactNativeWebView) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'exit' }));
-                }
-            } catch (e) { }
-        }
-
-        // --- Reticle positioning ---
-        // Pre-detection: screen center (CSS handles this via top:50% left:50% margin)
-        // Post-detection: lerp follow toward simulated surface point
-        function updateMotion() {
-            if (sessionState === 'PLACEMENT') {
-                currentX += (targetX - currentX) * LERP;
-                currentY += (targetY - currentY) * LERP;
-
-                // Offset from CSS center: reticle is at 50%/50% via margin,
-                // so we express the delta from screen center
-                var dx = currentX - (window.innerWidth / 2);
-                var dy = currentY - (window.innerHeight / 2);
-                if (reticleUI) reticleUI.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
-            }
-            requestAnimationFrame(updateMotion);
-        }
-
-        // --- Camera ---
->>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
         function startCamera() {
             navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -340,24 +283,12 @@
                 cameraStream = stream;
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
-<<<<<<< HEAD
-=======
-
-                applyUIVisibility();
->>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
                 loadingScreen.classList.add('hidden');
                 overlay.classList.remove('hidden');
                 setTimeout(function () {
                     sessionState = 'PLACEMENT';
                     statusChip.innerText = "Point at the floor to begin";
-<<<<<<< HEAD
                     reticleUI.style.opacity = '1';
-=======
-
-                    // Fade reticle in (centered by CSS, opacity transition)
-                    if (reticleUI) reticleUI.style.opacity = '1';
-
->>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
                     startBtn.classList.remove('hidden');
                 }, 1000);
             }).catch(function (err) {
@@ -365,15 +296,7 @@
             });
         }
 
-<<<<<<< HEAD
         window.receiveNativeAuth = function (userId, petId) {
-=======
-        // --- Auth Entry ---
-        window.receiveNativeAuth = function (userId, petId, idToken) {
-            window.AR_USER_ID = userId;
-            window.AR_PET_ID = petId;
-            applyUIVisibility();
->>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
             startCamera();
         };
 
@@ -396,7 +319,6 @@
             // Dimmer effect
             focusDim.style.opacity = '1';
 
-<<<<<<< HEAD
             // UI Refresh
             startBtn.classList.add('active-x');
             startBtn.innerText = "X";
@@ -409,68 +331,6 @@
             function run() {
                 if (idx >= messages.length) {
                     activePulse.style.opacity = '1';
-=======
-            // --- Transition: Hide reticle ---
-            // Start fading reticle out shortly after confirmation
-            setTimeout(function () {
-                if (reticleUI) reticleUI.style.opacity = '0';
-            }, 400);
-
-            // Transition to ACTIVE after 1.5s
-            setTimeout(function () {
-                sessionState = 'ACTIVE';
-
-                // Hide status chip during message sequence
-                statusChip.style.opacity = '0';
-
-                log("Session active and grounded.");
-
-                // Upload anchor
-                try {
-                    if (window.ReactNativeWebView) {
-                        window.ReactNativeWebView.postMessage(JSON.stringify({
-                            action: 'uploadSafeZone',
-                            name: window.SPOT_NAME || "Calm Spot",
-                            anchorData: { x: currentX, y: currentY }
-                        }));
-                    }
-                } catch (e) { }
-
-                // Start tracking
-                lastReportTime = performance.now();
-                requestAnimationFrame(trackActivityPoints);
-
-                // Run calming message sequence (only if UI is not hidden)
-                if (!window.HIDE_INTERNAL_UI) {
-                    runSequence();
-                }
-
-            }, 1500);
-        });
-
-        // --- Message Sequence ---
-        function runSequence() {
-            var messages = [
-                "Good. Just stay here with your pet.",
-                "Your calm helps your pet calm down.",
-                "Breathe with the circle.",
-                "Give a treat when your pet relaxes."
-            ];
-
-            var index = 0;
-            var FADE_IN = 1000;
-            var VISIBLE = 2500;
-            var FADE_OUT = 1000;
-            var OVERLAP = 400; // next starts fading in before previous fully gone
-
-            function showNext() {
-                if (index >= messages.length) {
-                    // Sequence complete — show breathing prompt
-                    setTimeout(function () {
-                        statusChip.innerText = "Follow the rhythm";
-                        statusChip.style.opacity = '1';
-                    }, 500);
->>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
                     return;
                 }
                 var m = document.createElement('div');
@@ -479,7 +339,6 @@
                 document.getElementById('sequence-overlay').appendChild(m);
                 setTimeout(() => { m.classList.add('visible'); setTimeout(() => { m.classList.remove('visible'); setTimeout(run, 1000); }, 3000); }, 100);
             }
-<<<<<<< HEAD
             run();
         });
     </script>
@@ -498,54 +357,6 @@
             }
         }
     </style>
-=======
-
-            // Small initial delay for user to settle
-            setTimeout(showNext, 400);
-        }
-
-        // --- Activity Tracking ---
-        function trackActivityPoints(t) {
-            if (sessionState !== 'ACTIVE') return;
-
-            if (t - lastReportTime >= 100) {
-                lastReportTime = t;
-                pointBuffer.push({
-                    x: 0, y: 0, z: 0,
-                    timestamp: { __type: 'serverTimestamp' },
-                    mode: 'lite_ar_unified'
-                });
-
-                if (pointBuffer.length >= 10) sendPoints();
-            }
-            requestAnimationFrame(trackActivityPoints);
-        }
-
-        function sendPoints() {
-            if (pointBuffer.length === 0) return;
-            var points = pointBuffer.splice(0, pointBuffer.length);
-            try {
-                if (window.ReactNativeWebView) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                        action: 'savePoints',
-                        points: points,
-                        userId: window.AR_USER_ID,
-                        petId: window.AR_PET_ID
-                    }));
-                }
-            } catch (e) { }
-        }
-
-        // Fallback for browser testing
-        setTimeout(function () {
-            if (!window.AR_USER_ID && !loadingScreen.classList.contains('hidden')) {
-                startCamera();
-                updateMotion();
-            }
-        }, 3000);
-    </script>
-
->>>>>>> 4d24f0426bcf434744a1498ae3622c5877bf3771
 </body>
 
 </html>
