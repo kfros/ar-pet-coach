@@ -1,20 +1,22 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Platform, Dimensions, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Dimensions, Pressable } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import LottieView from 'lottie-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  db, 
-  collection, 
-  addDoc, 
-  serverTimestamp 
+import {
+  db,
+  collection,
+  addDoc,
+  serverTimestamp
 } from '../../services/firebaseConfig';
 import { getBestARMode, ARMode, isLowPerformanceDevice } from '../../helpers/DeviceCheck';
 import { useCalmAudio } from '../../hooks/useCalmAudio';
-import CalmHUD from './CalmHUD';
 
 const { width } = Dimensions.get('window');
-const CALM_FIRST_TIME_KEY = 'chillpup_calm_has_seen_instructions';
 
+/**
+ * Session States for the Calm Session
+ */
 enum SessionState {
   INIT = 'INIT',
   AR_AVAILABLE_NO_ZONE = 'AR_AVAILABLE_NO_ZONE',
@@ -28,14 +30,16 @@ interface CalmFallbackEngineProps {
   onExit: () => void;
 }
 
+const CALM_FIRST_TIME_KEY = 'chillpup_calm_has_seen_instructions';
+
 /**
- * Onboarding Overlay for first-time users.
+ * Instruction Overlay Component
  */
 const CalmFallbackOverlay: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const [messageIndex, setMessageIndex] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
-  
+
   const messages = [
     "Stay here with your pet.",
     "Your calm helps them calm down.",
@@ -48,7 +52,7 @@ const CalmFallbackOverlay: React.FC<{ onComplete: () => void }> = ({ onComplete 
     const runSequence = async () => {
       const isLowPerf = await isLowPerformanceDevice();
       const hasSeen = await AsyncStorage.getItem(CALM_FIRST_TIME_KEY);
-      
+
       let activeMessages = messages;
       if (hasSeen) {
         activeMessages = [messages[0]];
@@ -83,36 +87,42 @@ const CalmFallbackOverlay: React.FC<{ onComplete: () => void }> = ({ onComplete 
 };
 
 /**
- * Main Calm Session Engine (Fallback Mode).
+ * Premium Calm Session Engine.
+ * Features a controlled random audio playback with seamless crossfades.
  */
-const CalmFallbackEngine: React.FC<CalmFallbackEngineProps> = ({
+const CalmFallbackEngine = ({
   userId,
   petId,
   onExit,
-}) => {
+}: CalmFallbackEngineProps) => {
   const insets = useSafeAreaInsets();
   const [sessionState, setSessionState] = useState<SessionState>(SessionState.INIT);
   const [sessionTime, setSessionTime] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
-  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
-  
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const isExiting = useRef(false);
+  const [pulseAnim] = useState(new Animated.Value(1));
+
+  // Audio Hook Integration
+  const { currentTrackId } = useCalmAudio(sessionState === SessionState.ACTIVE_SESSION);
+
+  // Refs for Save-on-Exit pattern preventing stale closures
   const finalSessionTime = useRef(0);
-  const currentTrackIdRef = useRef<string | null>(null);
-  const hasSaved = useRef(false);
+  const finalTrackId = useRef<string | null>(null);
+  const isExitingData = useRef(false);
 
-  // Audio Hook
-  const { currentTrackId, playRandomTrack, stopAudio } = useCalmAudio();
-
-  // Sync state to refs for safe access in cleanup
   useEffect(() => {
     finalSessionTime.current = sessionTime;
-    currentTrackIdRef.current = currentTrackId;
-  }, [sessionTime, currentTrackId]);
+  }, [sessionTime]);
+
+  useEffect(() => {
+    finalTrackId.current = currentTrackId;
+  }, [currentTrackId]);
+
 
   // 1. Initial Capability Detection
   useEffect(() => {
+    console.log('[CalmFallbackEngine] useEffect CapabilityDetection MOUNT/UPDATE sessionState:', sessionState);
     const detectCapabilities = async () => {
       try {
         const bestMode = await getBestARMode();
@@ -129,15 +139,17 @@ const CalmFallbackEngine: React.FC<CalmFallbackEngineProps> = ({
   }, [sessionState]);
 
   // 2. Lifecycle Management
+  // 2. Lifecycle Management
   useEffect(() => {
-    if (sessionState === SessionState.ACTIVE_SESSION && !isExiting.current) {
-      // Start timer
-      timerRef.current = setInterval(() => {
-        if (!isExiting.current) setSessionTime(prev => prev + 1);
-      }, 1000);
+    if (sessionState === SessionState.ACTIVE_SESSION) {
+      timerRef.current = setInterval(() => setSessionTime(prev => prev + 1), 1000);
 
-      // Start Audio
-      playRandomTrack();
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.15, duration: 4000, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 4000, useNativeDriver: true }),
+        ])
+      ).start();
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -150,58 +162,64 @@ const CalmFallbackEngine: React.FC<CalmFallbackEngineProps> = ({
     };
   }, [sessionState]);
 
-  // 3. Atomic Save-on-Exit
+  // 4. Persistence (Atomic Save-on-Exit)
   useEffect(() => {
     return () => {
-      // Threshold check: only save if session lasted at least 15 seconds
-      if (!hasSaved.current && finalSessionTime.current >= 15) {
-        hasSaved.current = true;
+      if (isExitingData.current) return;
+      isExitingData.current = true;
+
+      const latestTime = finalSessionTime.current;
+      if (latestTime >= 10) {
         addDoc(collection(db, 'users', userId, 'pets', petId, 'activityPoints'), {
           type: 'calm_session_complete',
           timestamp: serverTimestamp(),
-          durationSeconds: finalSessionTime.current,
+          durationSeconds: latestTime,
           mode: 'fallback',
-          trackId: currentTrackIdRef.current
-        }).catch((err) => {
-          console.error('[CalmFallbackEngine] Exit save failed:', err);
-        });
+          trackId: finalTrackId.current
+        }).catch(err => console.warn('[CalmFallback] Atomic save error:', err));
       }
     };
   }, []);
 
-  // 4. Simulated UX Parity
-  useEffect(() => {
-    if (sessionState === SessionState.AR_AVAILABLE_NO_ZONE || sessionState === SessionState.NON_AR_MODE) {
-      const timer = setTimeout(() => {
-        setSurfaceStatus('ready');
-      }, 1500);
-      return () => clearTimeout(timer);
+  const stateConfig = useMemo(() => {
+    switch (sessionState) {
+      case SessionState.AR_AVAILABLE_NO_ZONE:
+        return { headerTitle: 'Create Calm Space', description: 'Point your camera at a stable surface', buttonVisible: false };
+      case SessionState.NON_AR_MODE:
+        return { headerTitle: 'Guided Calming Session', description: 'Follow the rhythm and stay close to your pet', buttonLabel: 'Start session', buttonVisible: true, variant: 'primary' };
+      case SessionState.ACTIVE_SESSION:
+        return { headerTitle: 'Calming in progress', description: 'Breathe slowly and reward calm behavior', buttonLabel: 'End session', buttonVisible: true, variant: 'secondary' };
+      default:
+        return { headerTitle: 'Preparing...', description: '', buttonVisible: false };
     }
   }, [sessionState]);
 
   const handleExit = async () => {
-    if (isExiting.current) return;
+    console.log('[CalmFallbackEngine] handleExit started');
+    if (isExiting.current) {
+      console.log('[CalmFallbackEngine] handleExit isExiting: already true');
+      return;
+    }
     isExiting.current = true;
 
     try {
+      // Clear timer immediately
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+        console.log('[CalmFallbackEngine] timer cleared');
       }
+
+      // Fade out audio (awaits completion)
+      console.log('[CalmFallbackEngine] stopping audio');
       await stopAudio();
+      console.log('[CalmFallbackEngine] audio stopped');
     } catch (e) {
-      console.error('[CalmFallbackEngine] Exit cleanup error:', e);
+      console.error('[CalmFallbackEngine] Error during handleExit cleanup:', e);
     } finally {
+      // Let navigation.replace() handle the teardown
       onExit();
     }
-  };
-
-  const handleStartSession = () => {
-    setSessionState(SessionState.ACTIVE_SESSION);
-    // Show overlay for first-time session start
-    AsyncStorage.getItem(CALM_FIRST_TIME_KEY).then(val => {
-      if (!val) setShowOverlay(true);
-    });
   };
 
   const formatTime = (seconds: number) => {
@@ -210,9 +228,13 @@ const CalmFallbackEngine: React.FC<CalmFallbackEngineProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleStartSession = () => {
+    setSessionState(SessionState.ACTIVE_SESSION);
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Background Visuals */}
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom || 16 }]}>
+      {/* Background Visuals (Minimalist for Fallback) */}
       <View style={styles.mainVisual}>
         <View style={styles.timerContainer}>
           <Text style={styles.timerText}>{formatTime(sessionTime)}</Text>
@@ -227,54 +249,29 @@ const CalmFallbackEngine: React.FC<CalmFallbackEngineProps> = ({
         showReticle={sessionState === SessionState.AR_AVAILABLE_NO_ZONE}
         surfaceStatus={surfaceStatus}
       />
-
-      {showOverlay && (
-        <CalmFallbackOverlay onComplete={() => setShowOverlay(false)} />
-      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A'
-  },
-  mainVisual: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  timerContainer: {
-    position: 'absolute',
-    top: 80,
-    zIndex: 5,
-  },
-  timerText: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: '#38BDF8',
-    opacity: 0.8,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace'
-  },
-  overlayContainer: { 
-    ...StyleSheet.absoluteFillObject, 
-    zIndex: 200, 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)'
-  },
+  container: { flex: 1, backgroundColor: '#0F172A', paddingHorizontal: 16 },
+  header: { height: 'auto', alignItems: 'center', paddingVertical: 12 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.5 },
+  mainVisual: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  timerContainer: { height: 'auto', marginBottom: 24 },
+  timerText: { fontSize: 32, fontWeight: '300', color: '#38BDF8' },
+  lottieContainer: { width: width * 0.8, aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
+  animation: { width: '100%', height: '100%' },
+  bottomBlock: { height: 'auto', alignItems: 'center', gap: 16 },
+  description: { textAlign: 'center', color: '#94A3B8', fontSize: 16, lineHeight: 22, marginBottom: 12, fontWeight: '400' },
+  button: { width: '100%', minHeight: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  primary: { backgroundColor: '#38BDF8' },
+  secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#38BDF8' },
+  primaryText: { color: '#0F172A', fontWeight: '700', fontSize: 16 },
+  secondaryText: { color: '#38BDF8', fontWeight: '700', fontSize: 16 },
+  overlayContainer: { ...StyleSheet.absoluteFillObject, zIndex: 200, justifyContent: 'center', alignItems: 'center' },
   messageBox: { width: '80%', alignItems: 'center' },
-  overlayText: { 
-    fontSize: 22, 
-    fontWeight: '600', 
-    color: '#FFFFFF', 
-    textAlign: 'center', 
-    lineHeight: 30,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 12 
-  },
+  overlayText: { fontSize: 20, fontWeight: '600', color: '#FFFFFF', textAlign: 'center', lineHeight: 26, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12 },
 });
 
 export default CalmFallbackEngine;
