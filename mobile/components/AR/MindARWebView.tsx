@@ -54,7 +54,7 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
   const [sessionTime, setSessionTime] = useState(0);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [isPlaced, setIsPlaced] = useState(false);
-  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('ready');
   const [lowLight, setLowLight] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -76,13 +76,23 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
 
   // Lifecycle & Timer
   useEffect(() => {
-    timerRef.current = setInterval(() => setSessionTime(prev => prev + 1), 1000);
+    if (isPlaced) {
+      timerRef.current = setInterval(() => setSessionTime(prev => prev + 1), 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       if (heatmapUnsubscribe.current) heatmapUnsubscribe.current();
     };
-  }, []);
+  }, [isPlaced]);
 
   // Atomic Persistence (Matches Fallback Engine behavior)
   useEffect(() => {
@@ -153,6 +163,7 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
 
         case 'startAudio':
           setIsAudioActive(true);
+          setIsPlaced(true);
           break;
 
         case 'exit':
@@ -219,9 +230,8 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
 
       // Fade out audio (awaits completion)
       if (isPlaced) {
-        console.log('[MindARWebView] handleExit calling stopAudio');
-        await stopAudio();
-        console.log('[MindARWebView] stopAudio completed');
+        console.log('[MindARWebView] handleExit calling stopAudio (non-blocking)');
+        stopAudio().catch(e => console.warn('Background audio stop error:', e));
       }
     } catch (e) {
       console.error('[MindARWebView] Error during handleExit cleanup:', e);
@@ -293,6 +303,7 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
           showReticle={!isPlaced}
           surfaceStatus={surfaceStatus}
           lowLight={lowLight}
+          hideVisuals={true}
         />
       </View>
     </ARViewErrorBoundary>
