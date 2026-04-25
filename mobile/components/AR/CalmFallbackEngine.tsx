@@ -100,7 +100,7 @@ const CalmFallbackEngine = ({
   const [sessionState, setSessionState] = useState<SessionState>(SessionState.INIT);
   const [sessionTime, setSessionTime] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
-  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('ready');
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [pulseAnim] = useState(new Animated.Value(1));
@@ -212,10 +212,9 @@ const CalmFallbackEngine = ({
         console.log('[CalmFallbackEngine] timer cleared');
       }
 
-      // Fade out audio (awaits completion)
-      console.log('[CalmFallbackEngine] stopping audio');
-      await stopAudio();
-      console.log('[CalmFallbackEngine] audio stopped');
+      // Fade out audio (non-blocking for immediate UI feedback)
+      console.log('[CalmFallbackEngine] stopping audio (non-blocking)');
+      stopAudio().catch(e => console.warn('Background audio stop error:', e));
     } catch (e) {
       console.error('[CalmFallbackEngine] Error during handleExit cleanup:', e);
     } finally {

@@ -82,7 +82,7 @@ export const useCalmAudio = (isActive: boolean) => {
    * Linear Volume Fade helper
    */
   const fadeVolume = useCallback(async (sound: Audio.Sound, from: number, to: number, duration: number) => {
-    const steps = 15;
+    const steps = 50; // Increased for smoother "lerp"
     const interval = duration / steps;
     const stepValue = (to - from) / steps;
 

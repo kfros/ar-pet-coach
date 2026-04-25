@@ -284,12 +284,18 @@
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
                 loadingScreen.classList.add('hidden');
-                overlay.classList.remove('hidden');
+                if (!window.HIDE_INTERNAL_UI) {
+                    overlay.classList.remove('hidden');
+                }
                 setTimeout(function () {
                     sessionState = 'PLACEMENT';
-                    statusChip.innerText = "Point at the floor to begin";
+                    // Always show the smooth HTML reticle
                     reticleUI.style.opacity = '1';
-                    startBtn.classList.remove('hidden');
+                    
+                    if (!window.HIDE_INTERNAL_UI) {
+                        statusChip.innerText = "Point at the floor to begin";
+                        startBtn.classList.remove('hidden');
+                    }
                 }, 1000);
             }).catch(function (err) {
                 post("log", { message: "Camera error: " + err.message });
@@ -326,20 +332,25 @@
             reticleUI.style.opacity = '0';
 
             // Sequence
-            var messages = ["Good. Stay here with your pet.", "Your calm helps them calm down.", "Breathe with the circle.", "Give a treat when your pet relaxes."];
-            var idx = 0;
-            function run() {
-                if (idx >= messages.length) {
-                    activePulse.style.opacity = '1';
-                    return;
+            if (!window.HIDE_INTERNAL_UI) {
+                var messages = ["Good. Stay here with your pet.", "Your calm helps them calm down.", "Breathe with the circle.", "Give a treat when your pet relaxes."];
+                var idx = 0;
+                function run() {
+                    if (idx >= messages.length) {
+                        activePulse.style.opacity = '1';
+                        return;
+                    }
+                    var m = document.createElement('div');
+                    m.className = 'sequence-msg';
+                    m.textContent = messages[idx++];
+                    document.getElementById('sequence-overlay').appendChild(m);
+                    setTimeout(() => { m.classList.add('visible'); setTimeout(() => { m.classList.remove('visible'); setTimeout(run, 1000); }, 3000); }, 100);
                 }
-                var m = document.createElement('div');
-                m.className = 'sequence-msg';
-                m.textContent = messages[idx++];
-                document.getElementById('sequence-overlay').appendChild(m);
-                setTimeout(() => { m.classList.add('visible'); setTimeout(() => { m.classList.remove('visible'); setTimeout(run, 1000); }, 3000); }, 100);
+                run();
+            } else {
+                // In unified mode, still show the pulse immediately
+                activePulse.style.opacity = '1';
             }
-            run();
         });
     </script>
     <style>

@@ -20,6 +20,7 @@ interface CalmHUDProps {
   showReticle?: boolean;
   surfaceStatus?: 'detecting' | 'ready' | 'unstable';
   lowLight?: boolean;
+  hideVisuals?: boolean;
 }
 
 const CalmHUD = React.memo(({
@@ -29,6 +30,7 @@ const CalmHUD = React.memo(({
   showReticle = false,
   surfaceStatus = 'detecting',
   lowLight = false,
+  hideVisuals = false,
 }: CalmHUDProps) => {
   const insets = useSafeAreaInsets();
 
@@ -104,25 +106,25 @@ const CalmHUD = React.memo(({
 
       loop = Animated.loop(
         Animated.sequence([
-          // 1. Выдох: от 1.0 до 0.97 (половина фазы)
+          // 1. Exhale: from 1.0 to 0.95
           Animated.timing(reticleScale, {
-            toValue: 0.97,
-            duration: 2000,
-            easing: Easing.out(Easing.ease), // Используем только Out, чтобы старт от 1.0 был быстрым
+            toValue: 0.95,
+            duration: 2500,
+            easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
           }),
-          // 2. Полный вдох: от 0.97 до 1.03 (целая фаза) - это будет абсолютно бесшовно
+          // 2. Inhale: from 0.95 to 1.05
           Animated.timing(reticleScale, {
-            toValue: 1.03,
-            duration: 4000,
-            easing: Easing.inOut(Easing.ease),
+            toValue: 1.05,
+            duration: 5000,
+            easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
           }),
-          // 3. Возврат: от 1.03 до 1.0 (завершаем цикл)
+          // 3. Reset: from 1.05 to 1.0
           Animated.timing(reticleScale, {
             toValue: 1,
-            duration: 2000,
-            easing: Easing.in(Easing.ease), // Используем только In, чтобы стык с началом цикла (пункт 1) был плавным
+            duration: 2500,
+            easing: Easing.inOut(Easing.quad),
             useNativeDriver: true,
           }),
         ])
@@ -174,15 +176,18 @@ const CalmHUD = React.memo(({
     return () => { isMounted = false; instructionFade.stopAnimation(); };
   }, [isPlaced]);
 
-  // 6. Exit Button Delayed Fade
   useEffect(() => {
-    Animated.timing(exitButtonFade, {
-      toValue: 0.6,
-      duration: 500,
-      delay: 1500,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+    if (isPlaced) {
+      Animated.timing(exitButtonFade, {
+        toValue: 0.6,
+        duration: 500,
+        delay: 800,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      exitButtonFade.setValue(0);
+    }
+  }, [isPlaced]);
 
   const handlePlaceTapInternal = () => {
     if (isTransitioning || isPlaced) return;
@@ -241,7 +246,7 @@ const CalmHUD = React.memo(({
       />
 
       {/* 1. RETICLE (Placement Mode) - Fixed Layout Positioning */}
-      {!isPlaced && showReticle && (
+      {!isPlaced && showReticle && !hideVisuals && (
         <View style={styles.fixedCenterContainer} pointerEvents="none">
           <Animated.View style={[
             styles.reticleWrapper,
@@ -250,15 +255,16 @@ const CalmHUD = React.memo(({
               opacity: surfaceOpacity
             }
           ]}>
-            {/* De-weaponized soft blobs */}
+            {/* Premium multi-layer soft glow (simulating radial gradient) */}
             <View style={styles.reticleGlowInner} />
+            <View style={styles.reticleGlowMiddle} />
             <View style={styles.reticleGlowOuter} />
           </Animated.View>
         </View>
       )}
 
       {/* 2. BREATHING CIRCLE (Active Mode) */}
-      {isPlaced && (
+      {isPlaced && !hideVisuals && (
         <View style={styles.fixedCenterContainer} pointerEvents="none">
           <Animated.View style={[
             styles.breathingCircle,
@@ -291,7 +297,10 @@ const CalmHUD = React.memo(({
 
         <Animated.View style={{ opacity: exitButtonFade }}>
           <TouchableOpacity
-            onPress={onExit}
+            onPress={() => {
+              // Immediate UI feedback: navigate/close immediately
+              onExit();
+            }}
             style={styles.exitButton}
             hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
           >
@@ -335,24 +344,30 @@ const styles = StyleSheet.create({
   },
   reticleGlowInner: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(56, 189, 248, 0.18)',
-    borderRadius: 100, // perfectly circular blob constraint
-    margin: 4,
-    shadowColor: 'rgba(56, 189, 248, 1)',
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+    borderRadius: 100,
+    margin: 10,
+  },
+  reticleGlowMiddle: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderRadius: 100,
+    margin: -5,
+    shadowColor: '#38BDF8',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
     elevation: 4,
   },
   reticleGlowOuter: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    backgroundColor: 'rgba(56, 189, 248, 0.05)',
     borderRadius: 100,
-    margin: -10,
-    shadowColor: 'rgba(56, 189, 248, 1)',
+    margin: -25,
+    shadowColor: '#38BDF8',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
-    shadowRadius: 25,
+    shadowRadius: 40,
     elevation: 2,
   },
   breathingCircle: {
