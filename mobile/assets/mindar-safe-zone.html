@@ -292,6 +292,9 @@
                     // Always show the smooth HTML reticle
                     reticleUI.style.opacity = '1';
                     
+                    // Notify Native that we are ready for placement
+                    post("ready");
+
                     if (!window.HIDE_INTERNAL_UI) {
                         statusChip.innerText = "Point at the floor to begin";
                         startBtn.classList.remove('hidden');
@@ -318,6 +321,14 @@
             if (sessionState !== 'PLACEMENT') return;
 
             sessionState = 'ACTIVE';
+
+            // If we are in scan mode, we must save the zone first
+            if (window.AR_MODE === 'scan') {
+                post("uploadSafeZone", {
+                    name: window.SPOT_NAME || 'Modern Calm Space',
+                    anchorData: { timestamp: Date.now(), mode: 'lite' }
+                });
+            }
 
             // Audio trigger
             post("startAudio");
