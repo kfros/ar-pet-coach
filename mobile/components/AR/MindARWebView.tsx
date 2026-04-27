@@ -54,7 +54,7 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
   const [sessionTime, setSessionTime] = useState(0);
   const [isAudioActive, setIsAudioActive] = useState(false);
   const [isPlaced, setIsPlaced] = useState(false);
-  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('ready');
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
   const [lowLight, setLowLight] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -164,6 +164,10 @@ const MindARWebView: React.FC<MindARWebViewProps> = ({
         case 'startAudio':
           setIsAudioActive(true);
           setIsPlaced(true);
+          break;
+
+        case 'ready':
+          setSurfaceStatus('ready');
           break;
 
         case 'exit':

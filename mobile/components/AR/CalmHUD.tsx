@@ -190,7 +190,7 @@ const CalmHUD = React.memo(({
   }, [isPlaced]);
 
   const handlePlaceTapInternal = () => {
-    if (isTransitioning || isPlaced) return;
+    if (isTransitioning || isPlaced || surfaceStatus !== 'ready') return;
 
     // Disable idle pulse BEFORE transition starts to ensure scale ownership
     reticleScale.stopAnimation();

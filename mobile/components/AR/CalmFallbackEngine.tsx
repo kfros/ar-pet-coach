@@ -100,7 +100,7 @@ const CalmFallbackEngine = ({
   const [sessionState, setSessionState] = useState<SessionState>(SessionState.INIT);
   const [sessionTime, setSessionTime] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
-  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('ready');
+  const [surfaceStatus, setSurfaceStatus] = useState<'detecting' | 'ready' | 'unstable'>('detecting');
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [pulseAnim] = useState(new Animated.Value(1));
