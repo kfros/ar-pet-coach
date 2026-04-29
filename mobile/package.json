@@ -33,6 +33,7 @@
     "expo-crypto": "~15.0.8",
     "expo-dev-client": "~6.0.20",
     "expo-file-system": "~19.0.21",
+    "expo-image-picker": "~17.0.11",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.10",
     "lottie-react-native": "~7.3.1",

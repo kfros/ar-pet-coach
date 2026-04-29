@@ -70,3 +70,33 @@ export const deleteUserAccount = async () => {
         throw error; // Let the UI handle specific error codes
     }
 };
+
+/**
+ * Signs out from Firebase and RevenueCat.
+ */
+export const signOut = async () => {
+    try {
+        const user = auth().currentUser;
+        if (user) {
+            await auth().signOut();
+            await RevenueCatService.logOut();
+        } else {
+            console.warn('[AuthService] No authenticated user to sign out');
+        }
+    } catch (error) {
+        console.error('[AuthService] Error signing out:', error);
+        throw error;
+    }
+};
+
+/**
+ * Sends a password reset email via Firebase.
+ */
+export const sendPasswordResetEmail = async (email: string) => {
+    try {
+        await auth().sendPasswordResetEmail(email.trim());
+    } catch (error) {
+        console.error('[AuthService] Error sending password reset email:', error);
+        throw error;
+    }
+};

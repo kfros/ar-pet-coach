@@ -133,6 +133,8 @@ export default function PaywallScreen({ navigation }: any) {
         try {
             const result = await RevenueCatService.getOfferings();
             const currentOffering = result;
+            console.log("Offering from RC:", JSON.stringify(currentOffering, null, 2));
+
 
             if (currentOffering && currentOffering.availablePackages && currentOffering.availablePackages.length > 0) {
                 // Keep only Monthly and Annual

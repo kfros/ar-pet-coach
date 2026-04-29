@@ -6,25 +6,27 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Purchases from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../components/SubscriptionManager';
+import { signOut } from '../services/authService';
+import PetProfileRepository from '../services/petProfileRepository';
 
 export default function SettingsScreen({ navigation }: any) {
     const user = auth().currentUser;
     const { isPremium, customerInfo } = useSubscription();
     const [pets, setPets] = useState<any[]>([]);
+    const [authMode, setAuthMode] = useState<string>('unauthenticated');
 
     useEffect(() => {
-        const fetchPets = async () => {
-            if (!user) return;
-            try {
-                const snap = await db.collection('users').doc(user.uid).collection('pets').get();
-                const fetched = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-                setPets(fetched);
-            } catch (err) {
-                console.error(err);
+        const fetchInitialData = async () => {
+            const mode = await PetProfileRepository.getAuthMode();
+            setAuthMode(mode);
+
+            const profile = await PetProfileRepository.getPetProfile();
+            if (profile) {
+                setPets([profile]);
             }
         };
-        fetchPets();
-    }, [user]);
+        fetchInitialData();
+    }, []);
 
     const handleManageSubscription = async () => {
         try {
@@ -43,28 +45,101 @@ export default function SettingsScreen({ navigation }: any) {
         }
     };
 
-    const handleSignOut = async () => {
+    const handleRestorePurchases = async () => {
         try {
-            const isAnonymous = await Purchases.isAnonymous();
-            if (!isAnonymous) await Purchases.logOut();
-            try { await GoogleSignin.signOut(); } catch (e) { }
-            await auth().signOut();
-        } catch (error: any) {
-            console.error("Sign out error:", error);
-            Alert.alert("Error", "Failed to sign out. Please try again.");
+            const info = await Purchases.restorePurchases();
+            if (info.entitlements.active['ar-pet-coach-premium']) {
+                Alert.alert("Success", "Your purchases have been restored!");
+            } else {
+                Alert.alert("Info", "No active subscriptions found.");
+            }
+        } catch (e) {
+            Alert.alert("Error", "Failed to restore purchases.");
         }
     };
 
-    const MENU_ITEMS = [
-        { icon: 'card-outline', label: 'Payments', onPress: handleManageSubscription },
-        { icon: 'heart-outline', label: 'Favorite', onPress: () => Alert.alert('Favorites', 'Coming Soon!') },
-        { icon: 'gift-outline', label: 'Refer', onPress: () => Alert.alert('Refer', 'Coming Soon!') },
-        { icon: 'location-outline', label: 'Addresses', onPress: () => Alert.alert('Addresses', 'Coming Soon!') },
-        { icon: 'cube-outline', label: 'Orders', onPress: () => Alert.alert('Orders', 'Coming Soon!') },
-        { icon: 'person-outline', label: 'Account', onPress: () => navigation.navigate('Account') },
-        { icon: 'settings-outline', label: 'Settings', onPress: () => Alert.alert('Settings', 'Coming Soon!') },
-        { icon: 'information-circle-outline', label: 'About Us', onPress: () => Alert.alert('About Us', 'Coming Soon!') },
-    ];
+    const handleSignIn = () => {
+        navigation.navigate('Login', { mode: 'login' });
+    };
+
+    const handleCreateAccount = () => {
+        navigation.navigate('Login', { mode: 'signup' });
+    };
+
+    const handleClearGuestData = () => {
+        Alert.alert(
+            "Clear guest data?",
+            "This will delete your pet profile and progress from this device. This can’t be undone.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Clear Data", 
+                    style: "destructive",
+                    onPress: async () => {
+                        await PetProfileRepository.clearGuestData();
+                        await PetProfileRepository.setAuthMode('unauthenticated');
+                        // AppNavigator will handle navigation back to Auth stack
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleSignOut = async () => {
+        Alert.alert(
+            "Log Out",
+            "Are you sure you want to log out?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Log Out", 
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            if (auth().currentUser) {
+                                await signOut();
+                            }
+                            // Only call logOut for RevenueCat if the user was identified
+                            // (RevenueCat handles this internally but good to be explicit)
+                            await Purchases.logOut();
+                            
+                            await PetProfileRepository.setAuthMode('unauthenticated');
+                        } catch (error: any) {
+                            console.error("Sign out error:", error);
+                            Alert.alert("Error", "Failed to sign out. Please try again.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const getMenuItems = () => {
+        const commonItems = [
+            { icon: 'refresh-outline', label: 'Restore Purchases', onPress: handleRestorePurchases },
+            { icon: 'shield-checkmark-outline', label: 'Privacy Policy', onPress: () => navigation.navigate('Privacy') },
+            { icon: 'document-text-outline', label: 'Terms of Use', onPress: () => navigation.navigate('Terms') },
+        ];
+
+        if (authMode === 'guest') {
+            return [
+                { icon: 'person-add-outline', label: 'Create Account', onPress: handleCreateAccount },
+                { icon: 'log-in-outline', label: 'Sign In', onPress: handleSignIn },
+                { icon: 'trash-outline', label: 'Clear Guest Data', onPress: handleClearGuestData, color: COLORS.error },
+                ...commonItems
+            ];
+        }
+
+        return [
+            { icon: 'card-outline', label: 'Payments or Subscription', onPress: handleManageSubscription },
+            { icon: 'refresh-outline', label: 'Restore Purchases', onPress: handleRestorePurchases },
+            { icon: 'person-outline', label: 'Account', onPress: () => navigation.navigate('Account') },
+            { icon: 'shield-checkmark-outline', label: 'Privacy Policy', onPress: () => navigation.navigate('Privacy') },
+            { icon: 'document-text-outline', label: 'Terms of Use', onPress: () => navigation.navigate('Terms') },
+        ];
+    };
+
+    const MENU_ITEMS = getMenuItems();
 
     return (
         <View style={styles.container}>
@@ -82,45 +157,58 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Profile Info */}
+                {/* Profile Section */}
                 <View style={styles.profileSection}>
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{user?.email?.charAt(0).toUpperCase() || 'U'}</Text>
-                        <View style={styles.editBadge}>
-                            <Ionicons name="pencil" size={12} color="#fff" />
+                    {authMode === 'guest' ? (
+                        <View style={{ alignItems: 'center' }}>
+                            <View style={[styles.avatar, { backgroundColor: COLORS.border }]}>
+                                <Ionicons name="person" size={50} color={COLORS.textSecondary} />
+                            </View>
+                            <Text style={styles.emailText}>Guest User</Text>
+                            <Text style={styles.guestSubtitle}>
+                                Your pet profile and progress are saved on this device only.
+                            </Text>
                         </View>
-                    </View>
-                    <Text style={styles.emailText}>{user?.email || 'Guest User'}</Text>
+                    ) : (
+                        <View style={{ alignItems: 'center' }}>
+                            <View style={styles.avatar}>
+                                <Text style={styles.avatarText}>{user?.email?.charAt(0).toUpperCase() || 'U'}</Text>
+                            </View>
+                            <Text style={styles.emailText}>{user?.email}</Text>
+                        </View>
+                    )}
                 </View>
 
-                {/* My Pets Carousel */}
-                <View style={styles.petsSection}>
-                    <Text style={styles.sectionTitle}>My Pets</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petsScroll}>
-                        {pets.map(pet => (
-                            <View key={pet.id} style={styles.petCard}>
-                                <View style={styles.petAvatarBg}>
-                                    <Text style={{ fontSize: 30 }}>🐕</Text>
+                {/* My Pets Carousel - Only show if profile exists */}
+                {pets.length > 0 && (
+                    <View style={styles.petsSection}>
+                        <Text style={styles.sectionTitle}>My Pets</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petsScroll}>
+                            {pets.map(pet => (
+                                <View key={pet.id} style={styles.petCard}>
+                                    <View style={styles.petAvatarBg}>
+                                        <Text style={{ fontSize: 30 }}>🐕</Text>
+                                    </View>
+                                    <Text style={styles.petName} numberOfLines={1}>{pet.petName}</Text>
                                 </View>
-                                <Text style={styles.petName} numberOfLines={1}>{pet.petName}</Text>
-                            </View>
-                        ))}
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.addPetCard,
-                                pressed && { backgroundColor: COLORS.border, transform: [{ scale: 0.98 }] }
-                            ]}
-                            onPress={() => navigation.navigate('PetProfileStepper')}
-                        >
-                            <Ionicons name="add" size={32} color={COLORS.primary} />
-                            <Text style={styles.addPetText}>Add New</Text>
-                        </Pressable>
-                    </ScrollView>
-                </View>
+                            ))}
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.addPetCard,
+                                    pressed && { backgroundColor: COLORS.border, transform: [{ scale: 0.98 }] }
+                                ]}
+                                onPress={() => navigation.navigate('PetProfileStepper')}
+                            >
+                                <Ionicons name="add" size={32} color={COLORS.primary} />
+                                <Text style={styles.addPetText}>Add New</Text>
+                            </Pressable>
+                        </ScrollView>
+                    </View>
+                )}
 
                 {/* Menu List */}
                 <View style={styles.menuSection}>
-                    {MENU_ITEMS.map((item, index) => (
+                    {MENU_ITEMS.map((item: any, index) => (
                         <Pressable
                             key={index}
                             style={({ pressed }) => [
@@ -129,21 +217,24 @@ export default function SettingsScreen({ navigation }: any) {
                             ]}
                             onPress={item.onPress}
                         >
-                            <Ionicons name={item.icon as any} size={24} color={COLORS.primary} />
-                            <Text style={styles.menuItemText}>{item.label}</Text>
+                            <Ionicons name={item.icon as any} size={24} color={item.color || COLORS.primary} />
+                            <Text style={[styles.menuItemText, item.color && { color: item.color }]}>{item.label}</Text>
                             <Ionicons name="chevron-forward" size={20} color={COLORS.border} />
                         </Pressable>
                     ))}
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.menuItemLogOut,
-                            pressed && { backgroundColor: COLORS.backgroundLight }
-                        ]}
-                        onPress={handleSignOut}
-                    >
-                        <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
-                        <Text style={styles.menuItemTextLogOut}>Log Out</Text>
-                    </Pressable>
+                    
+                    {authMode !== 'guest' && (
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.menuItemLogOut,
+                                pressed && { backgroundColor: COLORS.backgroundLight }
+                            ]}
+                            onPress={handleSignOut}
+                        >
+                            <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
+                            <Text style={styles.menuItemTextLogOut}>Log Out</Text>
+                        </Pressable>
+                    )}
                 </View>
             </ScrollView>
         </View>
@@ -196,22 +287,18 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: COLORS.primary,
     },
-    editBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: COLORS.primary,
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: COLORS.backgroundLight,
-    },
     emailText: {
         ...FONTS.h3,
         color: COLORS.text,
+        textAlign: 'center',
+    },
+    guestSubtitle: {
+        ...FONTS.body,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        paddingHorizontal: 20,
+        marginTop: 8,
+        lineHeight: 22,
     },
     petsSection: {
         marginBottom: 30,

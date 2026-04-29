@@ -19,21 +19,22 @@ import SplashAnimation from '../screens/SplashAnimation';
 import OnboardingCarousel from '../screens/OnboardingCarousel';
 import PetProfileStepper from '../screens/PetProfileStepper';
 import AccountScreen from '../screens/AccountScreen';
+import PetProfileRepository, { AuthMode } from '../services/petProfileRepository';
 
 const AuthStack = createNativeStackNavigator();
 const AppStack = createNativeStackNavigator();
 
-// Auth Stack - shown when user is NOT logged in
-function AuthNavigator({ isFirstLaunch }: { isFirstLaunch: boolean }) {
+// Auth Stack - shown when user is NOT logged in and NOT in guest mode
+function AuthNavigator({ showOnboarding }: { showOnboarding: boolean }) {
     return (
-        <AuthStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={isFirstLaunch ? "Onboarding" : "Login"}>
+        <AuthStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={showOnboarding ? "Onboarding" : "Login"}>
             <AuthStack.Screen name="Onboarding" component={OnboardingCarousel} />
             <AuthStack.Screen name="Login" component={LoginScreen} />
         </AuthStack.Navigator>
     );
 }
 
-// App Stack - shown when user IS logged in
+// App Stack - shown when user IS logged in OR in guest mode
 function AppNavigatorStack() {
     return (
         <AppStack.Navigator>
@@ -54,33 +55,59 @@ function AppNavigatorStack() {
 
 export default function AppNavigator() {
     const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+    const [authMode, setAuthMode] = useState<AuthMode>('unauthenticated');
     const [initializing, setInitializing] = useState(true);
     const [showSplash, setShowSplash] = useState(true);
-    const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+    const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
 
     useEffect(() => {
-        const checkFirstLaunch = async () => {
+        const initializeAuth = async () => {
             try {
-                const hasLaunched = await AsyncStorage.getItem('hasLaunched');
-                if (hasLaunched === null) {
-                    await AsyncStorage.setItem('hasLaunched', 'true');
-                    setIsFirstLaunch(true);
-                } else {
-                    setIsFirstLaunch(false);
-                }
+                // Check if onboarding was completed
+                const onboardingCompleted = await PetProfileRepository.isOnboardingCompleted();
+                setShowOnboarding(!onboardingCompleted);
+
+                // Check persisted auth mode
+                const persistedMode = await PetProfileRepository.getAuthMode();
+                setAuthMode(persistedMode);
+
+                // Listen for Firebase Auth changes
+                const unsubscribe = auth().onAuthStateChanged(async (currentUser: FirebaseAuthTypes.User | null) => {
+                    console.log('[AppNavigator] Auth state changed:', currentUser?.uid || 'null');
+                    setUser(currentUser);
+
+                    if (currentUser) {
+                        await PetProfileRepository.setAuthMode('authenticated');
+                        setAuthMode('authenticated');
+                    } else {
+                        // If no Firebase user, check if we should be in guest mode or unauthenticated
+                        const currentMode = await PetProfileRepository.getAuthMode();
+                        if (currentMode !== 'guest') {
+                            await PetProfileRepository.setAuthMode('unauthenticated');
+                            setAuthMode('unauthenticated');
+                        } else {
+                            setAuthMode('guest');
+                        }
+                    }
+
+                    if (initializing) setInitializing(false);
+                });
+
+                return unsubscribe;
             } catch (error) {
-                console.error('Error checking first launch:', error);
-                setIsFirstLaunch(false);
+                console.error('[AppNavigator] Initialization error:', error);
+                setInitializing(false);
             }
         };
-        checkFirstLaunch();
 
-        const unsubscribe = auth().onAuthStateChanged((currentUser: FirebaseAuthTypes.User | null) => {
-            console.log('Auth state changed:', currentUser?.uid || 'null');
-            setUser(currentUser as any);
-            if (initializing) setInitializing(false);
+        initializeAuth();
+    }, []);
+
+    useEffect(() => {
+        const unsubscribe = PetProfileRepository.addListener((mode) => {
+            console.log('[AppNavigator] Manual AuthMode update:', mode);
+            setAuthMode(mode);
         });
-
         return unsubscribe;
     }, []);
 
@@ -88,7 +115,7 @@ export default function AppNavigator() {
         return <SplashAnimation onComplete={() => setShowSplash(false)} />;
     }
 
-    if (initializing || isFirstLaunch === null) {
+    if (initializing || showOnboarding === null) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#2563eb" />
@@ -96,11 +123,12 @@ export default function AppNavigator() {
         );
     }
 
-    // Conditionally render different navigators based on auth state
-    // This forces a complete remount when auth state changes, ensuring proper navigation
+    // Determine if we should show the App Stack or Auth Stack
+    const showAppStack = user !== null || authMode === 'guest';
+
     return (
         <NavigationContainer>
-            {user ? <AppNavigatorStack /> : <AuthNavigator isFirstLaunch={isFirstLaunch} />}
+            {showAppStack ? <AppNavigatorStack /> : <AuthNavigator showOnboarding={showOnboarding} />}
         </NavigationContainer>
     );
 }
