@@ -8,9 +8,11 @@ import {
     Pressable,
     RefreshControl,
     Dimensions,
+    ActivityIndicator
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import Purchases from 'react-native-purchases';
 import {
     auth,
     db,
@@ -36,6 +38,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ZONE_CARD_WIDTH = SCREEN_WIDTH * 0.7;
 const ZONE_CARD_MARGIN = 12;
 
+import PetProfileRepository from '../services/petProfileRepository';
+import { signOut } from '../services/authService';
+
 export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +50,7 @@ export default function DashboardScreen({ navigation }: any) {
     const [safeZones, setSafeZones] = useState<any[]>([]);
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [roomSelectorVisible, setRoomSelectorVisible] = useState(false);
+    const [authMode, setAuthMode] = useState<string>('unauthenticated');
 
     const { isPremium, checkPaywallTrigger, trackARSession } = useSubscription();
     const insets = useSafeAreaInsets();
@@ -55,29 +61,35 @@ export default function DashboardScreen({ navigation }: any) {
     const anxietyDesc = getAnxietyDescription(anxietyScore);
 
     const fetchData = async () => {
-
-        const user = auth().currentUser;
-        if (!user) { navigation.replace('Login'); return; }
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            if (userDoc.exists()) {
-                setProfile(userDoc.data());
-                const petsCol = collection(db, 'users', user.uid, 'pets');
-                const petsSnap = await getDocs(query(petsCol, limit(1)));
+            const mode = await PetProfileRepository.getAuthMode();
+            setAuthMode(mode);
 
-                if (!petsSnap.empty) {
-                    const petDoc = petsSnap.docs[0];
-                    setPetId(petDoc.id);
-                    setPetData(petDoc.data());
+            const pet = await PetProfileRepository.getPetProfile();
 
-                    const zonesCol = collection(db, 'users', user.uid, 'pets', petDoc.id, 'safeZones');
-                    const zSnap = await getDocs(zonesCol);
-                    const zones = zSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-                    zones.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                    setSafeZones(zones);
+            if (pet) {
+                setPetData(pet);
+                setPetId(pet.id || 'guest_pet');
+                setProfile({ petName: pet.petName }); // Fallback for header
+
+                // Fetch safe zones only if authenticated (for now)
+                if (mode === 'authenticated') {
+                    const user = auth().currentUser;
+                    if (user && pet.id) {
+                        const zonesCol = collection(db, 'users', user.uid, 'pets', pet.id, 'safeZones');
+                        const zSnap = await getDocs(zonesCol);
+                        const zones = zSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+                        zones.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                        setSafeZones(zones);
+                    }
+                } else {
+                    // For guest, safe zones are empty for now or we could load from local
+                    setSafeZones([]);
                 }
             } else {
-                navigation.replace('Onboarding');
+                // If no pet profile, we'll show the "Add First Pet" state which is already in the render
+                setPetData(null);
+                setPetId(null);
             }
         } catch (error) {
             console.error("Error fetching dashboard data:", error);
@@ -116,25 +128,39 @@ export default function DashboardScreen({ navigation }: any) {
 
 
     if (loading) {
-
-        return <View style={styles.center}><Text style={{ color: COLORS.textSecondary }}>Loading...</Text></View>;
+        return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
     }
-    if (!profile) return null;
 
     if (!petId) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-                <View style={styles.noPetAvatar}><Text style={{ fontSize: 80 }}>🐕</Text></View>
-                <Text style={styles.noPetTitle}>Welcome to ChillPup!</Text>
-                <Text style={styles.noPetDesc}>
-                    Add your furry friend to start tracking their anxiety and building a calmer environment together.
-                </Text>
-                <Pressable
-                    style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-                    onPress={() => navigation.navigate('PetProfileStepper')}
-                >
-                    <Text style={styles.primaryButtonText}>Add First Pet</Text>
-                </Pressable>
+            <View style={[styles.container, { padding: 20 }]}>
+                <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+                    <Text style={styles.headerTitle}>Welcome</Text>
+                    <Pressable
+                        onPress={() => navigation.navigate('Settings')}
+                        style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.6 }]}
+                    >
+                        <Ionicons
+                            name="person-outline"
+                            size={24}
+                            color={COLORS.primary}
+                        />
+                    </Pressable>
+                </View>
+
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={styles.noPetAvatar}><Text style={{ fontSize: 80 }}>🐕</Text></View>
+                    <Text style={styles.noPetTitle}>Welcome to ChillPup!</Text>
+                    <Text style={styles.noPetDesc}>
+                        Add your furry friend to start tracking their anxiety and building a calmer environment together.
+                    </Text>
+                    <Pressable
+                        style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
+                        onPress={() => navigation.navigate('PetProfileStepper')}
+                    >
+                        <Text style={styles.primaryButtonText}>Add First Pet</Text>
+                    </Pressable>
+                </View>
             </View>
         );
     }
@@ -181,8 +207,8 @@ export default function DashboardScreen({ navigation }: any) {
             {/* Header */}
             <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
                 <Text style={styles.headerTitle}>Pet Anxiety Coach</Text>
-                <Pressable 
-                    onPress={() => navigation.navigate('Settings')} 
+                <Pressable
+                    onPress={() => navigation.navigate('Settings')}
                     style={({ pressed }) => [
                         styles.settingsButton,
                         pressed && { opacity: 0.6 }
@@ -334,11 +360,11 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.backgroundLight },
     content: { padding: 20, paddingBottom: 40 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: 20, 
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
         // paddingTop is handled dynamically via insets
     },
     headerTitle: { ...FONTS.h2, color: COLORS.text },
@@ -390,4 +416,9 @@ const styles = StyleSheet.create({
     noPetAvatar: { width: 150, height: 150, backgroundColor: COLORS.lavender, borderRadius: 75, justifyContent: 'center', alignItems: 'center', marginBottom: 30, ...SHADOWS.small },
     noPetTitle: { ...FONTS.h1, color: COLORS.primary, textAlign: 'center', marginBottom: 16 },
     noPetDesc: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 24 },
+    logoutButton: {
+        padding: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 });

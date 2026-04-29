@@ -151,6 +151,18 @@ class RevenueCatService {
         };
     }
 
+    static async logIn(uid: string): Promise<void> {
+        if (!isConfigured) return;
+        try {
+            console.log('RevenueCat: Logging in with UID:', uid);
+            const { customerInfo, created } = await Purchases.logIn(uid);
+            console.log('RevenueCat: Login successful. Created:', created);
+        } catch (e) {
+            console.error('RevenueCat: Error logging in', e);
+            // Do not throw here to avoid blocking auth success
+        }
+    }
+
     static async logOut(): Promise<void> {
         if (!isConfigured) return;
         try {

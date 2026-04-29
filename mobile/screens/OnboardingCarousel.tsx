@@ -2,27 +2,28 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../constants/Theme';
+import PetProfileRepository from '../services/petProfileRepository';
 
 const { width, height } = Dimensions.get('window');
 
 const SLIDES = [
     {
         id: '1',
-        title: "Calm Your Pet's Anxiety\nwith AR Magic",
-        description: "Discover peaceful moments for your furry friend using our augmented reality tools safely inside your home.",
+        title: "Gentle AR Sessions\nfor Calmer Pets",
+        description: "Start short, at-home activities designed to help your pet relax, focus, and feel safe.",
         image: 'paw'
     },
     {
         id: '2',
-        title: "Join Our Course for\nPeaceful Pups",
-        description: "Expert-led programs to train and comfort your dog, directly from your living room.",
-        image: 'home'
+        title: "Guided Routines,\nStep by Step",
+        description: "Follow simple calming exercises, safety tips, and session guidance from your living room.",
+        image: 'list'
     },
     {
         id: '3',
-        title: "A House Apart?\nEverything in One App",
-        description: "Track progress, get insights, and bond with your pet like never before.",
-        image: 'search'
+        title: "Track What Works\nOver Time",
+        description: "Save sessions, follow progress, and learn which routines help your pet most.",
+        image: 'stats-chart'
     }
 ];
 
@@ -35,16 +36,21 @@ export default function OnboardingCarousel({ navigation }: any) {
         setCurrentIndex(index);
     };
 
+    const completeOnboarding = async () => {
+        await PetProfileRepository.setOnboardingCompleted(true);
+        navigation.replace('Login');
+    };
+
     const handleNext = () => {
         if (currentIndex < SLIDES.length - 1) {
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
         } else {
-            navigation.replace('Login');
+            completeOnboarding();
         }
     };
 
     const handleSkip = () => {
-        navigation.replace('Login');
+        completeOnboarding();
     };
 
     const renderItem = ({ item }: { item: typeof SLIDES[0] }) => {
@@ -70,7 +76,7 @@ export default function OnboardingCarousel({ navigation }: any) {
                 ]}
                 onPress={handleSkip}
             >
-                <Text style={styles.skipText}>Skip</Text>
+                <Text style={styles.skipText}>Skip intro</Text>
             </Pressable>
 
             <FlatList

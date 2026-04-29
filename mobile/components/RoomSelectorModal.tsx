@@ -15,6 +15,7 @@ interface RoomSelectorModalProps {
 export default function RoomSelectorModal({ visible, onClose, safeZones, onSelectZone, petId, onZoneDeleted }: RoomSelectorModalProps) {
     const user = auth().currentUser;
 
+
     const handleDelete = async (zoneId: string) => {
         if (!user) return;
 
