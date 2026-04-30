@@ -101,27 +101,8 @@ export default function PetProfileStepper({ navigation }: any) {
     const handlePhotoActionSheet = () => {
         Alert.alert(
             "Add Profile Photo",
-            "Take a photo or choose one from your library.",
+            "Choose a photo from your library or skip for now.",
             [
-                {
-                    text: "Take Photo",
-                    onPress: async () => {
-                        const permission = await ImagePicker.requestCameraPermissionsAsync();
-                        if (!permission.granted) {
-                            Alert.alert("Permission Needed", "Camera access is needed to take a pet photo. You can enable it in Settings.");
-                            return;
-                        }
-                        const result = await ImagePicker.launchCameraAsync({
-                            allowsEditing: true,
-                            aspect: [1, 1],
-                            quality: 0.7,
-                        });
-                        if (!result.canceled && result.assets && result.assets[0].uri) {
-                            setPhotoUri(result.assets[0].uri);
-                            setHasPhoto(true);
-                        }
-                    }
-                },
                 {
                     text: "Choose from Library",
                     onPress: async () => {
@@ -264,7 +245,7 @@ export default function PetProfileStepper({ navigation }: any) {
                             </Text>
                         </TouchableOpacity>
                         {!hasPhoto && (
-                            <Text style={styles.photoSubtext}>Take a photo or choose one from your library.</Text>
+                            <Text style={styles.photoSubtext}>Choose a photo from your library.</Text>
                         )}
                     </View>
                 );

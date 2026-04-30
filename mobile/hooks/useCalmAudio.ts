@@ -16,7 +16,7 @@ const FADE_OUT_DURATION = 800;
 const CROSSFADE_DURATION = 1500;
 
 /**
- * Premium Audio Hook for the Calm AR session.
+ * Premium Audio Hook for the Calm session.
  * Handles preloading, sequential randomization with cross-session memory,
  * and smooth transitions using expo-av.
  */

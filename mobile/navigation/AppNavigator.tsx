@@ -4,21 +4,19 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { auth } from '../services/firebaseConfig';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
 import TermsScreen from '../screens/TermsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import ARSafeZonesScreen from '../screens/ARSafeZonesScreen';
-import ARFeedbackScreen from '../screens/ARFeedbackScreen';
-import AnalysisScreen from '../screens/AnalysisScreen';
+import GuidedSessionScreen from '../screens/GuidedSessionScreen';
 import PaywallScreen from '../screens/PaywallScreen';
 import SplashAnimation from '../screens/SplashAnimation';
 import OnboardingCarousel from '../screens/OnboardingCarousel';
 import PetProfileStepper from '../screens/PetProfileStepper';
 import AccountScreen from '../screens/AccountScreen';
+import PremiumStatusScreen from '../screens/PremiumStatusScreen';
 import PetProfileRepository, { AuthMode } from '../services/petProfileRepository';
 import MigrationService from '../services/migrationService';
 
@@ -44,12 +42,11 @@ function AppNavigatorStack() {
             <AppStack.Screen name="PetProfileStepper" component={PetProfileStepper} options={{ headerShown: false }} />
             <AppStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Account" component={AccountScreen} options={{ headerShown: false }} />
-            <AppStack.Screen name="Analysis" component={AnalysisScreen} options={{ headerShown: false }} />
+            <AppStack.Screen name="GuidedSession" component={GuidedSessionScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Privacy" component={PrivacyScreen} />
             <AppStack.Screen name="Terms" component={TermsScreen} />
-            <AppStack.Screen name="ARSafeZones" component={ARSafeZonesScreen} options={{ title: 'Set calm spot' }} />
-            <AppStack.Screen name="ARFeedback" component={ARFeedbackScreen} options={{ headerShown: false, animation: 'fade' }} />
             <AppStack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
+            <AppStack.Screen name="PremiumStatus" component={PremiumStatusScreen} options={{ headerShown: false, presentation: 'modal' }} />
         </AppStack.Navigator>
     );
 }

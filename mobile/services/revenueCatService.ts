@@ -14,6 +14,7 @@ const API_KEYS = {
 
 // Track if SDK was successfully configured
 let isConfigured = false;
+const ENTITLEMENT_ID = 'ar-pet-coach-premium';
 
 // Pre-flight key validation log (first 4 and last 4 chars)
 const maskKey = (key: string | undefined) => {
@@ -133,6 +134,11 @@ class RevenueCatService {
         }
     }
 
+    static async isEntitlementActive(entitlementId: string = ENTITLEMENT_ID): Promise<boolean> {
+        const info = await this.getCustomerInfo();
+        return !!info?.entitlements.active[entitlementId];
+    }
+
     static async getSubscriptionStatus(): Promise<{
         isPremium: boolean;
         isTrial: boolean;
@@ -141,7 +147,7 @@ class RevenueCatService {
         const info = await this.getCustomerInfo();
         if (!info) return { isPremium: false, isTrial: false, expirationDate: null };
 
-        const entitlement = info.entitlements.active['ar-pet-coach-premium'];
+        const entitlement = info.entitlements.active[ENTITLEMENT_ID];
         if (!entitlement) return { isPremium: false, isTrial: false, expirationDate: null };
 
         return {

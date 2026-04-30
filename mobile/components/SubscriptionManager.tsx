@@ -10,7 +10,7 @@ interface SubscriptionContextType {
     restorePurchases: () => Promise<void>;
     isLoading: boolean;
     checkPaywallTrigger: () => Promise<boolean>;
-    trackARSession: () => Promise<number>;
+    trackCalmingSession: () => Promise<number>;
     refreshEntitlement: () => Promise<void>;
 }
 
@@ -21,7 +21,7 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
     restorePurchases: async () => { },
     isLoading: true,
     checkPaywallTrigger: async () => false,
-    trackARSession: async () => 0,
+    trackCalmingSession: async () => 0,
     refreshEntitlement: async () => { },
 });
 
@@ -48,7 +48,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const updateCustomerState = (info: CustomerInfo | null) => {
         setCustomerInfo(info);
         setCustomerInfo(info);
-        if (info?.entitlements.active['pro_access']) {
+        if (info?.entitlements.active['ar-pet-coach-premium']) {
             console.log("SubscriptionManager: User has active premium entitlement");
             setIsPremium(true);
         } else {
@@ -76,15 +76,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         updateCustomerState(info);
     };
 
-    const trackARSession = async () => {
+    const trackCalmingSession = async () => {
         try {
-            const sessions = await AsyncStorage.getItem('ar_session_count');
+            const sessions = await AsyncStorage.getItem('calming_session_count');
             const count = sessions ? parseInt(sessions, 10) + 1 : 1;
-            await AsyncStorage.setItem('ar_session_count', count.toString());
-            console.log('AR Session count:', count);
+            await AsyncStorage.setItem('calming_session_count', count.toString());
+            console.log('Calming Session count:', count);
             return count;
         } catch (e) {
-            console.error('Error tracking AR session', e);
+            console.error('Error tracking calming session', e);
             return 0;
         }
     };
@@ -97,12 +97,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             const info = await RevenueCatService.getCustomerInfo();
             updateCustomerState(info);
 
-            if (info?.entitlements.active['pro_access']) {
+            if (info?.entitlements.active['ar-pet-coach-premium']) {
                 return false;
             }
 
             // Check if entitlement expired (had it in the past but not active)
-            const hadPro = info?.entitlements.all['pro_access'];
+            const hadPro = info?.entitlements.all['ar-pet-coach-premium'];
             if (hadPro && !hadPro.isActive) {
                 console.log('Entitlement expired, triggering paywall.');
                 return true;
@@ -117,13 +117,13 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             const daysInstalled = (new Date().getTime() - new Date(installDate).getTime()) / (1000 * 3600 * 24);
 
             // Check Session Count
-            const sessions = await AsyncStorage.getItem('ar_session_count');
+            const sessions = await AsyncStorage.getItem('calming_session_count');
             const sessionCount = sessions ? parseInt(sessions, 10) : 0;
 
-            console.log(`Paywall Check: Days=${daysInstalled.toFixed(1)}, AR Sessions=${sessionCount}`);
+            console.log(`Paywall Check: Days=${daysInstalled.toFixed(1)}, Calming Sessions=${sessionCount}`);
 
             // Ensure the user experience is smooth:
-            // Don't trigger if they haven't completed their first AR session yet
+            // Don't trigger if they haven't completed their first calming session yet
             if (sessionCount === 0) {
                 return false;
             }
@@ -140,7 +140,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     return (
-        <SubscriptionContext.Provider value={{ isPremium, customerInfo, purchasePackage, restorePurchases, isLoading, checkPaywallTrigger, trackARSession, refreshEntitlement }}>
+        <SubscriptionContext.Provider value={{ isPremium, customerInfo, purchasePackage, restorePurchases, isLoading, checkPaywallTrigger, trackCalmingSession, refreshEntitlement }}>
             {children}
         </SubscriptionContext.Provider>
     );

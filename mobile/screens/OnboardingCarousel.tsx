@@ -9,14 +9,14 @@ const { width, height } = Dimensions.get('window');
 const SLIDES = [
     {
         id: '1',
-        title: "Gentle AR Sessions\nfor Calmer Pets",
-        description: "Start short, at-home activities designed to help your pet relax, focus, and feel safe.",
+        title: "Guided Calming\nSessions",
+        description: "Start short activities designed to help your pet relax, focus, and feel safe.",
         image: 'paw'
     },
     {
         id: '2',
-        title: "Guided Routines,\nStep by Step",
-        description: "Follow simple calming exercises, safety tips, and session guidance from your living room.",
+        title: "Gentle Routines,\nStep by Step",
+        description: "Follow simple calming exercises, safety tips, and visual session guidance anywhere.",
         image: 'list'
     },
     {
