@@ -73,12 +73,8 @@ export default function LoginScreen({ navigation, route }: any) {
             const credential = auth.GoogleAuthProvider.credential(idToken);
             const userCredential = await auth().signInWithCredential(credential);
 
-            if (userCredential.user) {
-                await RevenueCatService.logIn(userCredential.user.uid);
-                await PetProfileRepository.setAuthMode('authenticated');
-                await MigrationService.migrateGuestToAccount();
-                // Navigation will be handled by AppNavigator's onAuthStateChanged
-            }
+            // Note: RevenueCat login, PetProfile authMode, and guest migration 
+            // are now handled automatically in AppNavigator.tsx via MigrationService
         } catch (err: any) {
             console.error('Google Sign-In Error:', err);
             if (err.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -117,9 +113,8 @@ export default function LoginScreen({ navigation, route }: any) {
             const userCredential = await auth().signInWithCredential(oauthCredential);
 
             if (userCredential.user) {
-                await RevenueCatService.logIn(userCredential.user.uid);
-                await PetProfileRepository.setAuthMode('authenticated');
-                await MigrationService.migrateGuestToAccount();
+                // Note: Auth effects (RC sync, Firestore doc, Guest migration) 
+                // are now handled automatically in AppNavigator.tsx
             }
 
         } catch (e: any) {
@@ -157,9 +152,8 @@ export default function LoginScreen({ navigation, route }: any) {
             }
 
             if (userCredential.user) {
-                await RevenueCatService.logIn(userCredential.user.uid);
-                await PetProfileRepository.setAuthMode('authenticated');
-                await MigrationService.migrateGuestToAccount();
+                // Note: Auth effects (RC sync, Firestore doc, Guest migration) 
+                // are now handled automatically in AppNavigator.tsx
             }
         } catch (err: any) {
             console.error(err);

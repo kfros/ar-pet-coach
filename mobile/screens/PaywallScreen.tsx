@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
 import RevenueCatService from '../services/revenueCatService';
 import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
@@ -472,6 +472,15 @@ export default function PaywallScreen({ navigation }: any) {
                     <Pressable onPress={handleRestore}>
                         <Text style={styles.restoreText}>Restore Purchases</Text>
                     </Pressable>
+                    <View style={styles.legalFooter}>
+                        <Pressable onPress={() => Linking.openURL('https://www.kf-software.com/privacy-policy')}>
+                            <Text style={styles.legalText}>Privacy Policy</Text>
+                        </Pressable>
+                        <View style={styles.dotSeparator} />
+                        <Pressable onPress={() => Linking.openURL('https://www.kf-software.com/terms-of-use')}>
+                            <Text style={styles.legalText}>Terms of Use</Text>
+                        </Pressable>
+                    </View>
                 </View>
             </ScrollView>
 
@@ -738,6 +747,18 @@ const styles = StyleSheet.create({
     },
     restoreText: {
         fontSize: 14,
+        color: COLORS.textSecondary,
+        textDecorationLine: 'underline',
+        marginBottom: 16,
+    },
+    legalFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+    },
+    legalText: {
+        fontSize: 12,
         color: COLORS.textSecondary,
         textDecorationLine: 'underline',
     },
