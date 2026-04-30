@@ -13,22 +13,23 @@ export default function PrivacyScreen({ navigation }: any) {
             <Text style={styles.title}>Privacy Policy</Text>
             <Text style={styles.subtitle}>Last updated: December 2025</Text>
             <Text style={styles.paragraph}>
-                At Pet Anxiety Coach, we take your privacy seriously. This policy describes how we collect, use, and protect your data.
+                At ChillPup, we take your privacy seriously. This policy describes how we collect, use, and protect your data.
             </Text>
 
             <Text style={styles.sectionTitle}>1. Data Collection</Text>
-            <Text style={styles.paragraph}>• We collect your email for account management.</Text>
-            <Text style={styles.paragraph}>• We process audio recordings of your pet solely for anxiety analysis.</Text>
-            <Text style={styles.paragraph}>• We store your pet's profile data (name, breed, weight) to personalize the experience.</Text>
+            <Text style={styles.paragraph}>• We collect your email for account management (if authenticated).</Text>
+            <Text style={styles.paragraph}>• We store your pet's profile data (name, age, triggers) to personalize the experience.</Text>
+            <Text style={styles.paragraph}>• We store session history and check-in notes to track progress.</Text>
 
             <Text style={styles.sectionTitle}>2. Data Usage</Text>
             <Text style={styles.paragraph}>
-                Your data is used to provide personalized anxiety relief plans and to improve our AI models. We do not sell your data to third parties.
+                Your data is used to provide personalized calming routines and track behavioral patterns. We do not sell your data to third parties.
             </Text>
 
-            <Text style={styles.sectionTitle}>3. Data Deletion</Text>
+            <Text style={styles.sectionTitle}>3. Full Policy</Text>
             <Text style={styles.paragraph}>
-                You can request full data deletion at any time via the Settings menu in the app.
+                For our complete Privacy Policy, please visit:
+                https://www.kf-software.com/privacy-policy
             </Text>
         </ScrollView>
     );

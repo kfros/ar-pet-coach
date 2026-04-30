@@ -13,22 +13,23 @@ export default function TermsScreen({ navigation }: any) {
             <Text style={styles.title}>Terms of Service</Text>
             <Text style={styles.subtitle}>Last updated: December 2025</Text>
             <Text style={styles.paragraph}>
-                By using the Pet Anxiety Coach application, you agree to the following terms.
+                By using the ChillPup application, you agree to the following terms.
             </Text>
 
             <Text style={styles.sectionTitle}>1. Medical Disclaimer</Text>
             <Text style={styles.paragraph}>
-                This app provides advice and training protocols but is NOT a substitute for professional veterinary care. If your pet shows signs of severe aggression or health issues, consult a vet immediately.
+                This app provides gentle calming routines and tracking tools but is NOT a substitute for professional veterinary care, behavioral diagnosis, or medical treatment. If your pet shows signs of severe panic, aggression, or health issues, consult a veterinarian immediately.
             </Text>
 
-            <Text style={styles.sectionTitle}>2. Liability</Text>
+            <Text style={styles.sectionTitle}>2. Use of Content</Text>
             <Text style={styles.paragraph}>
-                We are not liable for any behavioral issues that may arise or persist during the use of this app. Results may vary for every pet.
+                The guided sessions and training tips are for educational purposes only. Results may vary depending on the individual pet.
             </Text>
 
-            <Text style={styles.sectionTitle}>3. Subscriptions</Text>
+            <Text style={styles.sectionTitle}>3. Full Terms</Text>
             <Text style={styles.paragraph}>
-                Premium subscriptions are billed annually or monthly. You can cancel at any time in your account settings.
+                For our complete Terms of Use, please visit:
+                https://www.kf-software.com/terms-of-use
             </Text>
         </ScrollView>
     );

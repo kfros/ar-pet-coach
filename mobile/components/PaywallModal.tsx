@@ -63,8 +63,8 @@ const PaywallModal: React.FC<PaywallModalProps> = ({ visible, onClose }) => {
         <Modal visible={visible} animationType="slide" transparent>
             <View style={styles.container}>
                 <View style={styles.content}>
-                    <Text style={styles.title}>Unlock Premium Features</Text>
-                    <Text style={styles.subtitle}>Get unlimited bark analysis and advanced insights.</Text>
+                    <Text style={styles.title}>Unlock Premium Calming</Text>
+                    <Text style={styles.subtitle}>Get full access to guided routines and advanced progress tracking.</Text>
 
                     {loading ? (
                         <ActivityIndicator size="large" color="#0000ff" />
