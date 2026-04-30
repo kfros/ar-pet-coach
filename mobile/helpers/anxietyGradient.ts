@@ -31,16 +31,16 @@ export function getAnxietyBgColor(score: number): string {
 
 /** Returns a short label: Low / Moderate / Elevated / High. */
 export function getAnxietyLabel(score: number): string {
-    if (score <= 3) return 'Low';
-    if (score <= 6) return 'Moderate';
-    if (score <= 8) return 'Elevated';
-    return 'High';
+    if (score <= 3) return 'Very Calm';
+    if (score <= 6) return 'Moderate Signs';
+    if (score <= 8) return 'Elevated Signs';
+    return 'High Signs';
 }
 
 /** Returns a calm micro-copy description. */
 export function getAnxietyDescription(score: number): string {
-    if (score <= 3) return 'Low anxiety detected — your pup is doing great';
-    if (score <= 6) return 'Moderate anxiety detected — consider a calming session';
-    if (score <= 8) return 'Elevated anxiety detected — a safe zone session is recommended';
-    return 'High anxiety detected — immediate calming intervention suggested';
+    if (score <= 3) return 'Your pup seems relaxed and comfortable.';
+    if (score <= 6) return 'Moderate signs noted — consider a calming routine.';
+    if (score <= 8) return 'Elevated signs noted — a guided session is recommended.';
+    return 'High signs noted — focus on a safe environment and calming routine.';
 }

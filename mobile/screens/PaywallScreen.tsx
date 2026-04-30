@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, Linking, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import RevenueCatService from '../services/revenueCatService';
 import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
@@ -350,9 +351,9 @@ export default function PaywallScreen({ navigation }: any) {
 
                 <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
                     <View style={styles.header}>
-                        <Text style={styles.headline}>Build calm habits in just 21 days</Text>
+                        <Text style={styles.headline}>Build a calmer life for your pet</Text>
                         <Text style={styles.subheadline}>
-                            Practice gentle calming routines to help your pet relax and build confidence.
+                            Access guided routines and tracking tools designed to help your pet relax and feel safe.
                         </Text>
                     </View>
 

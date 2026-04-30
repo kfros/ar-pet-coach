@@ -17,6 +17,7 @@ import OnboardingCarousel from '../screens/OnboardingCarousel';
 import PetProfileStepper from '../screens/PetProfileStepper';
 import AccountScreen from '../screens/AccountScreen';
 import PremiumStatusScreen from '../screens/PremiumStatusScreen';
+import SessionPreviewScreen from '../screens/SessionPreviewScreen';
 import PetProfileRepository, { AuthMode } from '../services/petProfileRepository';
 import MigrationService from '../services/migrationService';
 
@@ -43,6 +44,7 @@ function AppNavigatorStack() {
             <AppStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Account" component={AccountScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="GuidedSession" component={GuidedSessionScreen} options={{ headerShown: false }} />
+            <AppStack.Screen name="SessionPreview" component={SessionPreviewScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Privacy" component={PrivacyScreen} />
             <AppStack.Screen name="Terms" component={TermsScreen} />
             <AppStack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />

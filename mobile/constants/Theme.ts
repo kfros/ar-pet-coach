@@ -12,6 +12,7 @@ export const COLORS = {
     error: '#EF4444',
     success: '#10B981',
     border: '#E5E7EB',
+    calmBg: '#F6FAF8',
 };
 
 export const SIZES = {
@@ -28,6 +29,7 @@ export const FONTS = {
     body: { fontSize: 16, fontWeight: '400' as const },
     caption: { fontSize: 14, fontWeight: '400' as const },
     small: { fontSize: 12, fontWeight: '300' as const },
+    tiny: { fontSize: 10, fontWeight: '400' as const },
 };
 
 export const SHADOWS = {
