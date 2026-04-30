@@ -20,6 +20,7 @@ import OnboardingCarousel from '../screens/OnboardingCarousel';
 import PetProfileStepper from '../screens/PetProfileStepper';
 import AccountScreen from '../screens/AccountScreen';
 import PetProfileRepository, { AuthMode } from '../services/petProfileRepository';
+import MigrationService from '../services/migrationService';
 
 const AuthStack = createNativeStackNavigator();
 const AppStack = createNativeStackNavigator();
@@ -79,6 +80,8 @@ export default function AppNavigator() {
                     if (currentUser) {
                         await PetProfileRepository.setAuthMode('authenticated');
                         setAuthMode('authenticated');
+                        // Handle user document, RC sync, and guest migration
+                        MigrationService.handleAuthSuccess(currentUser);
                     } else {
                         // If no Firebase user, check if we should be in guest mode or unauthenticated
                         const currentMode = await PetProfileRepository.getAuthMode();
