@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, Linking, SafeAreaView } from 'react-native';
 import RevenueCatService from '../services/revenueCatService';
 import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
@@ -103,14 +103,11 @@ export default function PaywallScreen({ navigation }: any) {
     const checkSubscription = async () => {
         const status = await RevenueCatService.getSubscriptionStatus();
         if (status.isPremium) {
-            let daysLeft = null;
-            if (status.expirationDate) {
-                const exp = new Date(status.expirationDate).getTime();
-                const now = new Date().getTime();
-                daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
-            }
-            setSubscriptionStatus({ ...status, daysLeft });
+            // If user is already premium, redirect to status screen
+            navigation.replace('PremiumStatus', { source: 'settings' });
+            return;
         }
+        setSubscriptionStatus(status as any);
     };
 
     const checkPackageForTrial = (pack: PurchasesPackage) => {
@@ -212,7 +209,7 @@ export default function PaywallScreen({ navigation }: any) {
             const customerInfo = await RevenueCatService.purchasePackage(selectedPackage);
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
                 Alert.alert('Success', 'You are now a Pro member!');
-                navigation.goBack();
+                navigation.replace('PremiumStatus', { source: 'post_purchase' });
             }
         } catch (e) {
             console.log("Purchase cancelled or failed");
@@ -227,7 +224,7 @@ export default function PaywallScreen({ navigation }: any) {
             const customerInfo = await RevenueCatService.restorePurchases();
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
                 Alert.alert('Success', 'Purchases restored!');
-                navigation.goBack();
+                navigation.replace('PremiumStatus', { source: 'settings' });
             } else {
                 Alert.alert('Info', 'No active subscription found to restore.');
             }
@@ -338,53 +335,50 @@ export default function PaywallScreen({ navigation }: any) {
     const hasSelectedTrial = selectedPackage ? checkPackageForTrial(selectedPackage) : false;
 
     return (
-        <View style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-                {subscriptionStatus?.isPremium && (
-                    <View style={styles.trialStatusBanner}>
-                        <Ionicons
-                            name={subscriptionStatus.isTrial ? "time-outline" : "star"}
-                            size={18}
-                            color="#fff"
-                        />
-                        <Text style={styles.trialStatusText}>
-                            {subscriptionStatus.isTrial
-                                ? `Trial active • ${subscriptionStatus.daysLeft} days left`
-                                : "Premium Active"}
-                        </Text>
-                    </View>
-                )}
-
-                <View style={[styles.header, subscriptionStatus?.isPremium && { marginTop: 16 }]}>
-                    <Text style={styles.headline}>Build calm habits in just 21 days</Text>
-                    <Text style={styles.subheadline}>
-                        Train calm behavior in real-life situations using AR guided sessions.
-                    </Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.backgroundLight }}>
+            <View style={{ flex: 1 }}>
+                {/* Header Row with Close Button */}
+                <View style={styles.headerRow}>
+                    <Pressable 
+                        style={styles.closeButton}
+                        onPress={() => navigation.goBack()}
+                        hitSlop={12}
+                    >
+                        <Ionicons name="close" size={28} color={COLORS.textSecondary} />
+                    </Pressable>
                 </View>
 
-                <View style={styles.benefitsContainer}>
-                    <BenefitItem
-                        icon="eye-outline"
-                        title="Real-World AR Training"
-                        description="Calm your dog in real situations via AR"
-                    />
-                    <BenefitItem
-                        icon="analytics-outline"
-                        title="Progress Tracking"
-                        description="Identify anxiety patterns over time"
-                    />
-                    <BenefitItem
-                        icon="heart-outline"
-                        title="Expert Support"
-                        isLast={!isDetailsExpanded}
-                        description="Stress-relief with expert-validated routines"
-                    />
+                <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+                    <View style={styles.header}>
+                        <Text style={styles.headline}>Build calm habits in just 21 days</Text>
+                        <Text style={styles.subheadline}>
+                            Practice gentle calming routines to help your pet relax and build confidence.
+                        </Text>
+                    </View>
+
+                    <View style={styles.benefitsContainer}>
+                        <BenefitItem
+                            icon="leaf-outline"
+                            title="Guided Calming Routines"
+                            description="Step-by-step guidance for daily stress relief"
+                        />
+                        <BenefitItem
+                            icon="analytics-outline"
+                            title="Anxiety Check-ins"
+                            description="Track how your pet feels before and after sessions"
+                        />
+                        <BenefitItem
+                            icon="heart-outline"
+                            title="Pet-First Design"
+                            isLast={!isDetailsExpanded}
+                            description="Gentle visual guides tailored for pet focus"
+                        />
 
                     {isDetailsExpanded && (
                         <View style={styles.expandedDetails}>
                             <View style={styles.divider} />
                             <Text style={styles.detailsText}>
-                                AR sessions help bridge the gap between training and real-life triggers by overlaying calming guides in your home.
+                                Guided sessions help your pet focus on calming visuals, bridging the gap between high-stress triggers and relaxation.
                             </Text>
                         </View>
                     )}
@@ -484,14 +478,8 @@ export default function PaywallScreen({ navigation }: any) {
                 </View>
             </ScrollView>
 
-            {/* Close Button */}
-            <Pressable
-                style={styles.closeButton}
-                onPress={() => navigation.goBack()}
-            >
-                <Ionicons name="close" size={28} color={COLORS.textSecondary} />
-            </Pressable>
-        </View>
+            </View>
+        </SafeAreaView>
     );
 }
 
@@ -762,17 +750,19 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         textDecorationLine: 'underline',
     },
+    headerRow: {
+        height: 56,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        paddingHorizontal: 16,
+        backgroundColor: COLORS.backgroundLight,
+    },
     closeButton: {
-        position: 'absolute',
-        top: 50,
-        right: 20,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        width: 44,
+        height: 44,
         justifyContent: 'center',
         alignItems: 'center',
-        ...SHADOWS.small,
     },
     trialBadgeAbsolute: {
         position: 'absolute',

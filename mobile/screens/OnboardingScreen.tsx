@@ -12,7 +12,6 @@ import {
     ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useCameraPermissions } from 'expo-camera';
 import { auth, db, firestore } from '../services/firebaseConfig';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../constants/Theme';
 
@@ -20,7 +19,6 @@ export default function OnboardingScreen({ navigation }: any) {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [permission, requestPermission] = useCameraPermissions();
 
     // Check if user is already logged in (Profile Setup Mode)
     const currentUser = auth().currentUser;
@@ -41,7 +39,7 @@ export default function OnboardingScreen({ navigation }: any) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const totalSteps = 6;
+    const totalSteps = 5;
 
     const updateFormData = (key: string, value: any) => {
         setFormData(prev => ({ ...prev, [key]: value }));
@@ -73,10 +71,6 @@ export default function OnboardingScreen({ navigation }: any) {
                 if (formData.problems.length === 0) return "Please select at least one problem.";
                 break;
             case 4:
-                // Check if real permission is granted, or if user clicked the button
-                if (!permission?.granted) return "Please grant camera permissions to continue.";
-                break;
-            case 5:
                 if (!formData.termsAccepted) return "You must agree to the Terms and Privacy Policy.";
                 if (!formData.gdprAccepted) return "You must agree to data processing.";
                 break;
@@ -232,31 +226,9 @@ export default function OnboardingScreen({ navigation }: any) {
                     </View>
                 )}
 
-                {/* Step 4: Permissions */}
+
+                {/* Step 4: Legal */}
                 {step === 4 && (
-                    <View style={[styles.stepContainer, { alignItems: 'center' }]}>
-                        <Text style={[styles.title, { textAlign: 'center' }]}>We need your permission</Text>
-                        <Text style={[styles.subtitle, { textAlign: 'center' }]}>To analyze anxiety and use AR features, we need access to your camera.</Text>
-
-                        <View style={styles.permIconContainer}>
-                            <View style={[styles.permIconCircle, permission?.granted && styles.permGranted]}>
-                                <Ionicons name="camera" size={40} color={permission?.granted ? COLORS.success : COLORS.primary} />
-                            </View>
-                            <Text style={styles.permLabel}>Camera</Text>
-                        </View>
-
-                        {!permission?.granted ? (
-                            <TouchableOpacity style={styles.grantBtn} onPress={requestPermission}>
-                                <Text style={styles.grantBtnText}>Grant Permissions</Text>
-                            </TouchableOpacity>
-                        ) : (
-                            <Text style={styles.successText}>Permissions granted!</Text>
-                        )}
-                    </View>
-                )}
-
-                {/* Step 5: Legal */}
-                {step === 5 && (
                     <View style={styles.stepContainer}>
                         <Text style={styles.title}>Almost there!</Text>
                         <Text style={styles.subtitle}>Please review our terms.</Text>
@@ -293,8 +265,8 @@ export default function OnboardingScreen({ navigation }: any) {
                     </View>
                 )}
 
-                {/* Step 6: Create Account */}
-                {step === 6 && (
+                {/* Step 5: Create Account */}
+                {step === 5 && (
                     <View style={styles.stepContainer}>
                         <Text style={styles.title}>{isProfileSetupMode ? 'Complete Setup' : 'Create Account'}</Text>
                         <Text style={styles.subtitle}>Save your pet's profile and start the journey.</Text>

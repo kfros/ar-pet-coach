@@ -28,28 +28,12 @@ export default function SettingsScreen({ navigation }: any) {
         fetchInitialData();
     }, []);
 
-    const handleManageSubscription = async () => {
-        try {
-            if (customerInfo?.managementURL) {
-                await Linking.openURL(customerInfo.managementURL);
-                return;
-            }
-            if (Platform.OS === 'ios') {
-                await Linking.openURL('https://apps.apple.com/account/subscriptions');
-            } else {
-                await Linking.openURL('https://play.google.com/store/account/subscriptions');
-            }
-        } catch (err) {
-            console.error("Error opening subscription management:", err);
-            Alert.alert("Error", "Could not open subscription settings.");
-        }
-    };
-
     const handleRestorePurchases = async () => {
         try {
             const info = await Purchases.restorePurchases();
             if (info.entitlements.active['ar-pet-coach-premium']) {
                 Alert.alert("Success", "Your purchases have been restored!");
+                navigation.navigate('PremiumStatus');
             } else {
                 Alert.alert("Info", "No active subscriptions found.");
             }
@@ -131,7 +115,11 @@ export default function SettingsScreen({ navigation }: any) {
         }
 
         return [
-            { icon: 'card-outline', label: 'Payments or Subscription', onPress: handleManageSubscription },
+            { 
+                icon: isPremium ? 'star-outline' : 'card-outline', 
+                label: isPremium ? 'Premium' : 'Subscription', 
+                onPress: () => navigation.navigate(isPremium ? 'PremiumStatus' : 'Paywall') 
+            },
             { icon: 'refresh-outline', label: 'Restore Purchases', onPress: handleRestorePurchases },
             { icon: 'person-outline', label: 'Account', onPress: () => navigation.navigate('Account') },
             { icon: 'shield-checkmark-outline', label: 'Privacy Policy', onPress: () => navigation.navigate('Privacy') },
