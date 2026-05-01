@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Animated, Easing, ActivityIndicator, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Animated, Easing, ActivityIndicator, Dimensions, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
@@ -32,6 +33,9 @@ const ANXIETY_SIGNS: { id: AnxietySign; label: string }[] = [
     { id: 'other', label: 'Other' }
 ];
 
+const HINT_STORAGE_KEY = 'guidedFocusCircleHintDismissed';
+const REPEAT_STORAGE_KEY = 'backgroundSoundRepeatEnabled';
+
 export default function GuidedSessionScreen({ navigation, route }: any) {
     const { sessionId, petId } = route.params;
     const session = SessionService.getSessionById(sessionId);
@@ -42,9 +46,11 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [audioEnabled, setAudioEnabled] = useState(true);
-    
+    const [repeatEnabled, setRepeatEnabled] = useState(false);
+    const [showHint, setShowHint] = useState(false);
+
     // Audio Hook
-    const { isPlaying, stopAudio } = useCalmAudio(phase === 'active' && audioEnabled);
+    const { isPlaying, stopAudio, handleNext } = useCalmAudio(phase === 'active' && audioEnabled);
     const [beforeLevel, setBeforeLevel] = useState<AnxietyLevel | null>(null);
     const [beforeSigns, setBeforeSigns] = useState<AnxietySign[]>([]);
     const [afterLevel, setAfterLevel] = useState<AnxietyLevel | null>(null);
@@ -55,9 +61,20 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const dimAnim = useRef(new Animated.Value(0)).current;
     const timerRef = useRef<any>(null);
     const [isPaused, setIsPaused] = useState(false);
+    const [showNextStepPrompt, setShowNextStepPrompt] = useState(false);
 
     const steps = session?.steps || [];
     const currentStep = steps[currentStepIndex];
+
+    useEffect(() => {
+        const loadSettings = async () => {
+            const hintDismissed = await AsyncStorage.getItem(HINT_STORAGE_KEY);
+            const repeatOn = await AsyncStorage.getItem(REPEAT_STORAGE_KEY);
+            if (!hintDismissed) setShowHint(true);
+            if (repeatOn === 'true') setRepeatEnabled(true);
+        };
+        loadSettings();
+    }, []);
 
     useEffect(() => {
         if (phase === 'active' && currentStep) {
@@ -75,27 +92,30 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
     const startStep = (step: SessionStep) => {
         setTimeLeft(step.durationSeconds);
-        
-        // Reset animations
-        pulseAnim.setValue(1);
-        dimAnim.setValue(0);
+        setShowNextStepPrompt(false);
 
-        // Start Visual Cues
-        if (step.visualCue === 'pulse') {
-            startPulsing();
-        } else if (step.visualCue === 'dim') {
-            Animated.timing(dimAnim, { toValue: 1, duration: 2000, useNativeDriver: true }).start();
-        }
+        // GFM-001: Smooth transition for visual cues
+        const targetDim = step.visualCue === 'dim' ? 1 : 0;
+        Animated.timing(dimAnim, {
+            toValue: targetDim,
+            duration: 1000,
+            useNativeDriver: true,
+            easing: Easing.inOut(Easing.ease)
+        }).start();
+
+        // Pulse is managed by the isPaused/phase/currentStepIndex effect
+        // (it will detect the new step index and start with resetValues=true)
 
         // Start Timer
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
-            if (isPausedRef.current) return; // Respect pause state
-            
+            if (isPausedRef.current) return;
+
             setTimeLeft((prev) => {
                 if (prev <= 1) {
                     clearInterval(timerRef.current);
-                    handleNextStep();
+                    // GFM-003: Show prompt instead of auto-advancing
+                    setShowNextStepPrompt(true);
                     return 0;
                 }
                 return prev - 1;
@@ -103,31 +123,59 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }, 1000);
     };
 
-    const startPulsing = () => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.parallel([
-                    Animated.timing(pulseAnim, { toValue: 1.04, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-                    Animated.timing(opacityAnim, { toValue: 1.0, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) })
-                ]),
-                Animated.parallel([
-                    Animated.timing(pulseAnim, { toValue: 0.96, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-                    Animated.timing(opacityAnim, { toValue: 0.82, duration: 1300, useNativeDriver: true, easing: Easing.inOut(Easing.sin) })
-                ])
-            ])
-        ).start();
+    const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
+    const pulseStartedForStep = useRef<number>(-1);
+    const isGoingUp = useRef(true);
+
+    const startPulsing = (resetValues: boolean) => {
+        if (pulseLoop.current) pulseLoop.current.stop();
+
+        // Рекурсивная функция для идеального дыхания (заменяет Animated.loop)
+        const triggerNextPhase = (up: boolean, duration: number) => {
+            isGoingUp.current = up;
+            const targetScale = up ? 1.04 : 0.96;
+            const targetOpacity = up ? 1.0 : 0.82;
+
+            pulseLoop.current = Animated.parallel([
+                Animated.timing(pulseAnim, { toValue: targetScale, duration, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+                Animated.timing(opacityAnim, { toValue: targetOpacity, duration, useNativeDriver: true, easing: Easing.inOut(Easing.sin) })
+            ]);
+
+            pulseLoop.current.start(({ finished }) => {
+                // Запускаем следующую фазу ТОЛЬКО если текущая завершилась сама (не была остановлена паузой)
+                if (finished) {
+                    triggerNextPhase(!up, 2600); // Следующая фаза всегда идет в обратном направлении и занимает полные 2600мс
+                }
+            });
+        };
+
+        if (resetValues) {
+            // Старт нового шага: круг находится в центре.
+            pulseAnim.setValue(1);
+            opacityAnim.setValue(0.91);
+
+            // Запускаем первую вводную фазу (Вдох от центра до максимума за 1300мс)
+            triggerNextPhase(true, 1300);
+        } else {
+            // Снятие с паузы: продолжаем двигаться в том же направлении, в котором остановились.
+            // Никаких скачков или резких смен курса.
+            triggerNextPhase(isGoingUp.current, 2600);
+        }
     };
 
     useEffect(() => {
         if (isPaused) {
-            pulseAnim.stopAnimation();
-            opacityAnim.stopAnimation();
+            if (pulseLoop.current) pulseLoop.current.stop();
         } else if (phase === 'active' && currentStep?.visualCue === 'pulse') {
-            startPulsing();
+            // On resume: don't reset values. On new step: reset.
+            const isNewStep = pulseStartedForStep.current !== currentStepIndex;
+            pulseStartedForStep.current = currentStepIndex;
+            startPulsing(isNewStep);
         }
     }, [isPaused, phase, currentStepIndex]);
 
     const handleNextStep = () => {
+        setShowNextStepPrompt(false);
         if (currentStepIndex < steps.length - 1) {
             setCurrentStepIndex(currentStepIndex + 1);
         } else {
@@ -141,13 +189,24 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
     const handleEndSession = () => {
         Alert.alert(
-            "End Session?",
-            "Your progress so far will be saved.",
+            "End this session?",
+            "This will save the session as stopped early.",
             [
-                { text: "Cancel", style: "cancel" },
-                { text: "End", style: "destructive", onPress: () => setPhase('after_checkin') }
+                { text: "Keep Going", style: "cancel" },
+                { text: "End Session", style: "destructive", onPress: () => finalizeSession(true) }
             ]
         );
+    };
+
+    const dismissHint = async () => {
+        await AsyncStorage.setItem(HINT_STORAGE_KEY, 'true');
+        setShowHint(false);
+    };
+
+    const toggleRepeat = async () => {
+        const newValue = !repeatEnabled;
+        setRepeatEnabled(newValue);
+        await AsyncStorage.setItem(REPEAT_STORAGE_KEY, newValue.toString());
     };
 
     const handleSkipCheckin = () => {
@@ -164,7 +223,15 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
-    const saveSession = async () => {
+    const finalizeSession = async (stoppedEarly = false) => {
+        if (stoppedEarly) {
+            saveSession(true);
+        } else {
+            setPhase('after_checkin');
+        }
+    };
+
+    const saveSession = async (stoppedEarly = false) => {
         if (!session) return;
         setIsSaving(true);
 
@@ -194,11 +261,11 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 petId,
                 sessionId,
                 completedAt: new Date().toISOString(),
-                durationSeconds: steps.reduce((acc, s) => acc + s.durationSeconds, 0),
-                completed: true,
-                stoppedEarly: false,
+                durationSeconds: steps.slice(0, currentStepIndex + 1).reduce((acc, s) => acc + s.durationSeconds, 0),
+                completed: !stoppedEarly,
+                stoppedEarly: stoppedEarly,
                 beforeCheckin: beforeLevel ? beforeCheckin : undefined,
-                afterCheckin: afterLevel ? afterCheckin : undefined
+                afterCheckin: !stoppedEarly && afterLevel ? afterCheckin : undefined
             });
 
             await trackCalmingSession();
@@ -218,8 +285,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
         return (
             <ScrollView contentContainerStyle={styles.checkinScroll}>
-                <Text style={styles.checkinTitle}>{isBefore ? 'How is your dog right now?' : 'How is your dog after the session?'}</Text>
-                <Text style={styles.checkinSubtitle}>Choose the overall level and any visible signs.</Text>
+                <Text style={styles.checkinTitle}>{isBefore ? 'Calm Check-In' : 'After-Session Check-In'}</Text>
+                <Text style={styles.checkinSubtitle}>{isBefore ? 'How is your dog right now?' : 'How is your dog after the routine?'}</Text>
 
                 <View style={styles.levelContainer}>
                     {ANXIETY_LEVELS.map((lvl) => (
@@ -236,7 +303,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     ))}
                 </View>
 
-                <Text style={styles.signsTitle}>Visible Signs (optional)</Text>
+                <Text style={styles.signsTitle}>Signs Noted (optional)</Text>
                 <View style={styles.signsContainer}>
                     {ANXIETY_SIGNS.map((sign) => (
                         <Pressable
@@ -258,7 +325,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 >
                     <Text style={styles.checkinNextText}>{isBefore ? 'Start Session' : 'Finish & Save'}</Text>
                 </Pressable>
-                
+
                 {isBefore && (
                     <Pressable style={styles.skipButton} onPress={handleSkipCheckin}>
                         <Text style={styles.skipText}>Skip Check-in</Text>
@@ -278,77 +345,113 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     <Ionicons name="close" size={28} color={COLORS.text} />
                 </Pressable>
                 {phase === 'active' && (
-                    <View style={styles.progressBarBg}>
-                        <View style={[styles.progressBarFill, { width: `${((currentStepIndex + 1) / steps.length) * 100}%` }]} />
+                    <View style={styles.progressContainer}>
+                        <View style={styles.progressBarBg}>
+                            <View style={[styles.progressBarFill, { width: `${((currentStepIndex + 1) / steps.length) * 100}%` }]} />
+                        </View>
+                        <Text style={styles.progressText}>Step {currentStepIndex + 1} of {steps.length}</Text>
                     </View>
                 )}
-                <View style={{ width: 28 }} /> 
+                <View style={{ width: 28 }} />
             </View>
 
             <View style={{ flex: 1 }}>
                 {phase === 'before_checkin' && renderCheckin(true)}
                 {phase === 'after_checkin' && renderCheckin(false)}
-                
+
                 {phase === 'active' && currentStep && (
                     <View style={styles.activeSessionArea}>
                         <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#000', opacity: dimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }) }]} />
-                        
+
                         <View style={styles.stepInfo}>
+                            <Text style={styles.sessionStepTitle}>{session.title}</Text>
                             <Text style={styles.stepTitle}>{currentStep.title}</Text>
                             <Text style={styles.stepInstruction}>{currentStep.instruction}</Text>
                         </View>
 
-                        <View style={styles.visualArea}>
-                            <Animated.View style={[
-                                styles.mainCircle,
-                                { transform: [{ scale: pulseAnim }], opacity: opacityAnim }
-                            ]} />
-                            {currentStep.visualCue === 'reward' && (
-                                <View style={styles.iconOverlay}>
-                                    <Ionicons name="star" size={60} color="#fff" />
-                                </View>
-                            )}
-                            {currentStep.visualCue === 'pause' && (
-                                <View style={styles.iconOverlay}>
-                                    <Ionicons name="pause" size={60} color="#fff" />
-                                </View>
-                            )}
-                            <Text style={styles.timerLarge}>{timeLeft}s</Text>
-                            {isPaused && (
-                                <View style={styles.pausedOverlay}>
-                                    <Ionicons name="pause" size={48} color={COLORS.primary} />
-                                    <Text style={styles.pausedText}>Paused</Text>
-                                </View>
-                            )}
+                        <View style={styles.visualAreaWrapper}>
+                            <View style={styles.timerWrapper} testID="session-step-timer">
+                                <Ionicons name="time-outline" size={16} color={COLORS.textSecondary} />
+                                <Text style={styles.timerText}>
+                                    Suggested time: about {timeLeft > 60 ? `${Math.ceil(timeLeft / 60)} min` : `${timeLeft} sec`}
+                                </Text>
+                            </View>
+
+                            <View style={styles.visualArea}>
+                                <Animated.View
+                                    testID="focus-pulse-circle"
+                                    style={[
+                                        styles.mainCircle,
+                                        { transform: [{ scale: pulseAnim }], opacity: opacityAnim }
+                                    ]}
+                                />
+                                {isPaused && (
+                                    <View style={styles.pausedOverlay}>
+                                        <Ionicons name="pause" size={48} color={COLORS.primary} />
+                                        <Text style={styles.pausedText}>Paused</Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
 
                         <View style={styles.controls}>
-                            <View style={styles.controlRow}>
-                                <Pressable 
-                                    style={styles.audioToggle} 
+                            <View style={styles.controlGrid}>
+                                <Pressable
+                                    style={styles.controlToggle}
                                     onPress={() => setAudioEnabled(!audioEnabled)}
                                 >
-                                    <Ionicons 
-                                        name={audioEnabled ? "volume-medium" : "volume-mute"} 
-                                        size={20} 
-                                        color={audioEnabled ? COLORS.primary : COLORS.textSecondary} 
+                                    <Ionicons
+                                        name={audioEnabled ? "volume-medium" : "volume-mute"}
+                                        size={18}
+                                        color={audioEnabled ? COLORS.primary : COLORS.textSecondary}
                                     />
-                                    <Text style={[styles.audioText, !audioEnabled && { color: COLORS.textSecondary }]}>
-                                        Background Sound: {audioEnabled ? 'On' : 'Off'}
-                                    </Text>
+                                    <View>
+                                        <Text style={[styles.controlLabel, !audioEnabled && { color: COLORS.textSecondary }]}>Sound</Text>
+                                        <Text style={[styles.controlState, !audioEnabled && { color: COLORS.textSecondary }]}>{audioEnabled ? 'On' : 'Off'}</Text>
+                                    </View>
                                 </Pressable>
 
-                                <Pressable 
-                                    style={styles.pauseBtn} 
+                                <Pressable
+                                    style={styles.controlToggle}
+                                    onPress={toggleRepeat}
+                                >
+                                    <Ionicons
+                                        name="refresh"
+                                        size={18}
+                                        color={repeatEnabled ? COLORS.primary : COLORS.textSecondary}
+                                    />
+                                    <View>
+                                        <Text style={[styles.controlLabel, !repeatEnabled && { color: COLORS.textSecondary }]}>Repeat</Text>
+                                        <Text style={[styles.controlState, !repeatEnabled && { color: COLORS.textSecondary }]}>{repeatEnabled ? 'On' : 'Off'}</Text>
+                                    </View>
+                                </Pressable>
+
+                                <Pressable
+                                    style={styles.controlToggle}
+                                    onPress={handleNext}
+                                >
+                                    <Ionicons name="play-skip-forward" size={18} color={COLORS.primary} />
+                                    <View>
+                                        <Text style={styles.controlLabel}>Next</Text>
+                                        <Text style={styles.controlState}>Sound</Text>
+                                    </View>
+                                </Pressable>
+
+                                <Pressable
+                                    style={styles.controlToggle}
                                     onPress={togglePause}
                                 >
-                                    <Ionicons name={isPaused ? "play" : "pause"} size={20} color={COLORS.primary} />
-                                    <Text style={styles.pauseBtnText}>{isPaused ? 'Resume' : 'Pause'}</Text>
+                                    <Ionicons name={isPaused ? "play" : "pause"} size={18} color={COLORS.primary} />
+                                    <View>
+                                        <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
+                                    </View>
                                 </Pressable>
                             </View>
 
                             <Pressable style={styles.primaryActionBtn} onPress={handleNextStep}>
-                                <Text style={styles.primaryActionBtnText}>Next Step</Text>
+                                <Text style={styles.primaryActionBtnText}>
+                                    {currentStepIndex < steps.length - 1 ? 'Next Step' : 'Finish Session'}
+                                </Text>
                                 <Ionicons name="chevron-forward" size={18} color="#fff" />
                             </Pressable>
 
@@ -359,6 +462,43 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     </View>
                 )}
             </View>
+
+            <Modal visible={showHint} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalIcon}><Ionicons name="eye-outline" size={40} color={COLORS.primary} /></View>
+                        <Text style={styles.modalTitle}>Calm visual guide</Text>
+                        <Text style={styles.modalBody}>Use the circle as a soft visual anchor while you follow the steps.</Text>
+                        <Pressable style={styles.modalBtn} onPress={dismissHint}>
+                            <Text style={styles.modalBtnText}>Got it</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={showNextStepPrompt} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={[styles.modalIcon, { backgroundColor: '#E0F2FE' }]}>
+                            <Ionicons name="notifications-outline" size={40} color={COLORS.primary} />
+                        </View>
+                        <Text style={styles.modalTitle}>Ready for the next step?</Text>
+                        <Text style={styles.modalBody}>You can continue, or stay here a little longer if your dog needs more time.</Text>
+
+                        <View style={{ width: '100%', gap: 12 }}>
+                            <Pressable style={styles.modalBtn} onPress={handleNextStep}>
+                                <Text style={styles.modalBtnText}>Next Step</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.modalBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border }]}
+                                onPress={() => setShowNextStepPrompt(false)}
+                            >
+                                <Text style={[styles.modalBtnText, { color: COLORS.textSecondary }]}>Stay Here</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {isSaving && (
                 <View style={styles.saveOverlay}>
@@ -371,12 +511,14 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.calmBg },
+    container: { flex: 1, backgroundColor: '#F6FAF8' },
     header: { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 15 },
     closeButton: { padding: 4 },
-    progressBarBg: { flex: 1, height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, overflow: 'hidden' },
+    progressContainer: { flex: 1, gap: 4 },
+    progressBarBg: { height: 6, backgroundColor: '#E3ECEF', borderRadius: 3, overflow: 'hidden' },
     progressBarFill: { height: '100%', backgroundColor: COLORS.primary },
-    
+    progressText: { ...FONTS.tiny, color: COLORS.textSecondary, fontWeight: '600' },
+
     checkinScroll: { padding: 20, paddingBottom: 40 },
     checkinTitle: { ...FONTS.h2, color: COLORS.text, textAlign: 'center', marginBottom: 8 },
     checkinSubtitle: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 32 },
@@ -394,30 +536,40 @@ const styles = StyleSheet.create({
     skipButton: { marginTop: 16, alignSelf: 'center', padding: 10 },
     skipText: { ...FONTS.body, color: COLORS.textSecondary },
 
-    activeSessionArea: { flex: 1, justifyContent: 'space-between', paddingVertical: 20 },
-    stepInfo: { paddingHorizontal: 30, alignItems: 'center', marginTop: 20 },
-    stepTitle: { ...FONTS.h1, color: '#17212F', textAlign: 'center', marginBottom: 12 },
-    stepInstruction: { ...FONTS.body, color: '#52616B', textAlign: 'center', lineHeight: 26 },
-    visualArea: { height: 260, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+    activeSessionArea: { flex: 1, justifyContent: 'space-between', paddingVertical: 10 },
+    stepInfo: { paddingHorizontal: 30, alignItems: 'center', marginTop: 10 },
+    sessionStepTitle: { ...FONTS.tiny, color: COLORS.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+    stepTitle: { ...FONTS.h2, color: '#17212F', textAlign: 'center', marginBottom: 12 },
+    stepInstruction: { ...FONTS.body, color: '#52616B', textAlign: 'center', lineHeight: 24 },
+
+    visualAreaWrapper: { alignItems: 'center', gap: 12 },
+    timerWrapper: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#DDF4EF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+    timerText: { ...FONTS.small, color: COLORS.primary, fontWeight: '600' },
+    visualArea: { height: 220, width: 220, justifyContent: 'center', alignItems: 'center', position: 'relative' },
     mainCircle: { width: 140, height: 140, borderRadius: 70, backgroundColor: '#0F8A7A', opacity: 0.15 },
-    iconOverlay: { position: 'absolute', opacity: 0.8 },
-    timerLarge: { position: 'absolute', fontSize: 44, fontWeight: 'bold', color: '#0F8A7A' },
-    pausedOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(246, 250, 248, 0.8)', justifyContent: 'center', alignItems: 'center', borderRadius: 20 },
-    pausedText: { ...FONTS.h3, color: COLORS.primary, marginTop: 10 },
-    
-    controls: { paddingHorizontal: 30, alignItems: 'center', gap: 12, paddingBottom: 20 },
-    controlRow: { flexDirection: 'row', gap: 10, width: '100%', justifyContent: 'center' },
-    audioToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: '#fff', borderRadius: 20, ...SHADOWS.small },
-    audioText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
-    pauseBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: '#fff', borderRadius: 20, ...SHADOWS.small },
-    pauseBtnText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
-    
+    pausedOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(246, 250, 248, 0.8)', justifyContent: 'center', alignItems: 'center', borderRadius: 110 },
+    pausedText: { ...FONTS.small, fontWeight: '700', color: COLORS.primary, marginTop: 4 },
+
+    controls: { paddingHorizontal: 20, alignItems: 'center', gap: 12, paddingBottom: 20 },
+    controlGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%', justifyContent: 'center' },
+    controlToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '47%', minHeight: 52, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fff', borderRadius: 24, ...SHADOWS.small },
+    controlLabel: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+    controlState: { fontSize: 10, fontWeight: '600', color: COLORS.textSecondary },
+
     primaryActionBtn: { backgroundColor: COLORS.primary, width: '100%', height: 56, borderRadius: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...SHADOWS.medium },
     primaryActionBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-    
+
     endSessionBtn: { padding: 12 },
-    endSessionText: { ...FONTS.body, color: COLORS.error, fontWeight: '600' },
-    
+    endSessionText: { ...FONTS.body, color: '#B94A48', fontWeight: '600' },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 30 },
+    modalCard: { backgroundColor: '#fff', borderRadius: 24, padding: 30, alignItems: 'center', width: '100%', ...SHADOWS.large },
+    modalIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#DDF4EF', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { ...FONTS.h2, color: COLORS.text, marginBottom: 12 },
+    modalBody: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 30 },
+    modalBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 40, paddingVertical: 14, borderRadius: 25 },
+    modalBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+
     saveOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
     saveText: { marginTop: 16, ...FONTS.body, color: COLORS.text }
 });

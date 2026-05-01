@@ -3,13 +3,15 @@ import { StyleSheet, View } from 'react-native';
 import { SubscriptionProvider } from './components/SubscriptionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './navigation/AppNavigator';
-import RevenueCatService from './services/revenueCatService';
-import { useEffect } from 'react';
+import { LogBox } from 'react-native';
 // StripeProvider is commented out because @stripe/stripe-react-native requires native code
 // that is not available in Expo Go. Re-enable this when using a development build.
 // import { StripeProvider } from '@stripe/stripe-react-native';
 
 export default function App() {
+  LogBox.ignoreLogs([
+    'This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.'
+  ]);
   // Stripe is disabled for Expo Go compatibility.
   // Wrap with <StripeProvider> when using a development build.
   return (

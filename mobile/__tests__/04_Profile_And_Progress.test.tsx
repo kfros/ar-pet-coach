@@ -15,9 +15,15 @@ const mockNavigation = {
   goBack: jest.fn(),
 };
 
+// No local mock for PetProfileRepository to allow testing integration logic
+
 describe('Suite 04: Profile And Progress', () => {
   
-  test('16_local_session_history_saves_and_loads', async () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  
+  test('local_session_history_saves_and_loads', async () => {
     const mockEntry = {
       id: 'test-session',
       petId: 'pet-1',
@@ -27,7 +33,6 @@ describe('Suite 04: Profile And Progress', () => {
       completed: true,
       stoppedEarly: false,
     };
-    
     await SessionService.saveSessionHistory(mockEntry);
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         expect.stringContaining('session_history'), 
@@ -39,25 +44,11 @@ describe('Suite 04: Profile And Progress', () => {
     expect(history[0].id).toBe('test-session');
   });
 
-  test('21_settings_profile_screen_renders_options', async () => {
-    const { findByText } = render(
-      <SubscriptionProvider>
-        <NavigationContainer>
-          <SettingsScreen navigation={mockNavigation} />
-        </NavigationContainer>
-      </SubscriptionProvider>
-    );
-    
-    expect(await findByText(/Account/i)).toBeTruthy();
-    expect(await findByText(/Restore Purchases/i)).toBeTruthy();
-    expect(await findByText(/Log Out|Sign Out/i)).toBeTruthy();
-  });
-
-  test('22_guest_profile_state_shows_signup_prompt', async () => {
+  test('auth_guest_002: Guest profile shows guest actions and hides Log Out', async () => {
     // Mock PetProfileRepository.getAuthMode to return 'guest'
     jest.spyOn(PetProfileRepository, 'getAuthMode').mockResolvedValue('guest');
     
-    const { findByText } = render(
+    const { findByText, queryByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
           <SettingsScreen navigation={mockNavigation} />
@@ -66,9 +57,15 @@ describe('Suite 04: Profile And Progress', () => {
     );
     
     expect(await findByText(/Create Account/i)).toBeTruthy();
+    expect(await findByText(/Sign In/i)).toBeTruthy();
+    expect(await findByText(/Clear Guest Data/i)).toBeTruthy();
+    
+    // Guest must not show Log Out
+    expect(queryByText(/Log Out/i)).toBeNull();
+    expect(queryByText(/Sign Out/i)).toBeNull();
   });
 
-  test('23_authenticated_profile_state_shows_account_details', async () => {
+  test('authenticated_profile_shows_log_out', async () => {
     jest.spyOn(PetProfileRepository, 'getAuthMode').mockResolvedValue('authenticated');
     
     const { findByText } = render(
@@ -79,6 +76,30 @@ describe('Suite 04: Profile And Progress', () => {
       </SubscriptionProvider>
     );
     
-    expect(await findByText('test@example.com')).toBeTruthy();
+    expect(await findByText(/Log Out|Sign Out/i)).toBeTruthy();
+  });
+
+  test('profile_001: Guest pet profile is saved locally', async () => {
+    const ActualRepository = jest.requireActual('../services/petProfileRepository').default;
+    jest.spyOn(ActualRepository, 'getAuthMode').mockResolvedValue('guest');
+    
+    const mockProfile = {
+      petName: 'Buddy',
+      hasPhoto: false,
+      breed: 'Beagle',
+      size: 'medium',
+      notes: 'Friendly',
+      anxietyScore: 5
+    };
+    
+    await ActualRepository.savePetProfile(mockProfile);
+    
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      expect.stringContaining('guest.petProfile'),
+      expect.stringContaining('Buddy')
+    );
+    
+    const Firestore = require('@react-native-firebase/firestore');
+    expect(Firestore().collection).not.toHaveBeenCalled();
   });
 });

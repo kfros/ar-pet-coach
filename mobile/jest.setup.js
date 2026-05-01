@@ -235,5 +235,6 @@ jest.mock('./services/petProfileRepository', () => ({
   hasPetProfile: jest.fn(() => Promise.resolve(false)),
   setAuthMode: jest.fn(() => Promise.resolve()),
   clearGuestData: jest.fn(() => Promise.resolve()),
+  savePetProfile: jest.fn(() => Promise.resolve()),
 }));
 
