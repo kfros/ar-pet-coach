@@ -29,7 +29,7 @@ const mockNavigation = {
 
 describe('Suite 02: Main Navigation And Content', () => {
   
-  test('6_home_screen_renders_user_and_pet_data', async () => {
+  test('home_screen_renders_user_and_pet_data', async () => {
     const { findByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
@@ -42,8 +42,8 @@ describe('Suite 02: Main Navigation And Content', () => {
     expect(await findByText(/ChillPup/)).toBeTruthy();
   });
 
-  test('7_recommended_calming_session_card_is_visible', async () => {
-    const { findByText } = render(
+  test('recommended_calming_session_card_is_visible', async () => {
+    const { findByText, findAllByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
           <DashboardScreen navigation={mockNavigation} />
@@ -52,11 +52,47 @@ describe('Suite 02: Main Navigation And Content', () => {
     );
     
     expect(await findByText(/Recommended/)).toBeTruthy();
-    expect(await findByText(/Fireworks/i)).toBeTruthy();
+    const fireworksElements = await findAllByText(/Fireworks/i);
+    expect(fireworksElements.length).toBeGreaterThan(0);
   });
 
-  test('8_premium_session_triggers_paywall_if_not_premium', async () => {
-    // We'll test SessionPreviewScreen directly since that's where the logic is
+  test('session_free_001: Daily Calm Reset opens without paywall', async () => {
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <SessionPreviewScreen 
+            navigation={mockNavigation} 
+            route={{ params: { sessionId: 'daily_calm_reset', petId: 'test-pet' } }} 
+          />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+    
+    const startButton = getByText(/Start Session/i);
+    fireEvent.press(startButton);
+    
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('GuidedSession', expect.anything());
+  });
+
+  test('session_free_002: Fireworks & Loud Noises Quick Support opens without paywall', async () => {
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <SessionPreviewScreen 
+            navigation={mockNavigation} 
+            route={{ params: { sessionId: 'fireworks_loud_noises_basic', petId: 'test-pet' } }} 
+          />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+    
+    const startButton = getByText(/Start Session/i);
+    fireEvent.press(startButton);
+    
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('GuidedSession', expect.anything());
+  });
+
+  test('session_premium_001: Locked premium session opens paywall for non-premium user', async () => {
     const { getByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
@@ -74,22 +110,27 @@ describe('Suite 02: Main Navigation And Content', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', expect.anything());
   });
 
-  test('9_fireworks_loud_noises_allows_free_access', async () => {
-    const { getByText } = render(
+  test('session_premium_002: Premium user opens premium session without purchase CTA', async () => {
+    const { useSubscription } = require('../components/SubscriptionManager');
+    useSubscription.mockReturnValue({
+      isPremium: true,
+      checkPaywallTrigger: jest.fn(),
+      trackCalmingSession: jest.fn(),
+    });
+
+    const { getByText, queryByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
           <SessionPreviewScreen 
             navigation={mockNavigation} 
-            route={{ params: { sessionId: 'fireworks_loud_noises_basic', petId: 'test-pet' } }} 
+            route={{ params: { sessionId: 'fireworks_prep_extended', petId: 'test-pet' } }} 
           />
         </NavigationContainer>
       </SubscriptionProvider>
     );
     
-    const startButton = getByText(/Start Session/i);
-    fireEvent.press(startButton);
-    
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('GuidedSession', expect.anything());
+    expect(getByText(/Start Session/i)).toBeTruthy();
+    expect(queryByText(/Unlock with Premium/i)).toBeNull();
   });
 });
 

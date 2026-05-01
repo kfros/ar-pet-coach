@@ -9,29 +9,21 @@ import {
     RefreshControl,
     Dimensions,
     ActivityIndicator,
-    Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import Purchases from 'react-native-purchases';
-import {
-    auth,
-    db,
-} from '../services/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
 import {
     getAnxietyColor,
     getAnxietyLabel,
-    getAnxietyDescription,
 } from '../helpers/anxietyGradient';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import PetProfileRepository from '../services/petProfileRepository';
 import SessionService from '../services/sessionService';
-import { signOut } from '../services/authService';
 
 export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
@@ -39,49 +31,42 @@ export default function DashboardScreen({ navigation }: any) {
     const [profile, setProfile] = useState<any>(null);
     const [petId, setPetId] = useState<string | null>(null);
     const [petData, setPetData] = useState<any>(null);
-    const [authMode, setAuthMode] = useState<string>('unauthenticated');
-    const [progressSummary, setProgressSummary] = useState<string | null>(null);
+    const [progressData, setProgressData] = useState<{ title: string; body: string; details: string[] } | null>(null);
     const [recommendedSession, setRecommendedSession] = useState<any>(null);
     const [recommendationReason, setRecommendationReason] = useState<string>('');
 
-    const { isPremium, checkPaywallTrigger, trackCalmingSession } = useSubscription();
+    const { isPremium } = useSubscription();
     const insets = useSafeAreaInsets();
 
     const anxietyScore = petData?.anxietyScore ?? 0;
     const anxietyColor = getAnxietyColor(anxietyScore);
     const anxietyLabel = getAnxietyLabel(anxietyScore);
-    const anxietyDesc = getAnxietyDescription(anxietyScore);
 
     const fetchData = async () => {
         try {
-            const mode = await PetProfileRepository.getAuthMode();
-            setAuthMode(mode);
-
             const pet = await PetProfileRepository.getPetProfile();
 
             if (pet) {
                 setPetData(pet);
                 setPetId(pet.id || 'guest_pet');
-                setProfile({ petName: pet.petName }); // Fallback for header
+                setProfile({ petName: pet.petName });
 
-                // Fetch recommendations and progress
-                const summary = await SessionService.getRecentProgressSummary(pet.id || 'guest_pet');
-                setProgressSummary(summary);
+                const progress = await SessionService.getRecentProgress(pet.id || 'guest_pet');
+                setProgressData(progress);
 
-                // Simple recommendation logic
+                // Better recommendation logic
                 const allSessions = SessionService.getSessions();
                 let recommended = allSessions.find(s => s.id === 'daily_calm_reset');
-                let reason = 'Start with a calm foundation routine';
+                let reason = 'Start here: short and easy';
 
                 if (pet.anxietyTriggers?.includes('loud_noises') || pet.anxietyTriggers?.includes('fireworks')) {
                     recommended = allSessions.find(s => s.id === 'fireworks_loud_noises_basic');
-                    reason = 'Recommended because loud noises are selected';
+                    reason = 'Because loud noises are selected';
                 }
 
                 setRecommendedSession(recommended);
                 setRecommendationReason(reason);
             } else {
-                // If no pet profile, we'll show the "Add First Pet" state which is already in the render
                 setPetData(null);
                 setPetId(null);
             }
@@ -93,20 +78,65 @@ export default function DashboardScreen({ navigation }: any) {
         }
     };
 
-
     useFocusEffect(useCallback(() => { fetchData(); }, []));
     const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-    const handleStartSession = (sessionId?: string) => {
+    const handleStartSession = (session: any) => {
         if (!petId) {
-            navigation.navigate('Paywall', { warning: 'Add pet to start calming sessions.' });
+            navigation.navigate('PetProfileStepper');
             return;
         }
 
-        const id = sessionId || recommendedSession?.id || 'daily_calm_reset';
-        navigation.navigate('SessionPreview', { sessionId: id, petId });
+        if (session.accessLevel === 'premium' && !isPremium) {
+            navigation.navigate('Paywall', { sessionId: session.id });
+            return;
+        }
+
+        navigation.navigate('SessionPreview', { sessionId: session.id, petId });
     };
 
+    const renderSessionCard = (item: any, isHorizontal = false) => {
+        const isLocked = item.accessLevel === 'premium' && !isPremium;
+        
+        return (
+            <Pressable 
+                key={item.id}
+                style={[
+                    styles.sessionCardItem, 
+                    isHorizontal ? { width: SCREEN_WIDTH * 0.7, marginRight: 16 } : { width: '100%', marginBottom: 12 }
+                ]}
+                onPress={() => handleStartSession(item)}
+            >
+                <View style={styles.sessionCardTop}>
+                    <View style={styles.sessionIconBg}>
+                        <Ionicons 
+                            name={item.id.includes('fireworks') ? "thunderstorm-outline" : "sunny-outline"} 
+                            size={24} 
+                            color={COLORS.primary} 
+                        />
+                    </View>
+                    <View style={[
+                        styles.badge, 
+                        item.accessLevel === 'premium' ? styles.premiumBadge : styles.freeBadge
+                    ]}>
+                        {isLocked && <Ionicons name="lock-closed" size={10} color="#fff" style={{marginRight: 4}} />}
+                        <Text style={[
+                            styles.badgeText, 
+                            item.accessLevel === 'premium' ? {color: '#fff'} : {color: COLORS.primary}
+                        ]}>
+                            {item.accessLevel === 'premium' ? 'Premium' : 'Free'}
+                        </Text>
+                    </View>
+                </View>
+                <Text style={styles.sessionCardTitle} numberOfLines={1}>{item.title}</Text>
+                <Text style={styles.sessionCardSubtitle} numberOfLines={2}>{item.subtitle}</Text>
+                <View style={styles.sessionCardFooter}>
+                    <Text style={styles.sessionDuration}>{item.durationMinutes} min</Text>
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
+                </View>
+            </Pressable>
+        );
+    };
 
     if (loading) {
         return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
@@ -121,11 +151,7 @@ export default function DashboardScreen({ navigation }: any) {
                         onPress={() => navigation.navigate('Settings')}
                         style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.6 }]}
                     >
-                        <Ionicons
-                            name="person-outline"
-                            size={24}
-                            color={COLORS.primary}
-                        />
+                        <Ionicons name="person-outline" size={24} color={COLORS.primary} />
                     </Pressable>
                 </View>
 
@@ -133,7 +159,7 @@ export default function DashboardScreen({ navigation }: any) {
                     <View style={styles.noPetAvatar}><Text style={{ fontSize: 80 }}>🐕</Text></View>
                     <Text style={styles.noPetTitle}>Welcome to ChillPup!</Text>
                     <Text style={styles.noPetDesc}>
-                        Add your furry friend to start tracking their anxiety and building a calmer environment together.
+                        Add your furry friend to start building a calmer environment together.
                     </Text>
                     <Pressable
                         style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
@@ -146,6 +172,9 @@ export default function DashboardScreen({ navigation }: any) {
         );
     }
 
+    const allSessions = SessionService.getSessions();
+    const freeSessions = allSessions.filter(s => s.accessLevel === 'free');
+    const premiumSessions = allSessions.filter(s => s.accessLevel === 'premium');
 
     return (
         <ScrollView
@@ -155,42 +184,24 @@ export default function DashboardScreen({ navigation }: any) {
         >
             {/* Header */}
             <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-                <Text style={styles.headerTitle}>ChillPup</Text>
+                <View>
+                    <Text style={styles.greeting}>Hi {profile?.petName ? `${profile.petName}'s owner` : 'there'} 👋</Text>
+                    <Text style={styles.headerTitle}>ChillPup</Text>
+                </View>
                 <Pressable
                     onPress={() => navigation.navigate('Settings')}
-                    style={({ pressed }) => [
-                        styles.settingsButton,
-                        pressed && { opacity: 0.6 }
-                    ]}
-                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-                    accessibilityLabel="Open Settings"
-                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.6 }]}
                 >
                     <Ionicons name="settings-outline" size={26} color={COLORS.text} />
                 </Pressable>
             </View>
 
-            {/* Pet Card */}
-            <View style={styles.card}>
-                <View style={styles.petHeader}>
-                    <View style={[styles.avatar, { borderColor: COLORS.primary }]}>
-                        <Text style={{ fontSize: 30 }}>🐶</Text>
-                    </View>
-                    <View>
-                        <Text style={styles.petName}>{petData?.petName || profile?.petName || 'Unknown Pet'}</Text>
-                        <Text style={styles.petDetails}>
-                            {petData?.ageGroup ? (petData.ageGroup.charAt(0).toUpperCase() + petData.ageGroup.slice(1)) : 'Age not set'} · {petData?.size ? (petData.size.charAt(0).toUpperCase() + petData.size.slice(1)) : 'Size not set'}
-                        </Text>
-                    </View>
-                </View>
-            </View>
-
-            {/* Anxiety Alert — Calm Gradient Bar */}
+            {/* Anxiety Alert */}
             <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: anxietyColor }]}>
                 <View style={styles.rowBetween}>
                     <View style={styles.row}>
                         <Ionicons name="pulse" size={18} color={anxietyColor} />
-                        <Text style={[styles.cardTitle, { marginLeft: 8 }]}>Calm Check-In</Text>
+                        <Text style={[styles.cardTitle, { marginLeft: 8 }]}>Current Signs</Text>
                     </View>
                     <Text style={[styles.score, { color: anxietyColor }]}>{anxietyScore}/10</Text>
                 </View>
@@ -207,68 +218,87 @@ export default function DashboardScreen({ navigation }: any) {
                 </View>
                 <View style={styles.anxietyLabelRow}>
                     <Text style={[styles.anxietyLabelText, { color: anxietyColor }]}>{anxietyLabel}</Text>
-                    <Text style={styles.anxietyDesc}>{anxietyDesc}</Text>
+                    <Text style={styles.anxietyDesc}>Based on your last check-in</Text>
                 </View>
             </View>
 
-            {/* Recommended Session CTA */}
-            <View style={styles.sessionCard}>
-                <View style={styles.recommendationBadge}>
-                    <Ionicons name="sparkles" size={14} color={COLORS.primary} />
-                    <Text style={styles.recommendationBadgeText}>Recommended: {recommendationReason.includes('loud noises') ? 'Loud noises selected' : 'Daily routine'}</Text>
+            {/* Recent Progress — placed immediately after Current Signs */}
+            <View style={styles.progressSummaryCard}>
+                <View style={styles.row}>
+                    <Ionicons name="trending-up" size={20} color={COLORS.success} />
+                    <Text style={styles.progressSummaryTitle}>
+                        {progressData ? progressData.title : 'No sessions yet'}
+                    </Text>
                 </View>
-                <Text style={styles.sessionTitle}>{recommendedSession?.title || 'Guided Calming Session'}</Text>
-                <Text style={styles.sessionSubtitle}>
-                    {recommendedSession?.subtitle || 'A gentle visual guide to help your pet relax and build confidence.'}
-                </Text>
-                <Pressable
-                    style={({ pressed }) => [styles.sessionButton, pressed && styles.primaryButtonPressed]}
-                    onPress={() => handleStartSession(recommendedSession?.id)}
-                >
-                    <Ionicons name="play-circle-outline" size={22} color="#fff" />
-                    <Text style={styles.sessionButtonText}>Start Session</Text>
-                </Pressable>
+                {progressData ? (
+                    <>
+                        <Text style={styles.progressSummaryBody}>{progressData.body}</Text>
+                        {progressData.details.map((d, i) => (
+                            <Text key={i} style={styles.progressDetailText}>• {d}</Text>
+                        ))}
+                    </>
+                ) : (
+                    <Text style={styles.progressSummaryText}>Start a calming routine to track what seems to help.</Text>
+                )}
             </View>
 
-            {/* Progress Summary */}
-            {progressSummary && (
-                <View style={styles.progressSummaryCard}>
-                    <View style={styles.row}>
-                        <Ionicons name="trending-up" size={20} color={COLORS.success} />
-                        <Text style={styles.progressSummaryTitle}>Recent Progress</Text>
+            {/* Recommended Session */}
+            <Text style={styles.sectionTitle}>Recommended for your dog</Text>
+            <Pressable 
+                style={styles.heroCard}
+                onPress={() => handleStartSession(recommendedSession)}
+            >
+                <View style={styles.heroContent}>
+                    <View style={styles.recommendationBadge}>
+                        <Ionicons name="sparkles" size={14} color={COLORS.primary} />
+                        <Text style={styles.recommendationBadgeText}>{recommendationReason}</Text>
                     </View>
-                    <Text style={styles.progressSummaryText}>{progressSummary}</Text>
+                    <Text style={styles.heroTitle}>{recommendedSession?.title}</Text>
+                    <Text style={styles.heroSubtitle} numberOfLines={2}>{recommendedSession?.subtitle}</Text>
+                    <View style={styles.heroFooter}>
+                        <View style={styles.heroAction}>
+                            <Ionicons name="play" size={16} color="#fff" />
+                            <Text style={styles.heroActionText}>Start Now</Text>
+                        </View>
+                        <Text style={styles.heroDuration}>{recommendedSession?.durationMinutes} min</Text>
+                    </View>
                 </View>
-            )}
+            </Pressable>
 
+            {/* Free Routines */}
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Free routines</Text>
+            </View>
+            <FlatList 
+                data={freeSessions}
+                renderItem={({item}) => renderSessionCard(item, true)}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={item => item.id}
+                style={styles.horizontalList}
+            />
 
-
+            {/* Premium Routines */}
+            <View style={styles.sectionHeader}>
+                <View>
+                    <Text style={styles.sectionTitle}>More support with Premium</Text>
+                    <Text style={styles.sectionSubtitleText}>Unlock extended routines for common stress triggers.</Text>
+                </View>
+            </View>
+            {premiumSessions.map(session => renderSessionCard(session))}
         </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.backgroundLight },
+    container: { flex: 1, backgroundColor: '#F6FAF8' },
     content: { padding: 20, paddingBottom: 40 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-        // paddingTop is handled dynamically via insets
-    },
-    headerTitle: { ...FONTS.h2, color: COLORS.text },
-    settingsButton: {
-        padding: 4, // Slight internal padding to reach 44x44 easier
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    card: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, marginBottom: 16, ...SHADOWS.small },
-    petHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-    avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', borderWidth: 2 },
-    petName: { ...FONTS.h3, color: COLORS.text },
-    petDetails: { ...FONTS.caption, color: COLORS.textSecondary },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    greeting: { ...FONTS.small, color: COLORS.textSecondary, fontWeight: '600' },
+    headerTitle: { ...FONTS.h1, color: COLORS.text },
+    settingsButton: { padding: 4, justifyContent: 'center', alignItems: 'center' },
+    card: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, marginBottom: 24, ...SHADOWS.small },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     row: { flexDirection: 'row', alignItems: 'center' },
     cardTitle: { ...FONTS.body, fontWeight: '600', color: COLORS.text },
@@ -281,30 +311,46 @@ const styles = StyleSheet.create({
     anxietyLabelRow: { gap: 2 },
     anxietyLabelText: { ...FONTS.caption, fontWeight: '700' },
     anxietyDesc: { ...FONTS.small, color: COLORS.textSecondary },
-    sessionCard: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 24, marginBottom: 20, alignItems: 'center', ...SHADOWS.small, paddingTop: 32 },
-    recommendationBadge: { position: 'absolute', top: 5, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 12 },
-    recommendationBadgeText: { ...FONTS.tiny, color: COLORS.primary, fontWeight: '600' },
-    sessionTitle: { ...FONTS.h3, color: COLORS.text, marginBottom: 8 },
-    sessionSubtitle: { ...FONTS.caption, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-    sessionButton: { backgroundColor: COLORS.primary, paddingVertical: 16, paddingHorizontal: 32, borderRadius: SIZES.radius, flexDirection: 'row', alignItems: 'center', gap: 10 },
-    sessionButtonText: { color: '#fff', ...FONTS.body, fontWeight: 'bold' },
+    
+    sectionTitle: { ...FONTS.h3, color: COLORS.text, marginBottom: 12 },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12, marginTop: 8 },
+    sectionSubtitleText: { ...FONTS.small, color: COLORS.textSecondary, marginBottom: 4 },
+    
+    heroCard: { backgroundColor: COLORS.primary, borderRadius: 24, padding: 24, marginBottom: 24, ...SHADOWS.medium },
+    heroContent: { gap: 8 },
+    recommendationBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
+    recommendationBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+    heroTitle: { ...FONTS.h2, color: '#fff' },
+    heroSubtitle: { ...FONTS.body, color: 'rgba(255,255,255,0.8)', lineHeight: 22 },
+    heroFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+    heroAction: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+    heroActionText: { fontSize: 14, color: COLORS.primary, fontWeight: '700' },
+    heroDuration: { fontSize: 12, color: '#fff', fontWeight: '600' },
+
+    horizontalList: { marginHorizontal: -20, paddingHorizontal: 20, marginBottom: 24 },
+    sessionCardItem: { backgroundColor: '#fff', borderRadius: 20, padding: 16, ...SHADOWS.small, borderWidth: 1, borderColor: '#E3ECEF' },
+    sessionCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+    sessionIconBg: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#DDF4EF', justifyContent: 'center', alignItems: 'center' },
+    badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
+    freeBadge: { backgroundColor: '#DDF4EF' },
+    premiumBadge: { backgroundColor: COLORS.primary },
+    badgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+    sessionCardTitle: { ...FONTS.body, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+    sessionCardSubtitle: { ...FONTS.small, color: COLORS.textSecondary, lineHeight: 18, marginBottom: 12 },
+    sessionCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 10 },
+    sessionDuration: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+
     progressSummaryCard: { backgroundColor: '#F0FDF4', borderRadius: SIZES.radius, padding: 16, marginBottom: 20, borderLeftWidth: 4, borderLeftColor: COLORS.success },
     progressSummaryTitle: { ...FONTS.body, fontWeight: '700', color: COLORS.text, marginLeft: 8 },
-    progressSummaryText: { ...FONTS.body, color: COLORS.textSecondary, marginTop: 4 },
-    sectionTitle: { ...FONTS.h3, color: COLORS.text, marginBottom: 12 },
-    quickActionsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-    quickAction: { flex: 1, backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, alignItems: 'center', gap: 8, ...SHADOWS.small },
-    quickIconCircle: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-    quickActionText: { ...FONTS.small, fontWeight: '600', color: COLORS.text, textAlign: 'center' },
+    progressSummaryBody: { ...FONTS.body, fontWeight: '600', color: COLORS.text, marginTop: 8 },
+    progressDetailText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4, paddingLeft: 4 },
+    progressSummaryText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4 },
+    
     primaryButton: { backgroundColor: COLORS.primary, padding: 18, borderRadius: SIZES.radius, width: '100%', alignItems: 'center', ...SHADOWS.small },
     primaryButtonPressed: { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },
     primaryButtonText: { color: '#fff', ...FONTS.body, fontWeight: 'bold' },
     noPetAvatar: { width: 150, height: 150, backgroundColor: COLORS.lavender, borderRadius: 75, justifyContent: 'center', alignItems: 'center', marginBottom: 30, ...SHADOWS.small },
     noPetTitle: { ...FONTS.h1, color: COLORS.primary, textAlign: 'center', marginBottom: 16 },
     noPetDesc: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 24 },
-    logoutButton: {
-        padding: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    logoutButton: { padding: 8, justifyContent: 'center', alignItems: 'center' },
 });

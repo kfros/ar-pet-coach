@@ -15,21 +15,18 @@ const mockNavigation = {
 
 describe('Suite 01: Onboarding And Auth', () => {
   
-  test('1_intro_carousel_renders_and_swipes', async () => {
+  test('intro_carousel_renders_and_swipes', async () => {
     const { getByText } = render(
       <NavigationContainer>
         <OnboardingCarousel navigation={mockNavigation} />
       </NavigationContainer>
     );
     
-    // Verify the carousel renders with the first slide content
     expect(getByText(/Guided Calming/)).toBeTruthy();
-    
-    // Verify the Next button exists (navigation control is present)
     expect(getByText(/Next/)).toBeTruthy();
   });
 
-  test('2_auth_screen_renders_correctly', () => {
+  test('auth_screen_renders_correctly', () => {
     const { getByPlaceholderText, getByText } = render(
       <NavigationContainer>
         <LoginScreen navigation={mockNavigation} />
@@ -42,8 +39,9 @@ describe('Suite 01: Onboarding And Auth', () => {
     expect(getByText(/Continue as Guest/i)).toBeTruthy();
   });
 
-  test('3_continue_as_guest_triggers_guest_mode', async () => {
+  test('auth_guest_001: Continue as Guest creates local guest state without Firebase anonymous auth', async () => {
     const PetProfileRepository = require('../services/petProfileRepository');
+    const Purchases = require('react-native-purchases').default;
     
     const { getByText } = render(
       <NavigationContainer>
@@ -55,11 +53,22 @@ describe('Suite 01: Onboarding And Auth', () => {
     fireEvent.press(guestButton);
     
     await waitFor(() => {
+      // Assert local guest state is created
       expect(PetProfileRepository.setAuthMode).toHaveBeenCalledWith('guest');
+      
+      // Assert navigation proceeds
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('PetProfileStepper');
+      
+      // Assert Firebase auth methods are NOT called
+      expect(auth().signInAnonymously).not.toHaveBeenCalled();
+      
+      // Assert RevenueCat logIn/logOut are NOT called
+      expect(Purchases.logIn).not.toHaveBeenCalled();
+      expect(Purchases.logOut).not.toHaveBeenCalled();
     });
   });
 
-  test('4_login_sign_up_triggers_standard_auth', async () => {
+  test('auth_user_001: Authenticated login calls standard auth', async () => {
     const { getByPlaceholderText, getByText } = render(
       <NavigationContainer>
         <LoginScreen navigation={mockNavigation} />
@@ -74,22 +83,22 @@ describe('Suite 01: Onboarding And Auth', () => {
     fireEvent.changeText(passwordInput, 'password123');
     fireEvent.press(loginButton);
     
-    // Verify auth was called with correct credentials via shared mock instance
     await waitFor(() => {
       expect(auth().signInWithEmailAndPassword).toHaveBeenCalledWith('test@example.com', 'password123');
     });
   });
 
-  test('5_pet_profile_stepper_renders_first_step', async () => {
-    const { getByPlaceholderText, getByText } = render(
+  test('profile_001: Pet profile stepper renders for first step', async () => {
+    const { getByPlaceholderText, getByText, getByDisplayValue } = render(
       <NavigationContainer>
         <PetProfileStepper navigation={mockNavigation} />
       </NavigationContainer>
     );
     
-    // The pet name input has placeholder "Buddy" (example name)
     const nameInput = getByPlaceholderText('Buddy');
     fireEvent.changeText(nameInput, 'Max');
+    
+    expect(nameInput.props.value).toBe('Max');
     
     const continueButton = getByText(/Continue/i);
     fireEvent.press(continueButton);

@@ -143,9 +143,9 @@ export default function PremiumStatusScreen({ navigation, route }: any) {
                     {/* Benefits Summary */}
                     <View style={styles.benefitsSection}>
                         <Text style={styles.benefitsTitle}>Included with Premium</Text>
-                        <BenefitItem text="AR guided sessions" />
-                        <BenefitItem text="Progress tracking" />
-                        <BenefitItem text="Personalized routines" />
+                        <BenefitItem text="Extended calming routines" />
+                        <BenefitItem text="Profile-based suggestions" />
+                        <BenefitItem text="Progress patterns" />
                     </View>
 
                     {/* Primary CTA */}

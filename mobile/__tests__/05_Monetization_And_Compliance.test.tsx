@@ -28,7 +28,7 @@ const mockNavigation = {
 
 describe('Suite 05: Monetization And Compliance', () => {
   
-  test('17_paywall_renders_for_non_premium_users', async () => {
+  test('paywall_renders_for_non_premium_users', async () => {
     const { findByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
@@ -37,12 +37,11 @@ describe('Suite 05: Monetization And Compliance', () => {
       </SubscriptionProvider>
     );
     
-    // Use findByText to wait for loading to finish
     expect(await findByText(/Get Full Access/i)).toBeTruthy();
     expect(await findByText(/Restore Purchases/i)).toBeTruthy();
   });
 
-  test('18_premium_status_screen_for_subscribed_users', async () => {
+  test('premium_status_screen_for_subscribed_users', async () => {
     const mockRoute = { params: { source: 'settings' } };
     const { findByText } = render(
       <SubscriptionProvider>
@@ -55,7 +54,7 @@ describe('Suite 05: Monetization And Compliance', () => {
     expect(await findByText(/Premium Active/i)).toBeTruthy();
   });
 
-  test('19_restore_purchases_calls_revenuecat', async () => {
+  test('restore_purchases_calls_revenuecat', async () => {
     const { findByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
@@ -72,7 +71,7 @@ describe('Suite 05: Monetization And Compliance', () => {
     });
   });
 
-  test('20_privacy_policy_and_terms_links_exist', async () => {
+  test('privacy_policy_and_terms_links_exist', async () => {
     const { findByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
