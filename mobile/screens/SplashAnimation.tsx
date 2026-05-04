@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -48,50 +49,50 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
 
         // Phase 1: Paw pops in + breathing
         pawScale.value = withSequence(
-            withTiming(1, { duration: 700, easing: Easing.out(Easing.back(1.5)) }),
+            withTiming(1, { duration: 500, easing: Easing.out(Easing.back(1.2)) }),
             withRepeat(
                 withSequence(
-                    withTiming(1.02, { duration: 1300, easing: Easing.inOut(Easing.ease) }),
-                    withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1.02, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+                    withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
                 ),
                 -1, true,
             ),
         );
 
-        // Phase 2: Floor plane fades in
-        floorOpacity.value = withDelay(800,
-            withTiming(0.18, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+        // Phase 2: Floor plane fades in (earlier)
+        floorOpacity.value = withDelay(400,
+            withTiming(0.12, { duration: 600, easing: Easing.inOut(Easing.ease) }),
         );
 
         // Phase 3: Calm tap down + bounce back
-        pawTranslateY.value = withDelay(1800,
+        pawTranslateY.value = withDelay(800,
             withSequence(
-                withTiming(10, { duration: 300, easing: Easing.in(Easing.ease) }),
-                withTiming(0, { duration: 400, easing: Easing.out(Easing.back(1.2)) }),
+                withTiming(8, { duration: 250, easing: Easing.in(Easing.ease) }),
+                withTiming(0, { duration: 350, easing: Easing.out(Easing.back(1.1)) }),
             ),
         );
 
-        // Wave at tap-bottom (1800+300=2100ms)
-        waveOpacity.value = withDelay(2100,
+        // Wave at tap-bottom (800+250=1050ms)
+        waveOpacity.value = withDelay(1050,
             withSequence(
-                withTiming(0.35, { duration: 80 }),
-                withTiming(0, { duration: 1300, easing: Easing.out(Easing.ease) }),
+                withTiming(0.3, { duration: 60 }),
+                withTiming(0, { duration: 800, easing: Easing.out(Easing.ease) }),
             ),
         );
-        waveScale.value = withDelay(2100,
-            withTiming(4.5, { duration: 1300, easing: Easing.out(Easing.ease) }),
+        waveScale.value = withDelay(1050,
+            withTiming(4, { duration: 800, easing: Easing.out(Easing.ease) }),
         );
 
-        // Phase 4: Title reveal
-        titleOpacity.value = withDelay(2800,
-            withTiming(1, { duration: 600, easing: Easing.out(Easing.ease) }),
+        // Phase 4: Title reveal (much earlier, around brand establish target)
+        titleOpacity.value = withDelay(800,
+            withTiming(1, { duration: 500, easing: Easing.out(Easing.ease) }),
         );
-        titleTranslateY.value = withDelay(2800,
-            withTiming(0, { duration: 600, easing: Easing.out(Easing.back(1)) }),
+        titleTranslateY.value = withDelay(800,
+            withTiming(0, { duration: 500, easing: Easing.out(Easing.back(0.8)) }),
         );
 
-        // Completion
-        const completionTimer = setTimeout(onComplete, 3600);
+        // Completion - Targeted at ~1.8s
+        const completionTimer = setTimeout(onComplete, 1800);
         return () => clearTimeout(completionTimer);
     }, []);
 
@@ -115,13 +116,14 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
 
     return (
         <View style={styles.container}>
+            <StatusBar style="light" />
             <Animated.View style={[styles.floorPlane, floorStyle]} />
             <Animated.View style={[styles.wave, waveStyle]} />
             <Animated.View style={[styles.pawContainer, pawStyle]}>
                 <FontAwesome5 name="paw" size={140} color="#FFFFFF" />
             </Animated.View>
             <Animated.View style={[styles.titleContainer, titleStyle]}>
-                <Text style={styles.brandTitle}>ChillPup AR</Text>
+                <Text style={styles.brandTitle}>ChillPup</Text>
             </Animated.View>
         </View>
     );
@@ -138,10 +140,10 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 0,
         width: '100%',
-        height: '45%',
+        height: '35%', // Reduced from 45%
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 180,
-        borderTopRightRadius: 180,
+        borderTopLeftRadius: 240, // More subtle curve
+        borderTopRightRadius: 240,
         zIndex: 1,
     },
     wave: {

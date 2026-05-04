@@ -5,6 +5,8 @@ import RevenueCatService from '../services/revenueCatService';
 import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSubscription } from '../components/SubscriptionManager';
 
 const PAYWALL_FALLBACK_CONFIG = {
     mode: 'fallback_if_no_offerings',
@@ -60,6 +62,8 @@ export default function PaywallScreen({ navigation, route }: any) {
     const [loading, setLoading] = useState(true);
     const [purchasing, setPurchasing] = useState(false);
 
+    const insets = useSafeAreaInsets();
+    const { refreshEntitlement } = useSubscription();
     const [subscriptionStatus, setSubscriptionStatus] = useState<{ isPremium: boolean, isTrial: boolean, daysLeft: number | null } | null>(null);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
@@ -216,10 +220,16 @@ export default function PaywallScreen({ navigation, route }: any) {
         try {
             const customerInfo = await RevenueCatService.purchasePackage(selectedPackage);
             const { sessionId, petId } = route.params || {};
+            
+            // Refresh global entitlement state
+            await refreshEntitlement();
+
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
-                Alert.alert('Success', 'You are now a Pro member!');
                 if (sessionId) {
-                    navigation.replace('SessionPreview', { sessionId, petId });
+                    // First dismiss the paywall modal
+                    navigation.goBack();
+                    // Then navigate back to the existing routine preview to update it
+                    navigation.navigate('SessionPreview', { sessionId, petId, unlockedAfterPurchase: true });
                 } else {
                     navigation.replace('PremiumStatus', { source: 'post_purchase' });
                 }
@@ -236,10 +246,16 @@ export default function PaywallScreen({ navigation, route }: any) {
         try {
             const customerInfo = await RevenueCatService.restorePurchases();
             const { sessionId, petId } = route.params || {};
+
+            // Refresh global entitlement state
+            await refreshEntitlement();
+
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
-                Alert.alert('Success', 'Purchases restored!');
                 if (sessionId) {
-                    navigation.replace('SessionPreview', { sessionId, petId });
+                    // First dismiss the paywall modal
+                    navigation.goBack();
+                    // Then navigate back to the existing routine preview to update it
+                    navigation.navigate('SessionPreview', { sessionId, petId, unlockedAfterPurchase: true });
                 } else {
                     navigation.replace('PremiumStatus', { source: 'settings' });
                 }
@@ -357,7 +373,7 @@ export default function PaywallScreen({ navigation, route }: any) {
             <View style={{ flex: 1 }}>
                 {/* Header Row with Close Button */}
                 <View style={styles.headerRow}>
-                    <Pressable 
+                    <Pressable
                         style={styles.closeButton}
                         onPress={() => navigation.goBack()}
                         hitSlop={12}
@@ -366,11 +382,17 @@ export default function PaywallScreen({ navigation, route }: any) {
                     </Pressable>
                 </View>
 
-                <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+                <ScrollView 
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={[
+                        styles.container,
+                        { paddingBottom: 180 } // Space for sticky footer
+                    ]}
+                >
                     <View style={styles.header}>
-                        <Text style={styles.headline}>Unlock Premium routines</Text>
-                        <Text style={styles.subheadline}>
-                            Get more gentle, trigger-specific routines for fireworks prep, visitors, alone-time practice, and vet visit prep.
+                        <Text style={styles.headline} numberOfLines={2}>Unlock Premium routines</Text>
+                        <Text style={styles.subheadline} numberOfLines={3}>
+                            Get more gentle, trigger-specific routines for fireworks, visitors, alone-time, and vet visits.
                         </Text>
                     </View>
 
@@ -389,47 +411,25 @@ export default function PaywallScreen({ navigation, route }: any) {
                             icon="analytics-outline"
                             title="Expanded progress insights"
                             description="More ways to practice at your dog’s pace"
+                            isLast={true}
                         />
-                        <BenefitItem
-                            icon="heart-outline"
-                            title="Pet-First Design"
-                            isLast={!isDetailsExpanded}
-                            description="Gentle visual guides without pressure"
-                        />
+                    </View>
 
-                    {isDetailsExpanded && (
-                        <View style={styles.expandedDetails}>
-                            <View style={styles.divider} />
-                            <Text style={styles.detailsText}>
-                                Guided routines help your dog focus on calming visual anchors, bridging the gap between stressful triggers and relaxation.
-                            </Text>
-                        </View>
-                    )}
+                    <View style={styles.pricingSection}>
+                        {annualPack && renderPriceCard(annualPack, true)}
+                        {monthlyPack && renderPriceCard(monthlyPack, false)}
+                    </View>
 
-                    <Pressable
-                        onPress={() => setIsDetailsExpanded(!isDetailsExpanded)}
-                        style={styles.expandButton}
-                    >
-                        <Text style={styles.expandButtonText}>
-                            {isDetailsExpanded ? 'Show less' : 'How it works?'}
-                        </Text>
-                        <Ionicons
-                            name={isDetailsExpanded ? "chevron-up" : "chevron-down"}
-                            size={14}
-                            color={COLORS.textSecondary}
-                        />
-                    </Pressable>
-                </View>
+                    {/* Additional details collapsible if needed, or legal text */}
+                    <View style={styles.footer}>
+                        <Pressable onPress={handleRestore}>
+                            <Text style={styles.restoreText}>Restore Purchases</Text>
+                        </Pressable>
+                    </View>
+                </ScrollView>
 
-                <View style={styles.pricingSection}>
-                    {annualPack && renderPriceCard(annualPack, true)}
-                    {monthlyPack && renderPriceCard(monthlyPack, false)}
-                </View>
-
-                <View style={styles.ctaSection}>
-                    <Text style={styles.preCtaText}>Start improving your dog’s behavior today</Text>
-
-                    {/* Inline Feedback Message */}
+                {/* Sticky Bottom CTA */}
+                <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                     {(fallbackLoadingMessage || fallbackError) && (
                         <View style={styles.inlineFeedbackContainer}>
                             {fallbackLoadingMessage ? (
@@ -455,40 +455,21 @@ export default function PaywallScreen({ navigation, route }: any) {
                         {purchasing && !isFallback ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.ctaButtonText}>
-                                {isFallback ? PAYWALL_FALLBACK_CONFIG.cta.text : (hasSelectedTrial ? 'Start 7-day free trial' : 'Get Full Access')}
-                            </Text>
+                            <View style={{ alignItems: 'center' }}>
+                                <Text style={styles.ctaButtonText}>
+                                    {isFallback ? PAYWALL_FALLBACK_CONFIG.cta.text : (hasSelectedTrial ? 'Start 7-day free trial' : 'Continue')}
+                                </Text>
+                                {selectedPackage && !isFallback && (
+                                    <Text style={styles.ctaSubtext}>
+                                        {hasSelectedTrial 
+                                            ? `Then ${selectedPackage.product.priceString}/${selectedPackage.packageType === 'ANNUAL' ? 'year' : 'month'}` 
+                                            : `Get Premium for ${selectedPackage.product.priceString}`}
+                                    </Text>
+                                )}
+                            </View>
                         )}
                     </Pressable>
 
-                    {hasSelectedTrial && (
-                        <Text style={styles.transparencyText}>
-                            No charge today • Cancel anytime before trial ends
-                        </Text>
-                    )}
-
-                    <View style={styles.trustSignals}>
-                        <Text style={styles.trustSignalText}>
-                            {isFallback ? PAYWALL_FALLBACK_CONFIG.disclaimer.footer_text.split(' • ')[0] : 'Cancel anytime'}
-                        </Text>
-                        <View style={styles.dotSeparator} />
-                        <Text style={styles.trustSignalText}>
-                            {isFallback ? PAYWALL_FALLBACK_CONFIG.disclaimer.footer_text.split(' • ')[1] : 'No commitment'}
-                        </Text>
-                        <View style={styles.dotSeparator} />
-                        <Text style={styles.trustSignalText}>
-                            {isFallback ? PAYWALL_FALLBACK_CONFIG.disclaimer.footer_text.split(' • ')[2] : 'Secure payment'}
-                        </Text>
-                    </View>
-                    {isFallback && (
-                        <Text style={styles.priceNoteText}>{PAYWALL_FALLBACK_CONFIG.disclaimer.price_note}</Text>
-                    )}
-                </View>
-
-                <View style={styles.footer}>
-                    <Pressable onPress={handleRestore}>
-                        <Text style={styles.restoreText}>Restore Purchases</Text>
-                    </Pressable>
                     <View style={styles.legalFooter}>
                         <Pressable onPress={() => Linking.openURL('https://www.kf-software.com/privacy-policy')}>
                             <Text style={styles.legalText}>Privacy Policy</Text>
@@ -499,8 +480,6 @@ export default function PaywallScreen({ navigation, route }: any) {
                         </Pressable>
                     </View>
                 </View>
-            </ScrollView>
-
             </View>
         </SafeAreaView>
     );
@@ -524,8 +503,7 @@ const styles = StyleSheet.create({
     container: {
         flexGrow: 1,
         paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 40,
+        paddingTop: 20, // Reduced from 60
         backgroundColor: COLORS.backgroundLight,
     },
     loadingContainer: {
@@ -877,5 +855,27 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         marginTop: 8,
         opacity: 0.7,
+    },
+    stickyFooter: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 10,
+    },
+    ctaSubtext: {
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: 12,
+        fontWeight: '500',
+        marginTop: 2,
     },
 });
