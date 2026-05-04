@@ -125,8 +125,8 @@ export default function PremiumStatusScreen({ navigation, route }: any) {
                         <Text style={styles.bannerText}>Premium Active</Text>
                     </View>
 
-                    <Text style={styles.headline}>Your Premium is active</Text>
-                    <Text style={styles.bodyText}>You already have access to all premium features.</Text>
+                    <Text style={styles.headline}>Premium is active</Text>
+                    <Text style={styles.bodyText}>You have access to ChillPup’s premium routines and expanded features.</Text>
 
                     {/* Current Plan Card */}
                     <View style={styles.planCard}>
@@ -143,9 +143,9 @@ export default function PremiumStatusScreen({ navigation, route }: any) {
                     {/* Benefits Summary */}
                     <View style={styles.benefitsSection}>
                         <Text style={styles.benefitsTitle}>Included with Premium</Text>
-                        <BenefitItem text="Extended calming routines" />
-                        <BenefitItem text="Profile-based suggestions" />
-                        <BenefitItem text="Progress patterns" />
+                        <BenefitItem text="Trigger-specific routines" />
+                        <BenefitItem text="Gentle prep sessions" />
+                        <BenefitItem text="Expanded progress insights" />
                     </View>
 
                     {/* Primary CTA */}

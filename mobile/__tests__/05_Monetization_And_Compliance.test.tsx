@@ -32,7 +32,7 @@ describe('Suite 05: Monetization And Compliance', () => {
     const { findByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
-          <PaywallScreen navigation={mockNavigation} />
+          <PaywallScreen navigation={mockNavigation} route={{ params: {} }} />
         </NavigationContainer>
       </SubscriptionProvider>
     );
@@ -58,7 +58,7 @@ describe('Suite 05: Monetization And Compliance', () => {
     const { findByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
-          <PaywallScreen navigation={mockNavigation} />
+          <PaywallScreen navigation={mockNavigation} route={{ params: {} }} />
         </NavigationContainer>
       </SubscriptionProvider>
     );
@@ -75,7 +75,7 @@ describe('Suite 05: Monetization And Compliance', () => {
     const { findByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
-          <PaywallScreen navigation={mockNavigation} />
+          <PaywallScreen navigation={mockNavigation} route={{ params: {} }} />
         </NavigationContainer>
       </SubscriptionProvider>
     );

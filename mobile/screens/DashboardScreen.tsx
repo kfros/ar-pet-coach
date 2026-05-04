@@ -31,16 +31,55 @@ export default function DashboardScreen({ navigation }: any) {
     const [profile, setProfile] = useState<any>(null);
     const [petId, setPetId] = useState<string | null>(null);
     const [petData, setPetData] = useState<any>(null);
-    const [progressData, setProgressData] = useState<{ title: string; body: string; details: string[] } | null>(null);
+    const [progressData, setProgressData] = useState<{ 
+        title: string; 
+        body: string; 
+        details: string[];
+        outcome: 'improved' | 'worsened' | 'unchanged' | 'mixed' | 'stopped_early' | 'severe_signs' | 'no_checkins';
+        latestScore: number;
+        latestLevelLabel: string;
+        hasSevereSigns: boolean;
+        severeSignsNote: string;
+        positiveSigns: string[];
+        previousScore?: number | null;
+        scoreDeltaFromPrevious?: number | null;
+        trendLabel?: string | null;
+        beforeScore?: number | null;
+        afterScore?: number | null;
+        beforeAfterDelta?: number | null;
+    } | null>(null);
     const [recommendedSession, setRecommendedSession] = useState<any>(null);
     const [recommendationReason, setRecommendationReason] = useState<string>('');
 
-    const { isPremium } = useSubscription();
+    const { isPremium, isLoading: subLoading } = useSubscription();
     const insets = useSafeAreaInsets();
 
-    const anxietyScore = petData?.anxietyScore ?? 0;
-    const anxietyColor = getAnxietyColor(anxietyScore);
-    const anxietyLabel = getAnxietyLabel(anxietyScore);
+    const anxietyScore = progressData ? progressData.latestScore : (petData?.anxietyScore ?? 0);
+    const anxietyLabel = progressData && progressData.latestLevelLabel !== 'No check-in' 
+        ? `${progressData.latestLevelLabel.charAt(0).toUpperCase() + progressData.latestLevelLabel.slice(1)} signs`
+        : (petData ? getAnxietyLabel(anxietyScore) : 'No check-in yet');
+    
+    // HOME-001: Visual tone logic for Current Signs
+    let anxietyColor = getAnxietyColor(anxietyScore);
+    let anxietyDesc = 'Based on your last check-in';
+    
+    if (!progressData || progressData.latestLevelLabel === 'No check-in') {
+        anxietyColor = '#5F7680'; // Neutral blue-gray
+        anxietyDesc = 'Complete a Calm Check-In to track signs over time.';
+    } else if (anxietyScore < 4) {
+        anxietyColor = '#11866F'; // Positive soft
+        anxietyDesc = 'Based on your last check-in.';
+    } else if (anxietyScore >= 7) {
+        anxietyColor = '#B7791F'; // Warning soft
+        if (anxietyScore >= 9) {
+            anxietyDesc = 'Keep the session easy and stop if signs increase.';
+        } else {
+            anxietyDesc = 'Based on your last check-in — consider a calming routine.';
+        }
+    } else { // mild
+        anxietyColor = '#B7791F'; // Warning soft
+        anxietyDesc = 'Based on your last check-in — consider a calming routine.';
+    }
 
     const fetchData = async () => {
         try {
@@ -87,8 +126,8 @@ export default function DashboardScreen({ navigation }: any) {
             return;
         }
 
-        if (session.accessLevel === 'premium' && !isPremium) {
-            navigation.navigate('Paywall', { sessionId: session.id });
+        if (session.accessLevel === 'premium' && !isPremium && !subLoading) {
+            navigation.navigate('Paywall', { sessionId: session.id, petId });
             return;
         }
 
@@ -96,8 +135,16 @@ export default function DashboardScreen({ navigation }: any) {
     };
 
     const renderSessionCard = (item: any, isHorizontal = false) => {
-        const isLocked = item.accessLevel === 'premium' && !isPremium;
+        const isLocked = item.accessLevel === 'premium' && !isPremium && !subLoading;
+        const iconName = (item.iconKey || (item.id.includes('fireworks') ? 'sparkles' : 'sunny')) + "-outline";
         
+        // PREMIUM_BADGE_STATE_FIX
+        const badgeBg = isLocked ? COLORS.primary : '#E6F7F2';
+        const badgeText = isLocked ? '#FFFFFF' : '#0F766E';
+        const badgeBorder = isLocked ? COLORS.primary : '#B8E7DC';
+        const badgeLabel = isLocked ? 'PREMIUM' : 'INCLUDED';
+        const badgeIcon = isLocked ? 'lock-closed' : 'checkmark-circle';
+
         return (
             <Pressable 
                 key={item.id}
@@ -110,22 +157,34 @@ export default function DashboardScreen({ navigation }: any) {
                 <View style={styles.sessionCardTop}>
                     <View style={styles.sessionIconBg}>
                         <Ionicons 
-                            name={item.id.includes('fireworks') ? "thunderstorm-outline" : "sunny-outline"} 
+                            name={iconName as any} 
                             size={24} 
                             color={COLORS.primary} 
                         />
                     </View>
                     <View style={[
                         styles.badge, 
-                        item.accessLevel === 'premium' ? styles.premiumBadge : styles.freeBadge
+                        item.accessLevel === 'premium' 
+                            ? { backgroundColor: badgeBg, borderWidth: 1, borderColor: badgeBorder } 
+                            : styles.freeBadge
                     ]}>
-                        {isLocked && <Ionicons name="lock-closed" size={10} color="#fff" style={{marginRight: 4}} />}
-                        <Text style={[
-                            styles.badgeText, 
-                            item.accessLevel === 'premium' ? {color: '#fff'} : {color: COLORS.primary}
-                        ]}>
-                            {item.accessLevel === 'premium' ? 'Premium' : 'Free'}
-                        </Text>
+                        {item.accessLevel === 'premium' ? (
+                            <>
+                                <Ionicons 
+                                    name={badgeIcon as any} 
+                                    size={12} 
+                                    color={badgeText} 
+                                    style={{marginRight: 4}} 
+                                />
+                                <Text style={[styles.badgeText, { color: badgeText }]}>
+                                    {badgeLabel}
+                                </Text>
+                            </>
+                        ) : (
+                            <Text style={[styles.badgeText, {color: COLORS.primary}]}>
+                                FREE
+                            </Text>
+                        )}
                     </View>
                 </View>
                 <Text style={styles.sessionCardTitle} numberOfLines={1}>{item.title}</Text>
@@ -218,29 +277,60 @@ export default function DashboardScreen({ navigation }: any) {
                 </View>
                 <View style={styles.anxietyLabelRow}>
                     <Text style={[styles.anxietyLabelText, { color: anxietyColor }]}>{anxietyLabel}</Text>
-                    <Text style={styles.anxietyDesc}>Based on your last check-in</Text>
+                    <Text style={styles.anxietyDesc}>{anxietyDesc}</Text>
                 </View>
             </View>
 
-            {/* Recent Progress — placed immediately after Current Signs */}
-            <View style={styles.progressSummaryCard}>
-                <View style={styles.row}>
-                    <Ionicons name="trending-up" size={20} color={COLORS.success} />
-                    <Text style={styles.progressSummaryTitle}>
-                        {progressData ? progressData.title : 'No sessions yet'}
-                    </Text>
-                </View>
-                {progressData ? (
-                    <>
-                        <Text style={styles.progressSummaryBody}>{progressData.body}</Text>
-                        {progressData.details.map((d, i) => (
-                            <Text key={i} style={styles.progressDetailText}>• {d}</Text>
-                        ))}
-                    </>
-                ) : (
-                    <Text style={styles.progressSummaryText}>Start a calming routine to track what seems to help.</Text>
-                )}
-            </View>
+            {/* Recent Progress — HOME-002: Visual tone matches outcome */}
+            {(() => {
+                const outcome = progressData?.outcome || 'no_checkins';
+                let currentOutcome: string = outcome;
+                if (progressData?.hasSevereSigns) {
+                    currentOutcome = 'severe_signs';
+                }
+
+                const stylesMap: Record<string, {bg: string, accent: string, icon: string}> = {
+                    improved: { bg: '#EAF8F1', accent: '#11866F', icon: 'trending-up' },
+                    mixed: { bg: '#F2F9F7', accent: '#4DB6AC', icon: 'sparkles-outline' },
+                    unchanged: { bg: '#EEF4F6', accent: '#5F7680', icon: 'remove-circle-outline' },
+                    worsened: { bg: '#FFF4D8', accent: '#B7791F', icon: 'alert-circle-outline' },
+                    stopped_early: { bg: '#FFF8E8', accent: '#C0841A', icon: 'stop-circle-outline' },
+                    severe_signs: { bg: '#FFF1D6', accent: '#A85F00', icon: 'warning-outline' },
+                    no_checkins: { bg: '#EEF4F6', accent: '#5F7680', icon: 'checkmark-circle-outline' },
+                };
+                const theme = stylesMap[currentOutcome] || stylesMap['no_checkins'];
+
+                return (
+                    <View style={[styles.progressSummaryCard, { backgroundColor: theme.bg, borderLeftColor: theme.accent }]}>
+                        <View style={styles.row}>
+                            <Ionicons name={theme.icon as any} size={20} color={theme.accent} />
+                            <Text style={[styles.progressSummaryTitle, { color: COLORS.text }]}>
+                                {progressData ? progressData.title : 'No sessions yet'}
+                            </Text>
+                        </View>
+                        {progressData ? (
+                            <>
+                                <Text style={styles.progressSummaryBody}>
+                                    {progressData.hasSevereSigns ? 'Strong signs were noted.' : (currentOutcome === 'stopped_early' ? 'Session stopped early.' : progressData.body)}
+                                </Text>
+                                {progressData.details.map((d, i) => (
+                                    <Text key={i} style={styles.progressDetailText}>• {d}</Text>
+                                ))}
+                                {progressData.hasSevereSigns && progressData.severeSignsNote && (
+                                    <View style={styles.severeSignsBox}>
+                                        <Ionicons name="information-circle" size={16} color="#B85C38" />
+                                        <Text style={styles.severeSignsText}>
+                                            {progressData.severeSignsNote}
+                                        </Text>
+                                    </View>
+                                )}
+                            </>
+                        ) : (
+                            <Text style={styles.progressSummaryText}>Start a calming routine to track what seems to help.</Text>
+                        )}
+                    </View>
+                );
+            })()}
 
             {/* Recommended Session */}
             <Text style={styles.sectionTitle}>Recommended for your dog</Text>
@@ -345,6 +435,8 @@ const styles = StyleSheet.create({
     progressSummaryBody: { ...FONTS.body, fontWeight: '600', color: COLORS.text, marginTop: 8 },
     progressDetailText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4, paddingLeft: 4 },
     progressSummaryText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4 },
+    severeSignsBox: { flexDirection: 'row', gap: 8, backgroundColor: '#FFEDE6', padding: 12, borderRadius: 12, marginTop: 16 },
+    severeSignsText: { flex: 1, fontSize: 11, color: '#B85C38', lineHeight: 16, fontWeight: '500' },
     
     primaryButton: { backgroundColor: COLORS.primary, padding: 18, borderRadius: SIZES.radius, width: '100%', alignItems: 'center', ...SHADOWS.small },
     primaryButtonPressed: { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },

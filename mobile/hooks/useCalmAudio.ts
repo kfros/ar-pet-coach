@@ -193,6 +193,28 @@ export const useCalmAudio = (isActive: boolean) => {
     }
   }, [selectNextTrackId, playTrack]);
 
+  const pauseAudio = useCallback(async () => {
+    if (activeSound.current && isPlaying) {
+      try {
+        // Linear fade out before pause
+        await fadeVolume(activeSound.current, DEFAULT_VOLUME, 0, 500);
+        await activeSound.current.pauseAsync();
+        setIsPlaying(false);
+      } catch (e) {}
+    }
+  }, [fadeVolume, isPlaying]);
+
+  const resumeAudio = useCallback(async () => {
+    if (activeSound.current && !isPlaying) {
+      try {
+        await activeSound.current.playAsync();
+        // Linear fade in after resume
+        await fadeVolume(activeSound.current, 0, DEFAULT_VOLUME, 700);
+        setIsPlaying(true);
+      } catch (e) {}
+    }
+  }, [fadeVolume, isPlaying]);
+
   /**
    * Session Lifecycle Control
    */
@@ -250,6 +272,8 @@ export const useCalmAudio = (isActive: boolean) => {
     currentTrackId,
     isPlaying,
     handleNext,
-    stopAudio
+    stopAudio,
+    pauseAudio,
+    resumeAudio
   };
 };

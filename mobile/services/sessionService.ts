@@ -1,17 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, SessionHistoryEntry } from '../types/Session';
 import { SESSIONS } from '../content/sessions';
+import { PREMIUM_SESSIONS } from '../content/premiumRoutines';
 import { auth, db, firestore } from './firebaseConfig';
+import { 
+    calculateCheckinScore, 
+    getLevelLabelFromScore, 
+    getProgressOutcome, 
+    getTrendLabel, 
+    getOutcomeCopy,
+    OutcomeType
+} from './progressScoring';
 
 const HISTORY_KEY = 'chillpup_session_history';
 
 class SessionService {
     getSessions(): Session[] {
-        return SESSIONS;
+        return [...SESSIONS, ...PREMIUM_SESSIONS];
     }
 
     getSessionById(id: string): Session | undefined {
-        return SESSIONS.find(s => s.id === id);
+        return [...SESSIONS, ...PREMIUM_SESSIONS].find(s => s.id === id);
     }
 
     async saveSessionHistory(entry: SessionHistoryEntry): Promise<void> {
@@ -52,10 +61,40 @@ class SessionService {
         }
     }
 
+    getPreviousScoreForPet(petHistory: SessionHistoryEntry[], currentEntry: SessionHistoryEntry): number | null {
+        // Skip current entry (history is usually sorted desc by time, so we look for things after it in the array or just skip index 0)
+        const previousEntries = petHistory.filter(h => h.id !== currentEntry.id);
+        if (previousEntries.length === 0) return null;
+
+        // Try same sessionId first
+        const sameSession = previousEntries.find(h => h.sessionId === currentEntry.sessionId);
+        if (sameSession) {
+            const checkin = sameSession.afterCheckin || sameSession.beforeCheckin;
+            return calculateCheckinScore(checkin).score;
+        }
+
+        // Fallback to latest previous session
+        const anySession = previousEntries[0];
+        const checkin = anySession.afterCheckin || anySession.beforeCheckin;
+        return calculateCheckinScore(checkin).score;
+    }
+
     async getRecentProgress(petId: string): Promise<{
         title: string;
         body: string;
         details: string[];
+        outcome: OutcomeType;
+        latestScore: number;
+        latestLevelLabel: string;
+        hasSevereSigns: boolean;
+        severeSignsNote: string;
+        positiveSigns: string[];
+        previousScore: number | null;
+        scoreDeltaFromPrevious: number | null;
+        trendLabel: string | null;
+        beforeScore: number | null;
+        afterScore: number | null;
+        beforeAfterDelta: number | null;
     } | null> {
         const history = await this.getLocalHistory();
         const petHistory = history.filter(h => h.petId === petId);
@@ -68,37 +107,80 @@ class SessionService {
         const body = `Last: ${sessionDef?.title || 'Unknown session'}`;
         const details: string[] = [];
 
+        const beforeResult = last.beforeCheckin ? calculateCheckinScore(last.beforeCheckin) : null;
+        const afterResult = last.afterCheckin ? calculateCheckinScore(last.afterCheckin) : null;
+        
+        // Severe override is based primarily on latest/after check-in
+        const latestResult = afterResult || beforeResult;
+        const latestScore = latestResult ? latestResult.score : 0;
+        const latestLevelLabel = getLevelLabelFromScore(latestScore);
+        const hasSevereSigns = latestResult ? latestResult.hasSevereSigns : false;
+        const severeSignsNote = latestResult?.severeSignsNote || '';
+        const positiveSigns = latestResult?.positiveSigns || [];
+
+        const outcome = getProgressOutcome(
+            beforeResult?.score ?? 0,
+            afterResult?.score ?? 0,
+            {
+                stoppedEarly: !!last.stoppedEarly,
+                hasSevereSigns,
+                hasBefore: !!last.beforeCheckin,
+                hasAfter: !!last.afterCheckin,
+                hasPositiveSigns: positiveSigns.length > 0
+            }
+        );
+
+        // Previous comparison
+        const previousScore = this.getPreviousScoreForPet(petHistory, last);
+        const trendLabel = getTrendLabel(latestScore, previousScore);
+        const scoreDeltaFromPrevious = previousScore !== null ? latestScore - previousScore : null;
+
+        // details population
         if (last.beforeCheckin) {
             const signs = last.beforeCheckin.selectedSigns?.length
                 ? ` · ${last.beforeCheckin.selectedSigns.map(s => s.replace(/_/g, ' ')).slice(0, 3).join(', ')}`
                 : '';
-            details.push(`Before: ${last.beforeCheckin.overallLevel.charAt(0).toUpperCase() + last.beforeCheckin.overallLevel.slice(1)} signs${signs}`);
+            details.push(`Before: ${getLevelLabelFromScore(beforeResult?.score ?? 0)}${signs}`);
         }
         if (last.afterCheckin) {
             const signs = last.afterCheckin.selectedSigns?.length
                 ? ` · ${last.afterCheckin.selectedSigns.map(s => s.replace(/_/g, ' ')).slice(0, 3).join(', ')}`
                 : '';
-            details.push(`After: ${last.afterCheckin.overallLevel.charAt(0).toUpperCase() + last.afterCheckin.overallLevel.slice(1)} signs${signs}`);
+            details.push(`After: ${getLevelLabelFromScore(afterResult?.score ?? 0)}${signs}`);
         }
 
-        if (last.stoppedEarly) {
-            details.push('Stopped early');
-            details.push('Try a shorter or easier routine next time.');
-        } else if (last.completed) {
-            details.push('Completed');
-            if (!last.beforeCheckin && !last.afterCheckin) {
-                details.push('Add check-ins before and after sessions to spot patterns.');
-            } else if (last.beforeCheckin && last.afterCheckin) {
-                const levels = ['calm', 'mild', 'moderate', 'high'];
-                const bIdx = levels.indexOf(last.beforeCheckin.overallLevel);
-                const aIdx = levels.indexOf(last.afterCheckin.overallLevel);
-                if (aIdx < bIdx) details.push('Signs looked lower after the session.');
-                else if (aIdx > bIdx) details.push('Signs looked higher after the session.');
-                else details.push('Signs looked about the same after the session.');
-            }
+        if (positiveSigns.length > 0) {
+            details.push(`Positive signs: ${positiveSigns.slice(0, 3).join(', ')}`);
         }
 
-        return { title, body, details };
+        // Add outcome-based feedback
+        const outcomeCopy = getOutcomeCopy(outcome, positiveSigns.length > 0);
+        if (outcomeCopy.length > 0) {
+            // Add the first line of relevant template
+            details.push(outcomeCopy[0]);
+        }
+
+        if (trendLabel) {
+            details.push(trendLabel);
+        }
+
+        return { 
+            title, 
+            body, 
+            details, 
+            outcome, 
+            latestScore, 
+            latestLevelLabel, 
+            hasSevereSigns, 
+            severeSignsNote, 
+            positiveSigns,
+            previousScore,
+            scoreDeltaFromPrevious,
+            trendLabel,
+            beforeScore: beforeResult?.score ?? null,
+            afterScore: afterResult?.score ?? null,
+            beforeAfterDelta: (beforeResult && afterResult) ? afterResult.score - beforeResult.score : null
+        };
     }
 
     async getRecentProgressSummary(petId: string): Promise<string | null> {

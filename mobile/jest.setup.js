@@ -238,3 +238,22 @@ jest.mock('./services/petProfileRepository', () => ({
   savePetProfile: jest.fn(() => Promise.resolve()),
 }));
 
+// Mock RevenueCatService globally so SubscriptionProvider settles synchronously.
+// This eliminates "not wrapped in act()" warnings caused by setIsLoading(false)
+// firing after the test has already completed assertions.
+jest.mock('./services/revenueCatService', () => ({
+  configure: jest.fn(),
+  getOfferings: jest.fn(() => Promise.resolve(null)),
+  getCustomerInfo: jest.fn(() => Promise.resolve({ entitlements: { active: {}, all: {} } })),
+  purchasePackage: jest.fn(() => Promise.resolve({ entitlements: { active: {}, all: {} } })),
+  restorePurchases: jest.fn(() => Promise.resolve({ entitlements: { active: {}, all: {} } })),
+  isEntitlementActive: jest.fn(() => Promise.resolve(false)),
+  getSubscriptionStatus: jest.fn(() => Promise.resolve({ isPremium: false, isTrial: false, expirationDate: null })),
+  isReady: jest.fn(() => true),
+}));
+
+// Drain pending microtasks after each test to prevent act() warnings from
+// async state updates that resolve after the test body has finished.
+afterEach(async () => {
+  await new Promise(resolve => setImmediate(resolve));
+});
