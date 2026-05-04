@@ -20,6 +20,7 @@ import PremiumStatusScreen from '../screens/PremiumStatusScreen';
 import SessionPreviewScreen from '../screens/SessionPreviewScreen';
 import PetProfileRepository, { AuthMode } from '../services/petProfileRepository';
 import MigrationService from '../services/migrationService';
+import { COLORS } from '../constants/Theme';
 
 const AuthStack = createNativeStackNavigator();
 const AppStack = createNativeStackNavigator();
@@ -58,6 +59,7 @@ export default function AppNavigator() {
     const [authMode, setAuthMode] = useState<AuthMode>('unauthenticated');
     const [initializing, setInitializing] = useState(true);
     const [showSplash, setShowSplash] = useState(true);
+    const [splashAnimationFinished, setSplashAnimationFinished] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
 
     useEffect(() => {
@@ -113,15 +115,16 @@ export default function AppNavigator() {
         return unsubscribe;
     }, []);
 
-    if (showSplash) {
-        return <SplashAnimation onComplete={() => setShowSplash(false)} />;
-    }
+    const splashVisible = showSplash || initializing || showOnboarding === null;
 
-    if (initializing || showOnboarding === null) {
+    if (splashVisible) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#2563eb" />
-            </View>
+            <SplashAnimation
+                onComplete={() => {
+                    setShowSplash(false);
+                    setSplashAnimationFinished(true);
+                }}
+            />
         );
     }
 
@@ -140,6 +143,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.primaryDark,
     },
 });

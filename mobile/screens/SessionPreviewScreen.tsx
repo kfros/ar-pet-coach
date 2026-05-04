@@ -39,6 +39,12 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     { paddingBottom: insets.bottom + 120 } // Ensure content is not hidden by sticky footer
                 ]}
             >
+                {route.params?.unlockedAfterPurchase && (
+                    <View style={styles.celebrationBanner}>
+                        <Ionicons name="sparkles" size={20} color="#11866F" />
+                        <Text style={styles.celebrationText}>Premium Unlocked! Enjoy the routine.</Text>
+                    </View>
+                )}
                 <View style={styles.heroCard}>
                     <View style={styles.heroHeader}>
                         <View style={styles.titleContainer}>
@@ -245,4 +251,20 @@ const styles = StyleSheet.create({
     fallbackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
     fallbackTitle: { ...FONTS.body, fontWeight: '700', color: '#12312E' },
     fallbackBody: { ...FONTS.small, color: '#4A5F5B', lineHeight: 18 },
+    celebrationBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 16,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    celebrationText: {
+        color: '#065F46',
+        fontWeight: '600',
+        fontSize: 14,
+    },
 });
