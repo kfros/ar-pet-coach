@@ -54,7 +54,7 @@ const PAYWALL_FALLBACK_CONFIG = {
     }
 };
 
-export default function PaywallScreen({ navigation }: any) {
+export default function PaywallScreen({ navigation, route }: any) {
     const [packages, setPackages] = useState<PurchasesPackage[]>([]);
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [loading, setLoading] = useState(true);
@@ -103,7 +103,14 @@ export default function PaywallScreen({ navigation }: any) {
 
     const checkSubscription = async () => {
         const status = await RevenueCatService.getSubscriptionStatus();
+        const { sessionId, petId } = route.params || {};
+
         if (status.isPremium) {
+            if (sessionId) {
+                // If user was trying to access a session, go to preview
+                navigation.replace('SessionPreview', { sessionId, petId });
+                return;
+            }
             // If user is already premium, redirect to status screen
             navigation.replace('PremiumStatus', { source: 'settings' });
             return;
@@ -208,9 +215,14 @@ export default function PaywallScreen({ navigation }: any) {
         setPurchasing(true);
         try {
             const customerInfo = await RevenueCatService.purchasePackage(selectedPackage);
+            const { sessionId, petId } = route.params || {};
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
                 Alert.alert('Success', 'You are now a Pro member!');
-                navigation.replace('PremiumStatus', { source: 'post_purchase' });
+                if (sessionId) {
+                    navigation.replace('SessionPreview', { sessionId, petId });
+                } else {
+                    navigation.replace('PremiumStatus', { source: 'post_purchase' });
+                }
             }
         } catch (e) {
             console.log("Purchase cancelled or failed");
@@ -223,9 +235,14 @@ export default function PaywallScreen({ navigation }: any) {
         setPurchasing(true);
         try {
             const customerInfo = await RevenueCatService.restorePurchases();
+            const { sessionId, petId } = route.params || {};
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
                 Alert.alert('Success', 'Purchases restored!');
-                navigation.replace('PremiumStatus', { source: 'settings' });
+                if (sessionId) {
+                    navigation.replace('SessionPreview', { sessionId, petId });
+                } else {
+                    navigation.replace('PremiumStatus', { source: 'settings' });
+                }
             } else {
                 Alert.alert('Info', 'No active subscription found to restore.');
             }
@@ -351,35 +368,40 @@ export default function PaywallScreen({ navigation }: any) {
 
                 <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
                     <View style={styles.header}>
-                        <Text style={styles.headline}>Build a calmer life for your pet</Text>
+                        <Text style={styles.headline}>Unlock Premium routines</Text>
                         <Text style={styles.subheadline}>
-                            Access guided routines and tracking tools designed to help your pet relax and feel safe.
+                            Get more gentle, trigger-specific routines for fireworks prep, visitors, alone-time practice, and vet visit prep.
                         </Text>
                     </View>
 
                     <View style={styles.benefitsContainer}>
                         <BenefitItem
+                            icon="sparkles-outline"
+                            title="More trigger-specific routines"
+                            description="Fireworks prep, visitors, alone-time, and more"
+                        />
+                        <BenefitItem
                             icon="leaf-outline"
-                            title="Guided Calming Routines"
-                            description="Step-by-step guidance for daily stress relief"
+                            title="Gentle prep sessions"
+                            description="Support for common stressful moments"
                         />
                         <BenefitItem
                             icon="analytics-outline"
-                            title="Anxiety Check-ins"
-                            description="Track how your pet feels before and after sessions"
+                            title="Expanded progress insights"
+                            description="More ways to practice at your dog’s pace"
                         />
                         <BenefitItem
                             icon="heart-outline"
                             title="Pet-First Design"
                             isLast={!isDetailsExpanded}
-                            description="Gentle visual guides tailored for pet focus"
+                            description="Gentle visual guides without pressure"
                         />
 
                     {isDetailsExpanded && (
                         <View style={styles.expandedDetails}>
                             <View style={styles.divider} />
                             <Text style={styles.detailsText}>
-                                Guided sessions help your pet focus on calming visuals, bridging the gap between high-stress triggers and relaxation.
+                                Guided routines help your dog focus on calming visual anchors, bridging the gap between stressful triggers and relaxation.
                             </Text>
                         </View>
                     )}

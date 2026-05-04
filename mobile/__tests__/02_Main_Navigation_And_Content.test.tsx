@@ -98,7 +98,7 @@ describe('Suite 02: Main Navigation And Content', () => {
         <NavigationContainer>
           <SessionPreviewScreen 
             navigation={mockNavigation} 
-            route={{ params: { sessionId: 'fireworks_prep_extended', petId: 'test-pet' } }} 
+            route={{ params: { sessionId: 'fireworks_prep_routine', petId: 'test-pet' } }} 
           />
         </NavigationContainer>
       </SubscriptionProvider>
@@ -123,7 +123,7 @@ describe('Suite 02: Main Navigation And Content', () => {
         <NavigationContainer>
           <SessionPreviewScreen 
             navigation={mockNavigation} 
-            route={{ params: { sessionId: 'fireworks_prep_extended', petId: 'test-pet' } }} 
+            route={{ params: { sessionId: 'fireworks_prep_routine', petId: 'test-pet' } }} 
           />
         </NavigationContainer>
       </SubscriptionProvider>

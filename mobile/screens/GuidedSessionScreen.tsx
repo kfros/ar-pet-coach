@@ -7,7 +7,14 @@ import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
 import { useCalmAudio } from '../hooks/useCalmAudio';
-import { Session, SessionStep, AnxietyLevel, AnxietySign, CheckIn } from '../types/Session';
+import { Session, SessionStep, AnxietyLevel, AnxietySign, PositiveSign, CheckIn } from '../types/Session';
+import { 
+    MEDICAL_SEVERE_SIGNS, 
+    BEHAVIORAL_SEVERE_SIGNS, 
+    SEVERE_SIGN_LOGIC,
+    IN_SESSION_SAFETY_PROMPT
+} from '../content/routineSafety';
+import { calculateCheckinScore } from '../services/progressScoring';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -28,9 +35,26 @@ const ANXIETY_SIGNS: { id: AnxietySign; label: string }[] = [
     { id: 'freezing', label: 'Freezing' },
     { id: 'barking_whining_howling', label: 'Vocalizing' },
     { id: 'drooling', label: 'Drooling' },
-    { id: 'bolting_or_escape_attempts', label: 'Trying to Escape' },
     { id: 'not_accepting_treats', label: 'Refusing Treats' },
+    { id: 'aggression', label: 'Aggression' },
+    { id: 'self_harm', label: 'Self-Harm' },
+    { id: 'bolting_or_escape_attempts', label: 'Escape Attempts' },
+    { id: 'collapse_or_breathing_trouble', label: 'Breathing Trouble' },
+    { id: 'repeated_vomiting_or_diarrhea', label: 'Vomiting / Diarrhea' },
     { id: 'other', label: 'Other' }
+];
+
+const POSITIVE_SIGNS: { id: PositiveSign; label: string }[] = [
+    { id: 'relaxed_body', label: 'Relaxed Body' },
+    { id: 'soft_eyes', label: 'Soft Eyes' },
+    { id: 'slower_breathing', label: 'Slower Breathing' },
+    { id: 'settled_nearby', label: 'Settled Nearby' },
+    { id: 'took_treats_calmly', label: 'Took Treats Calmly' },
+    { id: 'resting_or_lying_down', label: 'Resting / Lying Down' },
+    { id: 'less_pacing', label: 'Less Pacing' },
+    { id: 'more_responsive', label: 'More Responsive' },
+    { id: 'chose_safe_spot', label: 'Chose Safe Spot' },
+    { id: 'fell_asleep', label: 'Fell Asleep' }
 ];
 
 const HINT_STORAGE_KEY = 'guidedFocusCircleHintDismissed';
@@ -50,11 +74,13 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [showHint, setShowHint] = useState(false);
 
     // Audio Hook
-    const { isPlaying, stopAudio, handleNext } = useCalmAudio(phase === 'active' && audioEnabled);
+    const { isPlaying, stopAudio, handleNext, pauseAudio, resumeAudio } = useCalmAudio(phase === 'active' && audioEnabled);
+    const wasSoundPlayingBeforePause = useRef(false);
     const [beforeLevel, setBeforeLevel] = useState<AnxietyLevel | null>(null);
     const [beforeSigns, setBeforeSigns] = useState<AnxietySign[]>([]);
     const [afterLevel, setAfterLevel] = useState<AnxietyLevel | null>(null);
     const [afterSigns, setAfterSigns] = useState<AnxietySign[]>([]);
+    const [afterPositiveSigns, setAfterPositiveSigns] = useState<PositiveSign[]>([]);
 
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const opacityAnim = useRef(new Animated.Value(1)).current;
@@ -62,6 +88,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const timerRef = useRef<any>(null);
     const [isPaused, setIsPaused] = useState(false);
     const [showNextStepPrompt, setShowNextStepPrompt] = useState(false);
+    const [showSafetyNotice, setShowSafetyNotice] = useState<{ title: string, body: string, type: 'medical' | 'behavioral' } | null>(null);
+    const [showFinalSafetyPrompt, setShowFinalSafetyPrompt] = useState(false);
 
     const steps = session?.steps || [];
     const currentStep = steps[currentStepIndex];
@@ -183,8 +211,22 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
-    const togglePause = () => {
-        setIsPaused(!isPaused);
+    const togglePause = async () => {
+        const newPaused = !isPaused;
+        setIsPaused(newPaused);
+        
+        if (newPaused) {
+            // Pausing
+            wasSoundPlayingBeforePause.current = isPlaying;
+            if (isPlaying) {
+                await pauseAudio();
+            }
+        } else {
+            // Resuming
+            if (wasSoundPlayingBeforePause.current && audioEnabled) {
+                await resumeAudio();
+            }
+        }
     };
 
     const handleEndSession = () => {
@@ -219,7 +261,36 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         if (current.includes(sign)) {
             setter(current.filter(s => s !== sign));
         } else {
-            setter([...current, sign]);
+            const newSigns = [...current, sign];
+            setter(newSigns);
+
+            // GFM-005: Severe sign logic
+            if (isBefore && session?.severeNoticeEnabled) {
+                const hasMedical = newSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s));
+                const hasBehavioral = newSigns.some(s => BEHAVIORAL_SEVERE_SIGNS.includes(s));
+
+                if (hasMedical) {
+                    setShowSafetyNotice({
+                        title: SEVERE_SIGN_LOGIC.medical.title,
+                        body: SEVERE_SIGN_LOGIC.medical.body,
+                        type: 'medical'
+                    });
+                } else if (hasBehavioral) {
+                    setShowSafetyNotice({
+                        title: SEVERE_SIGN_LOGIC.behavioral.title,
+                        body: SEVERE_SIGN_LOGIC.behavioral.body,
+                        type: 'behavioral'
+                    });
+                }
+            }
+        }
+    };
+
+    const togglePositiveSign = (sign: PositiveSign) => {
+        if (afterPositiveSigns.includes(sign)) {
+            setAfterPositiveSigns(afterPositiveSigns.filter(s => s !== sign));
+        } else {
+            setAfterPositiveSigns([...afterPositiveSigns, sign]);
         }
     };
 
@@ -252,11 +323,12 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             timestamp: new Date().toISOString(),
             phase: 'after',
             overallLevel: afterLevel || 'calm',
-            selectedSigns: afterSigns
+            selectedSigns: afterSigns,
+            positiveSigns: afterPositiveSigns
         };
 
         try {
-            await SessionService.saveSessionHistory({
+            const result = await SessionService.saveSessionHistory({
                 id: `session_${Date.now()}`,
                 petId,
                 sessionId,
@@ -269,7 +341,18 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             });
 
             await trackCalmingSession();
-            navigation.replace('Dashboard');
+
+            // Check if we should show safety prompt
+            const scoreResult = calculateCheckinScore(afterCheckin);
+            const prevScore = beforeLevel ? calculateCheckinScore(beforeCheckin) : null;
+            const worsened = prevScore !== null && (scoreResult.score - prevScore.score) >= 2;
+            const hasAfterSevere = afterSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s) || BEHAVIORAL_SEVERE_SIGNS.includes(s));
+
+            if (!stoppedEarly && (worsened || hasAfterSevere)) {
+                setShowFinalSafetyPrompt(true);
+            } else {
+                navigation.replace('Dashboard');
+            }
         } catch (error) {
             console.error('Error saving session:', error);
             navigation.replace('Dashboard');
@@ -319,9 +402,39 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     ))}
                 </View>
 
+                {!isBefore && (
+                    <>
+                        <Text style={styles.signsTitle}>Positive Signs (optional)</Text>
+                        <View style={styles.signsContainer}>
+                            {POSITIVE_SIGNS.map((sign) => (
+                                <Pressable
+                                    key={sign.id}
+                                    style={[
+                                        styles.signChip,
+                                        afterPositiveSigns.includes(sign.id) && styles.positiveSignChipSelected
+                                    ]}
+                                    onPress={() => togglePositiveSign(sign.id)}
+                                >
+                                    <Text style={[styles.signText, afterPositiveSigns.includes(sign.id) && styles.positiveSignTextSelected]}>{sign.label}</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </>
+                )}
+
                 <Pressable
                     style={styles.checkinNextButton}
-                    onPress={() => isBefore ? setPhase('active') : saveSession()}
+                    onPress={() => {
+                        if (isBefore) {
+                            if (showSafetyNotice?.type === 'medical' && SEVERE_SIGN_LOGIC.medical.blockStart) {
+                                // Blocked
+                                return;
+                            }
+                            setPhase('active');
+                        } else {
+                            saveSession();
+                        }
+                    }}
                 >
                     <Text style={styles.checkinNextText}>{isBefore ? 'Start Session' : 'Finish & Save'}</Text>
                 </Pressable>
@@ -500,6 +613,65 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 </View>
             </Modal>
 
+            <Modal visible={!!showSafetyNotice} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={[styles.modalIcon, showSafetyNotice?.type === 'medical' ? { backgroundColor: '#FEE2E2' } : { backgroundColor: '#FEF3C7' }]}>
+                            <Ionicons 
+                                name={showSafetyNotice?.type === 'medical' ? "medical-outline" : "alert-circle-outline"} 
+                                size={40} 
+                                color={showSafetyNotice?.type === 'medical' ? "#EF4444" : "#D97706"} 
+                            />
+                        </View>
+                        <Text style={styles.modalTitle}>{showSafetyNotice?.title}</Text>
+                        <Text style={styles.modalBody}>{showSafetyNotice?.body}</Text>
+
+                        <View style={{ width: '100%', gap: 12 }}>
+                            {showSafetyNotice?.type === 'behavioral' && (
+                                <Pressable 
+                                    style={styles.modalBtn} 
+                                    onPress={() => setShowSafetyNotice(null)}
+                                >
+                                    <Text style={styles.modalBtnText}>{SEVERE_SIGN_LOGIC.behavioral.primaryCTA}</Text>
+                                </Pressable>
+                            )}
+                            <Pressable
+                                style={[styles.modalBtn, showSafetyNotice?.type === 'medical' ? { backgroundColor: '#EF4444' } : { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border }]}
+                                onPress={() => {
+                                    setShowSafetyNotice(null);
+                                    if (showSafetyNotice?.type === 'medical' && SEVERE_SIGN_LOGIC.medical.blockStart) {
+                                        navigation.goBack();
+                                    } else {
+                                        // End session for behavioral secondary
+                                        navigation.goBack();
+                                    }
+                                }}
+                            >
+                                <Text style={[styles.modalBtnText, showSafetyNotice?.type !== 'medical' && { color: COLORS.textSecondary }]}>
+                                    {showSafetyNotice?.type === 'medical' ? SEVERE_SIGN_LOGIC.medical.primaryCTA : SEVERE_SIGN_LOGIC.behavioral.secondaryCTA}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={showFinalSafetyPrompt} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={[styles.modalIcon, { backgroundColor: '#FEF3C7' }]}>
+                            <Ionicons name="leaf-outline" size={40} color="#D97706" />
+                        </View>
+                        <Text style={styles.modalTitle}>{IN_SESSION_SAFETY_PROMPT.title}</Text>
+                        <Text style={styles.modalBody}>{IN_SESSION_SAFETY_PROMPT.body}</Text>
+
+                        <Pressable style={styles.modalBtn} onPress={() => navigation.replace('Dashboard')}>
+                            <Text style={styles.modalBtnText}>{IN_SESSION_SAFETY_PROMPT.primaryCTA}</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
             {isSaving && (
                 <View style={styles.saveOverlay}>
                     <ActivityIndicator size="large" color={COLORS.primary} />
@@ -531,6 +703,9 @@ const styles = StyleSheet.create({
     signChipSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
     signText: { ...FONTS.small, color: COLORS.textSecondary },
     signTextSelected: { color: '#fff', fontWeight: '600' },
+
+    positiveSignChipSelected: { backgroundColor: '#10B981', borderColor: '#10B981' },
+    positiveSignTextSelected: { color: '#fff', fontWeight: '600' },
     checkinNextButton: { backgroundColor: COLORS.primary, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
     checkinNextText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
     skipButton: { marginTop: 16, alignSelf: 'center', padding: 10 },

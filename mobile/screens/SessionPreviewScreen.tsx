@@ -5,8 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import SessionService from '../services/sessionService';
 import { useSubscription } from '../components/SubscriptionManager';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SessionPreviewScreen({ navigation, route }: any) {
+    const insets = useSafeAreaInsets();
     const { sessionId, petId } = route.params;
     const session = SessionService.getSessionById(sessionId);
     const { isPremium } = useSubscription();
@@ -31,14 +33,33 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                 <Text style={styles.headerTitle}>Session Preview</Text>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView 
+                contentContainerStyle={[
+                    styles.scrollContent, 
+                    { paddingBottom: insets.bottom + 120 } // Ensure content is not hidden by sticky footer
+                ]}
+            >
                 <View style={styles.heroCard}>
-                    <View style={styles.rowBetween}>
-                        <Text style={styles.title}>{session.title}</Text>
+                    <View style={styles.heroHeader}>
+                        <View style={styles.titleContainer}>
+                            <Text style={styles.title} numberOfLines={2}>{session.title}</Text>
+                        </View>
                         {session.accessLevel === 'premium' && (
-                            <View style={[styles.premiumBadge, isLocked && { backgroundColor: '#FEF3C7' }]}>
-                                <Ionicons name={isLocked ? "lock-closed" : "sparkles"} size={12} color={isLocked ? "#D97706" : COLORS.primary} />
-                                <Text style={[styles.premiumBadgeText, isLocked && { color: "#D97706" }]}>PREMIUM</Text>
+                            <View style={[
+                                styles.previewBadge, 
+                                isLocked ? styles.previewBadgeLocked : styles.previewBadgeUnlocked
+                            ]}>
+                                <Ionicons 
+                                    name={isLocked ? "lock-closed" : "checkmark-circle"} 
+                                    size={12} 
+                                    color={isLocked ? "#fff" : "#0F766E"} 
+                                />
+                                <Text style={[
+                                    styles.previewBadgeText, 
+                                    { color: isLocked ? "#fff" : "#0F766E" }
+                                ]}>
+                                    {isLocked ? 'PREMIUM' : 'INCLUDED'}
+                                </Text>
                             </View>
                         )}
                     </View>
@@ -56,49 +77,91 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Goal</Text>
-                    <Text style={styles.sectionText}>{session.goal}</Text>
-                </View>
+                {session.suitableFor && session.suitableFor.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Suitable For</Text>
+                        {session.suitableFor.map((item, index) => (
+                            <View key={index} style={styles.listItem}>
+                                <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.success} />
+                                <Text style={styles.listText}>{item}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Before You Start</Text>
-                    {session.beforeYouStart.map((item, index) => (
-                        <View key={index} style={styles.listItem}>
-                            <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.success} />
-                            <Text style={styles.listText}>{item}</Text>
-                        </View>
-                    ))}
-                </View>
+                {session.notFor && session.notFor.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Use another option if</Text>
+                        {session.notFor.map((item, index) => (
+                            <View key={index} style={styles.listItem}>
+                                <Ionicons name="close-circle-outline" size={18} color="#B7791F" />
+                                <Text style={styles.listText}>{item}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>What to Watch For</Text>
-                    {session.whatToWatchFor.map((item, index) => (
-                        <View key={index} style={styles.listItem}>
-                            <Ionicons name="eye-outline" size={18} color={COLORS.primary} />
-                            <Text style={styles.listText}>{item}</Text>
-                        </View>
-                    ))}
-                </View>
+                {session.fallbacks && session.fallbacks.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Try instead</Text>
+                        {session.fallbacks.map((fallback: any, index: number) => (
+                            <Pressable 
+                                key={index} 
+                                style={[
+                                    styles.fallbackCard,
+                                    fallback.type === 'info' && { opacity: 0.9 }
+                                ]}
+                                onPress={() => {
+                                    if (fallback.type === 'routine' && fallback.routineId) {
+                                        navigation.navigate('SessionPreview', { sessionId: fallback.routineId, petId });
+                                    }
+                                }}
+                            >
+                                <View style={styles.fallbackHeader}>
+                                    <Text style={styles.fallbackTitle}>{fallback.title}</Text>
+                                    {fallback.type === 'routine' && (
+                                        <Ionicons name="chevron-forward" size={16} color="#0F8A7A" />
+                                    )}
+                                </View>
+                                <Text style={styles.fallbackBody}>{fallback.body}</Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                )}
 
-                <View style={styles.warningSection}>
-                    <Text style={styles.warningTitle}>Stop the session if:</Text>
-                    {session.stopIf.map((item, index) => (
-                        <View key={index} style={styles.listItem}>
-                            <Ionicons name="alert-circle-outline" size={18} color={COLORS.error} />
-                            <Text style={[styles.listText, { color: COLORS.error }]}>{item}</Text>
-                        </View>
-                    ))}
-                </View>
+
+                {session.safetyNotes && session.safetyNotes.length > 0 && (
+                    <View style={styles.safetySection}>
+                        <Text style={styles.safetyTitle}>Before you start</Text>
+                        {session.safetyNotes.map((item, index) => (
+                            <View key={index} style={styles.listItem}>
+                                <Ionicons name="alert-circle" size={18} color="#B7791F" />
+                                <Text style={styles.safetyText}>{item}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {!session.safetyNotes && session.stopIf && (
+                    <View style={styles.safetySection}>
+                        <Text style={styles.safetyTitle}>Stop the session if:</Text>
+                        {session.stopIf.map((item, index) => (
+                            <View key={index} style={styles.listItem}>
+                                <Ionicons name="alert-circle" size={18} color="#B7791F" />
+                                <Text style={styles.safetyText}>{item}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
                 
                 <View style={styles.disclaimer}>
                     <Text style={styles.disclaimerText}>
-                        ChillPup provides gentle routines and tracking tools for pet owners. It does not diagnose, treat, or cure anxiety or medical conditions.
+                        ChillPup routines are gentle practice guides based on owner observations. They are not a diagnosis, treatment plan, or substitute for advice from a veterinarian or qualified behavior professional.
                     </Text>
                 </View>
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
                 <Pressable
                     style={({ pressed }) => [
                         styles.startButton, 
@@ -107,7 +170,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     ]}
                     onPress={() => {
                         if (isLocked) {
-                            navigation.navigate('Paywall', { source: 'premium_session' });
+                            navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
                         } else {
                             navigation.navigate('GuidedSession', { sessionId, petId });
                         }
@@ -148,6 +211,38 @@ const styles = StyleSheet.create({
     startButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-    premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E0F2FE', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    premiumBadgeText: { fontSize: 10, fontWeight: '800', color: COLORS.primary }
+    heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+    titleContainer: { flex: 1, marginRight: 12 },
+    previewBadge: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 4, 
+        paddingHorizontal: 10, 
+        paddingVertical: 6, 
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    previewBadgeLocked: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    previewBadgeUnlocked: {
+        backgroundColor: '#E6F7F2',
+        borderColor: '#B8E7DC',
+    },
+    previewBadgeText: { fontSize: 10, fontWeight: '800' },
+    safetySection: { backgroundColor: '#FFF8E8', borderRadius: SIZES.radius, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#F4D08A' },
+    safetyTitle: { ...FONTS.h3, color: '#9A5B00', marginBottom: 12 },
+    safetyText: { ...FONTS.body, color: '#6B4A1D', flex: 1, lineHeight: 22 },
+    fallbackCard: { 
+        backgroundColor: '#EEF8F6', 
+        borderRadius: 16, 
+        padding: 16, 
+        marginBottom: 12, 
+        borderWidth: 1, 
+        borderColor: '#CDECE5' 
+    },
+    fallbackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    fallbackTitle: { ...FONTS.body, fontWeight: '700', color: '#12312E' },
+    fallbackBody: { ...FONTS.small, color: '#4A5F5B', lineHeight: 18 },
 });
