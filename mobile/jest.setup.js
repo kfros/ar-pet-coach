@@ -128,15 +128,6 @@ jest.mock('@react-native-firebase/firestore', () => {
   return firestoreMock;
 });
 
-jest.mock('@react-native-firebase/storage', () => {
-  return () => ({
-    ref: jest.fn(() => ({
-      putFile: jest.fn(() => Promise.resolve()),
-      getDownloadURL: jest.fn(() => Promise.resolve('mock-url')),
-    })),
-  });
-});
-
 // Mock RevenueCat
 const mockPurchases = {
   configure: jest.fn(),

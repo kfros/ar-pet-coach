@@ -9,33 +9,14 @@ service cloud.firestore {
       match /pets/{petId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
         
-        // Safe Zones subcollection
-        match /safeZones/{zoneId} {
+        // Sessions subcollection (MVP Progress tracking)
+        match /sessions/{sessionId} {
             allow read, write: if request.auth != null && request.auth.uid == userId;
         }
-        
-        // Heatmap subcollection (for analytics)
-        match /heatmap/{sessionId}/points/{pointId} {
-            allow create: if request.auth != null && request.auth.uid == userId;
-            allow read: if request.auth != null && request.auth.uid == userId;
-        }
-        
-        // Activity Points subcollection (for pet pose heatmap)
-        match /activityPoints/{pointId} {
+
+        // Backward compatibility for old session path if needed for cleanup
+        match /calm_sessions/{sessionId} {
             allow read, write: if request.auth != null && request.auth.uid == userId;
-        }
-      }
-    }
-    
-    // Courses are public/auth-read
-    match /courses/{courseId} {
-      allow read: if true;
-      allow write: if false;
-      
-      match /days/{dayId} {
-        allow read: if true;
-        match /steps/{stepId} {
-            allow read: if true;
         }
       }
     }
