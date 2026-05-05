@@ -1,4 +1,4 @@
-import { auth, db, storage } from './firebaseConfig';
+import { auth, db } from './firebaseConfig';
 import RevenueCatService from './revenueCatService';
 
 /**
@@ -26,7 +26,7 @@ export const deleteUserAccount = async () => {
             console.log(`[AuthService] Cleaning up pet: ${petId}`);
 
             // Subcollections to clean up
-            const subcollections = ['activityPoints', 'safeZones', 'calm_sessions'];
+            const subcollections = ['sessions', 'calm_sessions'];
 
             for (const sub of subcollections) {
                 const subSnap = await petDoc.ref.collection(sub).get();
@@ -44,18 +44,7 @@ export const deleteUserAccount = async () => {
         // Delete the main user doc
         await db.collection('users').doc(uid).delete();
 
-        // 2. Cleanup Storage
-        // Delete analysis files
-        try {
-            const storageRef = storage.ref(`analysis/${uid}`);
-            const files = await storageRef.listAll();
-            await Promise.all(files.items.map(file => file.delete()));
-        } catch (storageError) {
-            // Storage might be empty or folder might not exist, ignore
-            console.warn('[AuthService] Storage cleanup warning:', storageError);
-        }
-
-        // 3. RevenueCat LogOut
+        // 2. RevenueCat LogOut
         // We do this BEFORE deleting the auth user to ensure we can still identify the user if needed
         await RevenueCatService.logOut();
 

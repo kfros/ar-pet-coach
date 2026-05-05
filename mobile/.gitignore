@@ -31,7 +31,9 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local 
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +43,18 @@ yarn-error.*
 /android
 !mobile/node_modules/react-native/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterCpp.js
 !mobile/node_modules/react-native/node_modules/@react-native/codegen/lib/generators/components/GenerateEventEmitterH.js
+
+# Secrets
+*.json
+!*package.json
+!*package-lock.json
+!*tsconfig.json
+!*app.json
+!google-services.json
+!GoogleService-Info.plist
+
+*service-account*.json
+*serviceAccount*.json
+*service_account*.json
+serviceAccountKey.json
+secrets.json
