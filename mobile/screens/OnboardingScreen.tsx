@@ -258,7 +258,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                     color={COLORS.primary}
                                 />
                                 <Text style={styles.checkboxText}>
-                                    I agree to the processing of audio and photos of my pet for analysis purposes.
+                                    I agree to have my pet's profile data securely stored locally or synced to my private account.
                                 </Text>
                             </TouchableOpacity>
                         </View>
