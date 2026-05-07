@@ -1,13 +1,13 @@
 {
   "expo": {
     "name": "ChillPup",
-    "slug": "chillpup-ar",
+    "slug": "chillpup",
     "platforms": [
       "ios",
       "android"
     ],
     "version": "1.0.0",
-    "scheme": "ar-pet-coach",
+    "scheme": "chillpup",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -31,7 +31,8 @@
             "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "buildNumber": "5",
@@ -39,8 +40,7 @@
       "entitlements": {},
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos",
-        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos"
+        "NSPhotoLibraryUsageDescription": "Allow access to select an optional profile photo for your pet."
       },
       "bundleIdentifier": "com.kfsoftware.chillpup",
       "googleServicesFile": "./GoogleService-Info.plist"

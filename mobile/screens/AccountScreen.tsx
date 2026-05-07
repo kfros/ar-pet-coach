@@ -52,7 +52,7 @@ export default function AccountScreen({ navigation }: any) {
                     <Text style={styles.sectionTitle}>Account Actions</Text>
                     <Text style={styles.description}>
                         Deleting your account will remove all your data from our servers.
-                        This includes your pet profiles, calming session history, and AI analysis results. This action cannot be undone.
+                        This will delete your account, pet profiles, session history, and check-in data.
                     </Text>
                     <Text style={styles.infoSection}>
                         Subscriptions are managed by Apple and must be cancelled in your device settings (Settings → Apple ID → Subscriptions).

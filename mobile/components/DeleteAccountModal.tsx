@@ -86,7 +86,7 @@ export default function DeleteAccountModal({ visible, onClose, onConfirm, naviga
 
                         <View style={styles.bulletPoint}>
                             <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
-                            <Text style={styles.bulletText}>All your data (pets, sessions, analysis) will be permanently deleted.</Text>
+                            <Text style={styles.bulletText}>All your data (pets, sessions, check-ins) will be permanently deleted.</Text>
                         </View>
 
                         <View style={styles.bulletPoint}>
