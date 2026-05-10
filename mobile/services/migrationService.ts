@@ -15,8 +15,12 @@ class MigrationService {
 
         console.log('[MigrationService] Processing auth success for:', user.uid);
 
-        // 1. Sync RevenueCat (asynchronous, non-blocking)
-        await RevenueCatService.logIn(user.uid);
+        // 1. Sync RevenueCat (Blocking)
+        try {
+            await RevenueCatService.logIn(user.uid);
+        } catch (err) {
+            console.error('[MigrationService] RevenueCat sync failed:', err);
+        }
 
         try {
             // 2. Ensure User Document exists in Firestore
@@ -87,7 +91,7 @@ class MigrationService {
     private async migrateGuestToAccount(user: FirebaseAuthTypes.User): Promise<boolean> {
         try {
             // Check if guest profile exists locally
-            const guestProfile = await PetProfileRepository.getPetProfile();
+            const guestProfile = await PetProfileRepository.getGuestProfile();
             if (!guestProfile) {
                 // No guest profile
                 return false;

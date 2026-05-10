@@ -54,12 +54,16 @@ class PetProfileRepository {
         this.notifyListeners(mode);
     }
 
+    async getGuestProfile(): Promise<PetProfile | null> {
+        const raw = await AsyncStorage.getItem(STORAGE_KEYS.GUEST_PET_PROFILE);
+        return raw ? JSON.parse(raw) : null;
+    }
+
     async getPetProfile(): Promise<PetProfile | null> {
         const mode = await this.getAuthMode();
 
         if (mode === 'guest') {
-            const raw = await AsyncStorage.getItem(STORAGE_KEYS.GUEST_PET_PROFILE);
-            return raw ? JSON.parse(raw) : null;
+            return this.getGuestProfile();
         }
 
         if (mode === 'authenticated') {
