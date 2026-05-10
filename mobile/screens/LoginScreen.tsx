@@ -78,8 +78,6 @@ export default function LoginScreen({ navigation, route }: any) {
             if (userCredential.user) {
                 if (navigation.canGoBack()) {
                     navigation.goBack();
-                } else {
-                    navigation.replace('Dashboard');
                 }
             }
         } catch (err: any) {
@@ -122,8 +120,6 @@ export default function LoginScreen({ navigation, route }: any) {
             if (userCredential.user) {
                 if (navigation.canGoBack()) {
                     navigation.goBack();
-                } else {
-                    navigation.replace('Dashboard');
                 }
             }
 
@@ -164,8 +160,6 @@ export default function LoginScreen({ navigation, route }: any) {
             if (userCredential.user) {
                 if (navigation.canGoBack()) {
                     navigation.goBack();
-                } else {
-                    navigation.replace('Dashboard');
                 }
             }
         } catch (err: any) {
