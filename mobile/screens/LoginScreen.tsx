@@ -44,7 +44,7 @@ export default function LoginScreen({ navigation, route }: any) {
     const [error, setError] = useState('');
     const [isAppleAuthAvailable, setIsAppleAuthAvailable] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    
+
     // Forgot Password State
     const [showResetModal, setShowResetModal] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
@@ -66,7 +66,7 @@ export default function LoginScreen({ navigation, route }: any) {
 
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
-            
+
             const idToken = userInfo.data?.idToken;
             if (!idToken) throw new Error('No ID token received from Google');
 
@@ -75,6 +75,13 @@ export default function LoginScreen({ navigation, route }: any) {
 
             // Note: RevenueCat login, PetProfile authMode, and guest migration 
             // are now handled automatically in AppNavigator.tsx via MigrationService
+            if (userCredential.user) {
+                if (navigation.canGoBack()) {
+                    navigation.goBack();
+                } else {
+                    navigation.replace('Dashboard');
+                }
+            }
         } catch (err: any) {
             console.error('Google Sign-In Error:', err);
             if (err.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -113,8 +120,11 @@ export default function LoginScreen({ navigation, route }: any) {
             const userCredential = await auth().signInWithCredential(oauthCredential);
 
             if (userCredential.user) {
-                // Note: Auth effects (RC sync, Firestore doc, Guest migration) 
-                // are now handled automatically in AppNavigator.tsx
+                if (navigation.canGoBack()) {
+                    navigation.goBack();
+                } else {
+                    navigation.replace('Dashboard');
+                }
             }
 
         } catch (e: any) {
@@ -152,8 +162,11 @@ export default function LoginScreen({ navigation, route }: any) {
             }
 
             if (userCredential.user) {
-                // Note: Auth effects (RC sync, Firestore doc, Guest migration) 
-                // are now handled automatically in AppNavigator.tsx
+                if (navigation.canGoBack()) {
+                    navigation.goBack();
+                } else {
+                    navigation.replace('Dashboard');
+                }
             }
         } catch (err: any) {
             console.error(err);
@@ -194,14 +207,14 @@ export default function LoginScreen({ navigation, route }: any) {
 
         try {
             await firebaseResetPassword(resetEmail);
-            setResetMessage({ 
-                text: 'If an account exists for this email, a reset link has been sent.', 
-                type: 'success' 
+            setResetMessage({
+                text: 'If an account exists for this email, a reset link has been sent.',
+                type: 'success'
             });
         } catch (err: any) {
-            setResetMessage({ 
-                text: mapFirebaseError(err.code), 
-                type: 'error' 
+            setResetMessage({
+                text: mapFirebaseError(err.code),
+                type: 'error'
             });
         } finally {
             setResetLoading(false);
@@ -241,8 +254,8 @@ export default function LoginScreen({ navigation, route }: any) {
                         <View style={styles.header}>
                             <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
                             <Text style={styles.subtitle}>
-                                {isLogin 
-                                    ? 'Sign in to continue your pet’s progress' 
+                                {isLogin
+                                    ? 'Sign in to continue your pet’s progress'
                                     : 'Save your pet’s profile and track calming progress over time'}
                             </Text>
                         </View>
@@ -300,10 +313,10 @@ export default function LoginScreen({ navigation, route }: any) {
                                     secureTextEntry={!showPassword}
                                 />
                                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                                    <Ionicons 
-                                        name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                                        size={20} 
-                                        color={COLORS.textSecondary} 
+                                    <Ionicons
+                                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                                        size={20}
+                                        color={COLORS.textSecondary}
                                     />
                                 </TouchableOpacity>
                             </View>
@@ -413,7 +426,7 @@ export default function LoginScreen({ navigation, route }: any) {
 
                             {resetMessage.text ? (
                                 <Text style={[
-                                    styles.resetMessage, 
+                                    styles.resetMessage,
                                     { color: resetMessage.type === 'success' ? COLORS.success : COLORS.error }
                                 ]}>
                                     {resetMessage.text}
@@ -421,8 +434,8 @@ export default function LoginScreen({ navigation, route }: any) {
                             ) : null}
 
                             <View style={styles.modalActions}>
-                                <TouchableOpacity 
-                                    style={styles.modalCancelBtn} 
+                                <TouchableOpacity
+                                    style={styles.modalCancelBtn}
                                     onPress={() => {
                                         setShowResetModal(false);
                                         setResetMessage({ text: '', type: '' });
@@ -430,8 +443,8 @@ export default function LoginScreen({ navigation, route }: any) {
                                 >
                                     <Text style={styles.modalCancelText}>Cancel</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity 
-                                    style={[styles.modalSubmitBtn, resetLoading && styles.disabledButton]} 
+                                <TouchableOpacity
+                                    style={[styles.modalSubmitBtn, resetLoading && styles.disabledButton]}
                                     onPress={handleResetPassword}
                                     disabled={resetLoading}
                                 >

@@ -74,11 +74,11 @@
         }
       ]
     },
+    "owner": "kfros",
     "extra": {
       "eas": {
-        "projectId": "23bbaadb-97bf-42a2-abe1-a2d1ea6e4061"
+        "projectId": "e92d969e-982d-4c1b-b0c5-b52486f6deb4"
       }
-    },
-    "owner": "kfros"
+    }
   }
 }

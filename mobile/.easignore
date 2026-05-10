@@ -1,4 +1,7 @@
-node_modules/
-android/
-ios/
-.git/
+**/node_modules/
+**/android/
+**/ios/
+**/.gradle/
+**/.git/
+archive/
+../Content/

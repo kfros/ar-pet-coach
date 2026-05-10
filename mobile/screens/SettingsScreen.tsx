@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert, Linking, Platform, ScrollView } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../services/firebaseConfig';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -15,18 +16,27 @@ export default function SettingsScreen({ navigation }: any) {
     const [pets, setPets] = useState<any[]>([]);
     const [authMode, setAuthMode] = useState<string>('unauthenticated');
 
-    useEffect(() => {
-        const fetchInitialData = async () => {
-            const mode = await PetProfileRepository.getAuthMode();
-            setAuthMode(mode);
+    const refreshData = useCallback(async () => {
+        const mode = await PetProfileRepository.getAuthMode();
+        setAuthMode(mode);
 
-            const profile = await PetProfileRepository.getPetProfile();
-            if (profile) {
-                setPets([profile]);
-            }
-        };
-        fetchInitialData();
+        const profile = await PetProfileRepository.getPetProfile();
+        if (profile) {
+            setPets([profile]);
+        } else {
+            setPets([]);
+        }
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            refreshData();
+        }, [refreshData])
+    );
+
+    useEffect(() => {
+        refreshData();
+    }, [refreshData]);
 
     const handleRestorePurchases = async () => {
         try {
@@ -56,8 +66,8 @@ export default function SettingsScreen({ navigation }: any) {
             "This will delete your pet profile and progress from this device. This can’t be undone.",
             [
                 { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Clear Data", 
+                {
+                    text: "Clear Data",
                     style: "destructive",
                     onPress: async () => {
                         await PetProfileRepository.clearGuestData();
@@ -75,8 +85,8 @@ export default function SettingsScreen({ navigation }: any) {
             "Are you sure you want to log out?",
             [
                 { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Log Out", 
+                {
+                    text: "Log Out",
                     style: "destructive",
                     onPress: async () => {
                         try {
@@ -86,11 +96,11 @@ export default function SettingsScreen({ navigation }: any) {
                             // Only call logOut for RevenueCat if the user was identified
                             // (RevenueCat handles this internally but good to be explicit)
                             await Purchases.logOut();
-                            
+
                             await PetProfileRepository.setAuthMode('unauthenticated');
                         } catch (error: any) {
                             console.error("Sign out error:", error);
-                            Alert.alert("Error", "Failed to sign out. Please try again.");
+                            //Alert.alert("Error", "Failed to sign out. Please try again.");
                         }
                     }
                 }
@@ -115,10 +125,10 @@ export default function SettingsScreen({ navigation }: any) {
         }
 
         return [
-            { 
-                icon: isPremium ? 'star-outline' : 'card-outline', 
-                label: isPremium ? 'Premium' : 'Subscription', 
-                onPress: () => navigation.navigate(isPremium ? 'PremiumStatus' : 'Paywall') 
+            {
+                icon: isPremium ? 'star-outline' : 'card-outline',
+                label: isPremium ? 'Premium' : 'Subscription',
+                onPress: () => navigation.navigate(isPremium ? 'PremiumStatus' : 'Paywall')
             },
             { icon: 'refresh-outline', label: 'Restore Purchases', onPress: handleRestorePurchases },
             { icon: 'person-outline', label: 'Account', onPress: () => navigation.navigate('Account') },
@@ -210,7 +220,7 @@ export default function SettingsScreen({ navigation }: any) {
                             <Ionicons name="chevron-forward" size={20} color={COLORS.border} />
                         </Pressable>
                     ))}
-                    
+
                     {authMode !== 'guest' && (
                         <Pressable
                             style={({ pressed }) => [
