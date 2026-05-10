@@ -171,7 +171,10 @@ export default function PetProfileStepper({ navigation }: any) {
             };
 
             await PetProfileRepository.savePetProfile(profile);
-            navigation.replace('Dashboard');
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+            });
         } catch (error) {
             console.error('[PetProfileStepper] Error saving profile:', error);
             Alert.alert('Error', 'Could not save pet profile. Please try again.');
