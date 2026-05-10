@@ -16,9 +16,7 @@ class MigrationService {
         console.log('[MigrationService] Processing auth success for:', user.uid);
 
         // 1. Sync RevenueCat (asynchronous, non-blocking)
-        RevenueCatService.logIn(user.uid).catch(err =>
-            console.error('[MigrationService] RevenueCat sync failed:', err)
-        );
+        await RevenueCatService.logIn(user.uid);
 
         try {
             // 2. Ensure User Document exists in Firestore
@@ -90,8 +88,8 @@ class MigrationService {
         try {
             // Check if guest profile exists locally
             const guestProfile = await PetProfileRepository.getPetProfile();
-            if (!guestProfile || guestProfile.id) {
-                // No guest profile or already has an ID (likely already synced or a returning user)
+            if (!guestProfile) {
+                // No guest profile
                 return false;
             }
 

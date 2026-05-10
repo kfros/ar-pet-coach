@@ -50,6 +50,12 @@ function AppNavigatorStack() {
             <AppStack.Screen name="Terms" component={TermsScreen} />
             <AppStack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
             <AppStack.Screen name="PremiumStatus" component={PremiumStatusScreen} options={{ headerShown: false, presentation: 'modal' }} />
+            {/* ДОБАВЛЯЕМ ЭКРАН ЛОГИНА ДЛЯ ГОСТЕЙ */}
+            <AppStack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ headerShown: false, presentation: 'modal' }}
+            />
         </AppStack.Navigator>
     );
 }
