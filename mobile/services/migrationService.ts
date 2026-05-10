@@ -108,8 +108,9 @@ class MigrationService {
 
             if (petsSnap.empty) {
                 // Upload guest profile data to Firestore
+                const { id, ...cleanProfile } = guestProfile; // Strip the 'guest-pet' ID
                 const petData = {
-                    ...guestProfile,
+                    ...cleanProfile,
                     createdAt: firestore.FieldValue.serverTimestamp(),
                     updatedAt: firestore.FieldValue.serverTimestamp()
                 };

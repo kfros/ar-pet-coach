@@ -176,11 +176,14 @@ export default function LoginScreen({ navigation, route }: any) {
             await PetProfileRepository.setAuthMode('guest');
             // Navigation will be triggered by AppNavigator if it's listening to AuthMode changes
             // or we can manually navigate if we want immediate feedback
-            const hasProfile = await PetProfileRepository.hasPetProfile();
-            if (hasProfile) {
-                navigation.replace('Dashboard');
+            if (navigation.canGoBack()) {
+                navigation.goBack();
             } else {
-                navigation.navigate('PetProfileStepper');
+                const hasProfile = await PetProfileRepository.hasPetProfile();
+                navigation.reset({
+                    index: 0,
+                    routes: [{ name: hasProfile ? 'Dashboard' : 'PetProfileStepper' }],
+                });
             }
         } catch (err) {
             console.error('Guest mode error:', err);

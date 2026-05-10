@@ -90,10 +90,12 @@ class PetProfileRepository {
         const mode = await this.getAuthMode();
 
         if (mode === 'guest') {
-            await AsyncStorage.setItem(
-                STORAGE_KEYS.GUEST_PET_PROFILE,
-                JSON.stringify({ ...profile, createdAt: new Date().toISOString() })
-            );
+            const guestPet = { 
+                ...profile, 
+                id: profile.id || 'guest-pet', 
+                createdAt: profile.createdAt || new Date().toISOString() 
+            };
+            await AsyncStorage.setItem(STORAGE_KEYS.GUEST_PET_PROFILE, JSON.stringify(guestPet));
             return;
         }
 
