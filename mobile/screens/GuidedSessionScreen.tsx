@@ -13,7 +13,7 @@ import {
     BEHAVIORAL_SEVERE_SIGNS, 
     SEVERE_SIGN_LOGIC,
     IN_SESSION_SAFETY_PROMPT
-} from '../content/routineSafety';
+} from '../appContent/routineSafety';
 import { calculateCheckinScore } from '../services/progressScoring';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

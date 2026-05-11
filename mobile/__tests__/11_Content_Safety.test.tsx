@@ -1,4 +1,4 @@
-import { lintContent, lintRoutine } from '../content/contentSafetyLinter';
+import { lintContent, lintRoutine } from '../appContent/contentSafetyLinter';
 import SessionService from '../services/sessionService';
 
 describe('Content Safety Linter', () => {
