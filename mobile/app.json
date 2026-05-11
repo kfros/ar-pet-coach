@@ -39,8 +39,7 @@
       "supportsTablet": false,
       "entitlements": {},
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Allow access to select an optional profile photo for your pet."
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.kfsoftware.chillpup",
       "googleServicesFile": "./GoogleService-Info.plist"

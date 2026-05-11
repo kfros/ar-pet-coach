@@ -31,9 +31,9 @@ export default function DashboardScreen({ navigation }: any) {
     const [profile, setProfile] = useState<any>(null);
     const [petId, setPetId] = useState<string | null>(null);
     const [petData, setPetData] = useState<any>(null);
-    const [progressData, setProgressData] = useState<{ 
-        title: string; 
-        body: string; 
+    const [progressData, setProgressData] = useState<{
+        title: string;
+        body: string;
         details: string[];
         outcome: 'improved' | 'worsened' | 'unchanged' | 'mixed' | 'stopped_early' | 'severe_signs' | 'no_checkins';
         latestScore: number;
@@ -55,14 +55,14 @@ export default function DashboardScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
 
     const anxietyScore = progressData ? progressData.latestScore : (petData?.anxietyScore ?? 0);
-    const anxietyLabel = progressData && progressData.latestLevelLabel !== 'No check-in' 
+    const anxietyLabel = progressData && progressData.latestLevelLabel !== 'No check-in'
         ? `${progressData.latestLevelLabel.charAt(0).toUpperCase() + progressData.latestLevelLabel.slice(1)} signs`
         : (petData ? getAnxietyLabel(anxietyScore) : 'No check-in yet');
-    
+
     // HOME-001: Visual tone logic for Current Signs
     let anxietyColor = getAnxietyColor(anxietyScore);
     let anxietyDesc = 'Based on your last check-in';
-    
+
     if (!progressData || progressData.latestLevelLabel === 'No check-in') {
         anxietyColor = '#5F7680'; // Neutral blue-gray
         anxietyDesc = 'Complete a Calm Check-In to track signs over time.';
@@ -137,7 +137,7 @@ export default function DashboardScreen({ navigation }: any) {
     const renderSessionCard = (item: any, isHorizontal = false) => {
         const isLocked = item.accessLevel === 'premium' && !isPremium && !subLoading;
         const iconName = (item.iconKey || (item.id.includes('fireworks') ? 'sparkles' : 'sunny')) + "-outline";
-        
+
         // PREMIUM_BADGE_STATE_FIX
         const badgeBg = isLocked ? COLORS.primary : '#E6F7F2';
         const badgeText = isLocked ? '#FFFFFF' : '#0F766E';
@@ -146,42 +146,42 @@ export default function DashboardScreen({ navigation }: any) {
         const badgeIcon = isLocked ? 'lock-closed' : 'checkmark-circle';
 
         return (
-            <Pressable 
+            <Pressable
                 key={item.id}
                 style={[
-                    styles.sessionCardItem, 
+                    styles.sessionCardItem,
                     isHorizontal ? { width: SCREEN_WIDTH * 0.7, marginRight: 16 } : { width: '100%', marginBottom: 12 }
                 ]}
                 onPress={() => handleStartSession(item)}
             >
                 <View style={styles.sessionCardTop}>
                     <View style={styles.sessionIconBg}>
-                        <Ionicons 
-                            name={iconName as any} 
-                            size={24} 
-                            color={COLORS.primary} 
+                        <Ionicons
+                            name={iconName as any}
+                            size={24}
+                            color={COLORS.primary}
                         />
                     </View>
                     <View style={[
-                        styles.badge, 
-                        item.accessLevel === 'premium' 
-                            ? { backgroundColor: badgeBg, borderWidth: 1, borderColor: badgeBorder } 
+                        styles.badge,
+                        item.accessLevel === 'premium'
+                            ? { backgroundColor: badgeBg, borderWidth: 1, borderColor: badgeBorder }
                             : styles.freeBadge
                     ]}>
                         {item.accessLevel === 'premium' ? (
                             <>
-                                <Ionicons 
-                                    name={badgeIcon as any} 
-                                    size={12} 
-                                    color={badgeText} 
-                                    style={{marginRight: 4}} 
+                                <Ionicons
+                                    name={badgeIcon as any}
+                                    size={12}
+                                    color={badgeText}
+                                    style={{ marginRight: 4 }}
                                 />
                                 <Text style={[styles.badgeText, { color: badgeText }]}>
                                     {badgeLabel}
                                 </Text>
                             </>
                         ) : (
-                            <Text style={[styles.badgeText, {color: COLORS.primary}]}>
+                            <Text style={[styles.badgeText, { color: COLORS.primary }]}>
                                 FREE
                             </Text>
                         )}
@@ -289,7 +289,7 @@ export default function DashboardScreen({ navigation }: any) {
                     currentOutcome = 'severe_signs';
                 }
 
-                const stylesMap: Record<string, {bg: string, accent: string, icon: string}> = {
+                const stylesMap: Record<string, { bg: string, accent: string, icon: string }> = {
                     improved: { bg: '#EAF8F1', accent: '#11866F', icon: 'trending-up' },
                     mixed: { bg: '#F2F9F7', accent: '#4DB6AC', icon: 'sparkles-outline' },
                     unchanged: { bg: '#EEF4F6', accent: '#5F7680', icon: 'remove-circle-outline' },
@@ -334,7 +334,7 @@ export default function DashboardScreen({ navigation }: any) {
 
             {/* Recommended Session */}
             <Text style={styles.sectionTitle}>Recommended for your dog</Text>
-            <Pressable 
+            <Pressable
                 style={styles.heroCard}
                 onPress={() => handleStartSession(recommendedSession)}
             >
@@ -359,9 +359,9 @@ export default function DashboardScreen({ navigation }: any) {
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Free routines</Text>
             </View>
-            <FlatList 
+            <FlatList
                 data={freeSessions}
-                renderItem={({item}) => renderSessionCard(item, true)}
+                renderItem={({ item }) => renderSessionCard(item, true)}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={item => item.id}
@@ -401,11 +401,11 @@ const styles = StyleSheet.create({
     anxietyLabelRow: { gap: 2 },
     anxietyLabelText: { ...FONTS.caption, fontWeight: '700' },
     anxietyDesc: { ...FONTS.small, color: COLORS.textSecondary },
-    
+
     sectionTitle: { ...FONTS.h3, color: COLORS.text, marginBottom: 12 },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12, marginTop: 8 },
     sectionSubtitleText: { ...FONTS.small, color: COLORS.textSecondary, marginBottom: 4 },
-    
+
     heroCard: { backgroundColor: COLORS.primary, borderRadius: 24, padding: 24, marginBottom: 24, ...SHADOWS.medium },
     heroContent: { gap: 8 },
     recommendationBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     progressSummaryText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4 },
     severeSignsBox: { flexDirection: 'row', gap: 8, backgroundColor: '#FFEDE6', padding: 12, borderRadius: 12, marginTop: 16 },
     severeSignsText: { flex: 1, fontSize: 11, color: '#B85C38', lineHeight: 16, fontWeight: '500' },
-    
+
     primaryButton: { backgroundColor: COLORS.primary, padding: 18, borderRadius: SIZES.radius, width: '100%', alignItems: 'center', ...SHADOWS.small },
     primaryButtonPressed: { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },
     primaryButtonText: { color: '#fff', ...FONTS.body, fontWeight: 'bold' },

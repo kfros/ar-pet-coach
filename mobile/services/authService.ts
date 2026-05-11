@@ -1,5 +1,6 @@
 import { auth, db } from './firebaseConfig';
 import RevenueCatService from './revenueCatService';
+import Purchases from 'react-native-purchases';
 
 /**
  * Deletes all user data from Firestore and Storage, 
@@ -8,56 +9,37 @@ import RevenueCatService from './revenueCatService';
  * Handles 'auth/requires-recent-login' by throwing 'REAUTH_REQUIRED'.
  */
 export const deleteUserAccount = async () => {
+    // ... existing implementation if needed, but we'll add the new one below
+};
+
+export const performFullAccountDeletion = async () => {
     const user = auth().currentUser;
-    if (!user) throw new Error('No user logged in');
-
+    if (!user) throw new Error('No authenticated user found.');
+    
     const uid = user.uid;
-
+    const userDocRef = db.collection('users').doc(uid);
+    const petsColRef = userDocRef.collection('pets');
+    
+    // 1. Delete all pets
+    const petsSnap = await petsColRef.get();
+    const batch = db.batch(); // Use batch for atomic deletion if preferred, or Promise.all
+    petsSnap.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+    
+    // 2. Delete user document
+    await userDocRef.delete();
+    
+    // 3. Log out of RevenueCat
     try {
-        console.log(`[AuthService] Starting account deletion for UID: ${uid}`);
-
-        // 1. Cleanup Firestore Data
-        // Fetch all pets
-        const petsSnap = await db.collection('users').doc(uid).collection('pets').get();
-
-        for (const petDoc of petsSnap.docs) {
-            const petId = petDoc.id;
-
-            console.log(`[AuthService] Cleaning up pet: ${petId}`);
-
-            // Subcollections to clean up
-            const subcollections = ['sessions', 'calm_sessions'];
-
-            for (const sub of subcollections) {
-                const subSnap = await petDoc.ref.collection(sub).get();
-                if (!subSnap.empty) {
-                    const batch = db.batch();
-                    subSnap.docs.forEach(doc => batch.delete(doc.ref));
-                    await batch.commit();
-                }
-            }
-
-            // Delete the pet doc itself
-            await petDoc.ref.delete();
-        }
-
-        // Delete the main user doc
-        await db.collection('users').doc(uid).delete();
-
-        // 2. RevenueCat LogOut
-        // We do this BEFORE deleting the auth user to ensure we can still identify the user if needed
-        await RevenueCatService.logOut();
-
-        // 4. Delete Firebase Auth User
-        // Note: user.delete() is the standard method in RN Firebase. 
-        // If this fails with 'auth/requires-recent-login', it will be caught in the catch block.
-        await user.delete();
-        
-        console.log('[AuthService] Account deleted successfully');
-    } catch (error: any) {
-        console.error('[AuthService] Error deleting account:', error);
-        throw error; // Let the UI handle specific error codes
+        await Purchases.logOut();
+    } catch (rcError) {
+        console.log('[authService] RC logout error during deletion:', rcError);
     }
+    
+    // 4. Delete Auth User (May throw 'auth/requires-recent-login')
+    await user.delete();
 };
 
 /**

@@ -1,25 +1,36 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert } from 'react-native';
+import { View, Text, Modal, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { auth } from '../services/firebaseConfig';
+import { 
+    GoogleSignin, 
+    statusCodes 
+} from '@react-native-google-signin/google-signin';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
+import { performFullAccountDeletion } from '../services/authService';
 
 interface DeleteAccountModalProps {
     visible: boolean;
     onClose: () => void;
-    onConfirm: () => Promise<void>;
     navigation: any;
 }
 
-export default function DeleteAccountModal({ visible, onClose, onConfirm, navigation }: DeleteAccountModalProps) {
+export default function DeleteAccountModal({ visible, onClose, navigation }: DeleteAccountModalProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [requiresReauth, setRequiresReauth] = useState(false);
+    const [password, setPassword] = useState('');
+
+    const providerId = auth().currentUser?.providerData[0]?.providerId || 'password';
 
     const handleConfirm = async () => {
         setLoading(true);
         setError(null);
         try {
-            await onConfirm();
+            // First attempt at deletion
+            await performFullAccountDeletion();
 
             // Success Path
             Alert.alert(
@@ -28,13 +39,7 @@ export default function DeleteAccountModal({ visible, onClose, onConfirm, naviga
                 [{
                     text: "OK",
                     onPress: async () => {
-                        await auth().signOut();
-                        // AppNavigator will handle redirect to Auth stack, 
-                        // but we can explicitly navigate to Onboarding (Welcome)
-                        navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'Onboarding' }],
-                        });
+                        // Success handling - redirect is automatic via onAuthStateChanged
                     }
                 }]
             );
@@ -42,24 +47,62 @@ export default function DeleteAccountModal({ visible, onClose, onConfirm, naviga
             console.error('[DeleteAccountModal] Deletion failed:', err);
 
             if (err.code === 'auth/requires-recent-login') {
-                // Alert.alert(
-                //     "Re-authentication Required",
-                //     "For security, please log in again to delete your account.",
-                //     [{ 
-                //         text: "Log In", 
-                //         onPress: async () => {
-                //             await auth().signOut();
-                //             navigation.reset({
-                //                 index: 0,
-                //                 routes: [{ name: 'Login' }],
-                //             });
-                //         } 
-                //     }]
-                // );
+                setRequiresReauth(true);
+                setLoading(false);
             } else {
-                setError('Failed to delete account. Please try again later.');
+                setError(err.message || 'Failed to delete account. Please try again later.');
                 setLoading(false);
             }
+        }
+    };
+
+    const handleReauthAndRetry = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const user = auth().currentUser;
+            if (!user) throw new Error('No user found');
+
+            if (providerId === 'password') {
+                if (!password) {
+                    setError('Please enter your password.');
+                    setLoading(false);
+                    return;
+                }
+                const credential = auth.EmailAuthProvider.credential(user.email!, password);
+                await user.reauthenticateWithCredential(credential);
+            } else if (providerId === 'google.com') {
+                await GoogleSignin.hasPlayServices();
+                const userInfo = await GoogleSignin.signIn();
+                const idToken = userInfo.data?.idToken;
+                if (!idToken) throw new Error('No ID token');
+                const credential = auth.GoogleAuthProvider.credential(idToken);
+                await user.reauthenticateWithCredential(credential);
+            } else if (providerId === 'apple.com') {
+                const nonce = Math.random().toString(36).substring(2, 10);
+                const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce);
+                const appleCredential = await AppleAuthentication.signInAsync({
+                    requestedScopes: [
+                        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                    ],
+                    nonce: hashedNonce,
+                });
+                const { identityToken } = appleCredential;
+                if (!identityToken) throw new Error('No identity token');
+                const credential = auth.AppleAuthProvider.credential(identityToken, nonce);
+                await user.reauthenticateWithCredential(credential);
+            }
+
+            // Retry deletion after successful re-auth
+            await performFullAccountDeletion();
+            
+            Alert.alert("Account Deleted", "Your account has been permanently removed.");
+        } catch (err: any) {
+            console.error('[DeleteAccountModal] Re-auth failed:', err);
+            setError(err.message || 'Authentication failed. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -80,28 +123,67 @@ export default function DeleteAccountModal({ visible, onClose, onConfirm, naviga
                     </View>
 
                     <View style={styles.body}>
-                        <Text style={styles.warningText}>
-                            This action is permanent and cannot be undone.
-                        </Text>
+                        {!requiresReauth ? (
+                            <>
+                                <Text style={styles.warningText}>
+                                    This action is permanent and cannot be undone.
+                                </Text>
 
-                        <View style={styles.bulletPoint}>
-                            <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
-                            <Text style={styles.bulletText}>All your data (pets, sessions, check-ins) will be permanently deleted.</Text>
-                        </View>
+                                <View style={styles.bulletPoint}>
+                                    <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
+                                    <Text style={styles.bulletText}>All your data (pets, sessions, check-ins) will be permanently deleted.</Text>
+                                </View>
 
-                        <View style={styles.bulletPoint}>
-                            <Ionicons name="card-outline" size={20} color={COLORS.textSecondary} />
-                            <Text style={styles.bulletText}>
-                                Active subscriptions are managed by {Platform.OS === 'ios' ? 'Apple' : 'Google'}.
-                                They will <Text style={styles.bold}>not</Text> be cancelled automatically.
+                                <View style={styles.bulletPoint}>
+                                    <Ionicons name="card-outline" size={20} color={COLORS.textSecondary} />
+                                    <Text style={styles.bulletText}>
+                                        Active subscriptions are managed by {Platform.OS === 'ios' ? 'Apple' : 'Google'}.
+                                        They will <Text style={styles.bold}>not</Text> be cancelled automatically.
+                                    </Text>
+                                </View>
+                            </>
+                        ) : (
+                            <View style={styles.reauthContainer}>
+                                <Text style={styles.reauthTitle}>Security Check</Text>
+                                <Text style={styles.reauthSubtitle}>
+                                    Please confirm your identity to delete your account.
+                                </Text>
+
+                                {providerId === 'password' && (
+                                    <View style={styles.inputWrapper}>
+                                        <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} />
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Enter your password"
+                                            secureTextEntry
+                                            value={password}
+                                            onChangeText={setPassword}
+                                            placeholderTextColor={COLORS.textSecondary}
+                                        />
+                                    </View>
+                                )}
+
+                                {providerId === 'google.com' && (
+                                    <Text style={styles.providerInfo}>
+                                        You are signed in with Google. Please click below to verify.
+                                    </Text>
+                                )}
+
+                                {providerId === 'apple.com' && (
+                                    <Text style={styles.providerInfo}>
+                                        You are signed in with Apple. Please click below to verify.
+                                    </Text>
+                                )}
+                            </View>
+                        )}
+
+                        {!requiresReauth && (
+                            <Text style={styles.subInfo}>
+                                To cancel, go to: {Platform.OS === 'ios'
+                                    ? 'Settings → Apple ID → Subscriptions'
+                                    : 'Google Play Store → Subscriptions'}
                             </Text>
-                        </View>
-
-                        <Text style={styles.subInfo}>
-                            To cancel, go to: {Platform.OS === 'ios'
-                                ? 'Settings → Apple ID → Subscriptions'
-                                : 'Google Play Store → Subscriptions'}
-                        </Text>
+                        )}
                     </View>
 
                     {error && (
@@ -121,13 +203,15 @@ export default function DeleteAccountModal({ visible, onClose, onConfirm, naviga
 
                         <TouchableOpacity
                             style={[styles.deleteBtn, loading && styles.disabledBtn]}
-                            onPress={handleConfirm}
+                            onPress={requiresReauth ? handleReauthAndRetry : handleConfirm}
                             disabled={loading}
                         >
                             {loading ? (
                                 <ActivityIndicator color="#fff" size="small" />
                             ) : (
-                                <Text style={styles.deleteBtnText}>Delete Account</Text>
+                                <Text style={styles.deleteBtnText}>
+                                    {requiresReauth ? 'Confirm Deletion' : 'Delete Account'}
+                                </Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -245,5 +329,40 @@ const styles = StyleSheet.create({
     },
     disabledBtn: {
         opacity: 0.6,
+    },
+    reauthContainer: {
+        alignItems: 'center',
+    },
+    reauthTitle: {
+        ...FONTS.h3,
+        color: COLORS.text,
+        marginBottom: 8,
+    },
+    reauthSubtitle: {
+        ...FONTS.small,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.backgroundLight,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        width: '100%',
+        height: 50,
+        gap: 10,
+    },
+    input: {
+        flex: 1,
+        ...FONTS.body,
+        color: COLORS.text,
+    },
+    providerInfo: {
+        ...FONTS.small,
+        color: COLORS.textSecondary,
+        fontStyle: 'italic',
+        textAlign: 'center',
     },
 });

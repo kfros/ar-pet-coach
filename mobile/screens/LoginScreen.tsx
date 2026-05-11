@@ -43,6 +43,7 @@ export default function LoginScreen({ navigation, route }: any) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [isAppleAuthAvailable, setIsAppleAuthAvailable] = useState(false);
+    const isModal = route?.params?.isModal;
     const [showPassword, setShowPassword] = useState(false);
 
     // Forgot Password State
@@ -76,7 +77,7 @@ export default function LoginScreen({ navigation, route }: any) {
             // Note: RevenueCat login, PetProfile authMode, and guest migration 
             // are now handled automatically in AppNavigator.tsx via MigrationService
             if (userCredential.user) {
-                if (navigation.canGoBack()) {
+                if (isModal) {
                     navigation.goBack();
                 }
             }
@@ -118,7 +119,7 @@ export default function LoginScreen({ navigation, route }: any) {
             const userCredential = await auth().signInWithCredential(oauthCredential);
 
             if (userCredential.user) {
-                if (navigation.canGoBack()) {
+                if (isModal) {
                     navigation.goBack();
                 }
             }
@@ -158,7 +159,7 @@ export default function LoginScreen({ navigation, route }: any) {
             }
 
             if (userCredential.user) {
-                if (navigation.canGoBack()) {
+                if (isModal) {
                     navigation.goBack();
                 }
             }
@@ -174,16 +175,10 @@ export default function LoginScreen({ navigation, route }: any) {
         try {
             setLoading(true);
             await PetProfileRepository.setAuthMode('guest');
-            // Navigation will be triggered by AppNavigator if it's listening to AuthMode changes
-            // or we can manually navigate if we want immediate feedback
-            if (navigation.canGoBack()) {
+
+            if (isModal) {
+                // Opened from Settings, close the modal gracefully
                 navigation.goBack();
-            } else {
-                const hasProfile = await PetProfileRepository.hasPetProfile();
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: hasProfile ? 'Dashboard' : 'PetProfileStepper' }],
-                });
             }
         } catch (err) {
             console.error('Guest mode error:', err);
