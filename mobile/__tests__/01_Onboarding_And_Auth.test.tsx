@@ -10,7 +10,9 @@ import { NavigationContainer } from '@react-navigation/native';
 const mockNavigation = {
   navigate: jest.fn(),
   replace: jest.fn(),
+  reset: jest.fn(),
   goBack: jest.fn(),
+  canGoBack: jest.fn(() => false),
 };
 
 describe('Suite 01: Onboarding And Auth', () => {
@@ -56,8 +58,8 @@ describe('Suite 01: Onboarding And Auth', () => {
       // Assert local guest state is created
       expect(PetProfileRepository.setAuthMode).toHaveBeenCalledWith('guest');
       
-      // Assert navigation proceeds
-      expect(mockNavigation.navigate).toHaveBeenCalledWith('PetProfileStepper');
+      // The root navigator observes guest mode and switches to the app stack.
+      expect(mockNavigation.navigate).not.toHaveBeenCalledWith('PetProfileStepper');
       
       // Assert Firebase auth methods are NOT called
       expect(auth().signInAnonymously).not.toHaveBeenCalled();

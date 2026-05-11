@@ -35,10 +35,16 @@ function AuthNavigator({ showOnboarding }: { showOnboarding: boolean }) {
     );
 }
 
+type AppRouteName = 'Dashboard' | 'PetProfileStepper';
+type AppEntryState = {
+    initialRouteName: AppRouteName;
+    key: number;
+};
+
 // App Stack - shown when user IS logged in OR in guest mode
-function AppNavigatorStack() {
+function AppNavigatorStack({ initialRouteName }: { initialRouteName: AppRouteName }) {
     return (
-        <AppStack.Navigator>
+        <AppStack.Navigator initialRouteName={initialRouteName}>
             <AppStack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="PetProfileStepper" component={PetProfileStepper} options={{ headerShown: false }} />
@@ -67,6 +73,19 @@ export default function AppNavigator() {
     const [showSplash, setShowSplash] = useState(true);
     const [splashAnimationFinished, setSplashAnimationFinished] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+    const [appEntry, setAppEntry] = useState<AppEntryState>({
+        initialRouteName: 'Dashboard',
+        key: 0,
+    });
+
+    const prepareAppEntry = async () => {
+        const hasProfile = await PetProfileRepository.hasPetProfile();
+        const initialRouteName = hasProfile ? 'Dashboard' : 'PetProfileStepper';
+        setAppEntry((current) => ({
+            initialRouteName,
+            key: current.key + 1,
+        }));
+    };
 
     useEffect(() => {
         const initializeAuth = async () => {
@@ -77,6 +96,9 @@ export default function AppNavigator() {
 
                 // Check persisted auth mode
                 const persistedMode = await PetProfileRepository.getAuthMode();
+                if (persistedMode === 'guest' || persistedMode === 'authenticated') {
+                    await prepareAppEntry();
+                }
                 setAuthMode(persistedMode);
 
                 // Listen for Firebase Auth changes
@@ -86,6 +108,7 @@ export default function AppNavigator() {
 
                     if (currentUser) {
                         await PetProfileRepository.setAuthMode('authenticated');
+                        await prepareAppEntry();
                         setAuthMode('authenticated');
                         // Handle user document, RC sync, and guest migration
                         MigrationService.handleAuthSuccess(currentUser);
@@ -96,6 +119,7 @@ export default function AppNavigator() {
                             await PetProfileRepository.setAuthMode('unauthenticated');
                             setAuthMode('unauthenticated');
                         } else {
+                            await prepareAppEntry();
                             setAuthMode('guest');
                         }
                     }
@@ -114,8 +138,11 @@ export default function AppNavigator() {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = PetProfileRepository.addListener((mode) => {
+        const unsubscribe = PetProfileRepository.addListener(async (mode) => {
             console.log('[AppNavigator] Manual AuthMode update:', mode);
+            if (mode === 'guest' || mode === 'authenticated') {
+                await prepareAppEntry();
+            }
             setAuthMode(mode);
         });
         return unsubscribe;
@@ -138,8 +165,16 @@ export default function AppNavigator() {
     const showAppStack = user !== null || authMode === 'guest';
 
     return (
-        <NavigationContainer>
-            {showAppStack ? <AppNavigatorStack /> : <AuthNavigator showOnboarding={showOnboarding} />}
+        <NavigationContainer
+            key={showAppStack ? `app-${authMode}-${appEntry.initialRouteName}-${appEntry.key}` : `auth-${showOnboarding ? 'onboarding' : 'login'}`}
+        >
+            {showAppStack ? (
+                <AppNavigatorStack
+                    initialRouteName={appEntry.initialRouteName}
+                />
+            ) : (
+                <AuthNavigator showOnboarding={showOnboarding} />
+            )}
         </NavigationContainer>
     );
 }

@@ -74,7 +74,6 @@ export default function AccountScreen({ navigation }: any) {
             <DeleteAccountModal
                 visible={modalVisible}
                 onClose={() => setModalVisible(false)}
-                onConfirm={deleteUserAccount}
                 navigation={navigation}
             />
         </View>

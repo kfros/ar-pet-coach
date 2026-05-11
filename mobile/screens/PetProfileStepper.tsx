@@ -14,13 +14,12 @@ import {
     Modal,
     Image
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import PetProfileRepository, { PetProfile } from '../services/petProfileRepository';
 import { signOut } from '../services/authService';
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 const ANXIETY_TRIGGERS = [
     { id: "being_alone", label: "Being alone" },
@@ -67,8 +66,6 @@ export default function PetProfileStepper({ navigation }: any) {
 
     // Profile State
     const [petName, setPetName] = useState('');
-    const [hasPhoto, setHasPhoto] = useState(false);
-    const [photoUri, setPhotoUri] = useState<string | null>(null);
     const [anxietyTriggers, setAnxietyTriggers] = useState<string[]>([]);
     const [anxietyTriggerOther, setAnxietyTriggerOther] = useState('');
     const [breed, setBreed] = useState('');
@@ -89,47 +86,15 @@ export default function PetProfileStepper({ navigation }: any) {
 
     const isCurrentStepValid = () => {
         if (step === 1) return petName.trim().length > 0 && petName.length <= 40;
-        if (step === 2) return true; // Optional
-        if (step === 3) return true; // Optional
-        if (step === 4) return true; // Optional
-        if (step === 5) return size !== ''; // Required
-        if (step === 6) return true; // Optional
-        if (step === 7) return true; // Optional
+        if (step === 2) return true; // Triggers
+        if (step === 3) return true; // Breed
+        if (step === 4) return size !== ''; // Size
+        if (step === 5) return true; // Age
+        if (step === 6) return true; // Notes
         return true;
     };
 
-    const handlePhotoActionSheet = () => {
-        Alert.alert(
-            "Add Profile Photo",
-            "Choose a photo from your library or skip for now.",
-            [
-                {
-                    text: "Choose from Library",
-                    onPress: async () => {
-                        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                        if (!permission.granted) {
-                            Alert.alert("Permission Needed", "Photo library access is needed to choose a pet photo. You can enable it in Settings.");
-                            return;
-                        }
-                        const result = await ImagePicker.launchImageLibraryAsync({
-                            allowsEditing: true,
-                            aspect: [1, 1],
-                            quality: 0.7,
-                        });
-                        if (!result.canceled && result.assets && result.assets[0].uri) {
-                            setPhotoUri(result.assets[0].uri);
-                            setHasPhoto(true);
-                        }
-                    }
-                },
-                {
-                    text: "Skip for now",
-                    onPress: () => setStep(step + 1)
-                },
-                { text: "Cancel", style: "cancel" }
-            ]
-        );
-    };
+
 
     const handleNext = () => {
         if (!isCurrentStepValid()) return;
@@ -146,11 +111,25 @@ export default function PetProfileStepper({ navigation }: any) {
     };
 
     const handleSkip = () => {
-        // Skip is only available on optional steps: 2, 3, 4, 6, 7
-        if ([2, 3, 4, 6, 7].includes(step)) {
+        // Skip is only available on optional steps: 2, 3, 5, 6 (Triggers, Breed, Age, Notes)
+        if ([2, 3, 5, 6].includes(step)) {
             if (step < TOTAL_STEPS) setStep(step + 1);
             else handleComplete();
         }
+    };
+
+    const handleExitSetup = () => {
+        setShowExitModal(false);
+
+        if (navigation.canGoBack?.()) {
+            navigation.goBack();
+            return;
+        }
+
+        navigation.reset({
+            index: 0,
+            routes: [{ name: 'Dashboard' }],
+        });
     };
 
     const handleComplete = async () => {
@@ -158,8 +137,8 @@ export default function PetProfileStepper({ navigation }: any) {
         try {
             const profile: PetProfile = {
                 petName: petName.trim(),
-                hasPhoto,
-                photoUri,
+                hasPhoto: false,
+                photoUri: null,
                 anxietyTriggers,
                 anxietyTriggerOther: anxietyTriggerOther.trim() || null,
                 breed: breed.trim(),
@@ -227,32 +206,7 @@ export default function PetProfileStepper({ navigation }: any) {
                         />
                     </View>
                 );
-            case 2: // Photo
-                return (
-                    <View style={styles.stepContainer}>
-                        <View style={styles.helperCard}>
-                            <Text style={styles.helperText}>Show us how cute they are!</Text>
-                        </View>
-                        <Text style={styles.stepTitle}>Add a Profile Photo</Text>
-                        <TouchableOpacity
-                            style={[styles.photoUploadBtn, hasPhoto && styles.photoUploadBtnActive]}
-                            onPress={handlePhotoActionSheet}
-                        >
-                            {photoUri ? (
-                                <Image source={{ uri: photoUri }} style={styles.photoPreview} />
-                            ) : (
-                                <Ionicons name={hasPhoto ? "checkmark-circle" : "camera"} size={60} color={hasPhoto ? COLORS.success : COLORS.primary} />
-                            )}
-                            <Text style={styles.photoUploadText}>
-                                {hasPhoto ? "Photo Selected!" : "Add Photo"}
-                            </Text>
-                        </TouchableOpacity>
-                        {!hasPhoto && (
-                            <Text style={styles.photoSubtext}>Choose a photo from your library.</Text>
-                        )}
-                    </View>
-                );
-            case 3: // Triggers
+            case 2: // Triggers
                 return (
                     <ScrollView style={styles.stepContainer} showsVerticalScrollIndicator={false}>
                         <View style={styles.helperCard}>
@@ -291,7 +245,7 @@ export default function PetProfileStepper({ navigation }: any) {
                         <View style={{ height: 20 }} />
                     </ScrollView>
                 );
-            case 4: // Breed
+            case 3: // Breed
                 return (
                     <View style={styles.stepContainer}>
                         <View style={styles.helperCard}>
@@ -319,7 +273,7 @@ export default function PetProfileStepper({ navigation }: any) {
                         </View>
                     </View>
                 );
-            case 5: // Size
+            case 4: // Size
                 return (
                     <View style={styles.stepContainer}>
                         <View style={styles.helperCard}>
@@ -352,7 +306,7 @@ export default function PetProfileStepper({ navigation }: any) {
                         </View>
                     </View>
                 );
-            case 6: // Age
+            case 5: // Age
                 return (
                     <View style={styles.stepContainer}>
                         <View style={styles.helperCard}>
@@ -388,7 +342,7 @@ export default function PetProfileStepper({ navigation }: any) {
                         </View>
                     </View>
                 );
-            case 7: // Notes
+            case 6: // Notes
                 return (
                     <View style={styles.stepContainer}>
                         <View style={styles.helperCard}>
@@ -428,7 +382,7 @@ export default function PetProfileStepper({ navigation }: any) {
 
                 <Text style={styles.headerTitle}>Add Pet</Text>
 
-                {[2, 3, 4, 6, 7].includes(step) ? (
+                {[2, 3, 5, 6].includes(step) ? (
                     <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
                         <Text style={styles.skipText}>Skip</Text>
                     </TouchableOpacity>
@@ -478,7 +432,7 @@ export default function PetProfileStepper({ navigation }: any) {
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.modalPrimaryBtn}
-                                onPress={() => navigation.goBack()}
+                                onPress={handleExitSetup}
                             >
                                 <Text style={styles.modalPrimaryBtnText}>Exit</Text>
                             </TouchableOpacity>
@@ -596,38 +550,7 @@ const styles = StyleSheet.create({
         height: 150,
         textAlignVertical: 'top',
     },
-    photoUploadBtn: {
-        backgroundColor: COLORS.background,
-        height: 200,
-        borderRadius: SIZES.radius,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...SHADOWS.medium,
-        overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: COLORS.primary + '30',
-        borderStyle: 'dashed',
-    },
-    photoUploadBtnActive: {
-        borderStyle: 'solid',
-        borderColor: COLORS.success,
-    },
-    photoPreview: {
-        width: '100%',
-        height: '100%',
-    },
-    photoUploadText: {
-        ...FONTS.body,
-        color: COLORS.primary,
-        marginTop: 10,
-        fontWeight: '600',
-    },
-    photoSubtext: {
-        ...FONTS.caption,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-        marginTop: 10,
-    },
+
     chipsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',

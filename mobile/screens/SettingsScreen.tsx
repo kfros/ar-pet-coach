@@ -53,11 +53,11 @@ export default function SettingsScreen({ navigation }: any) {
     };
 
     const handleSignIn = () => {
-        navigation.navigate('Login', { mode: 'login' });
+        navigation.navigate('Login', { mode: 'login', isModal: true });
     };
 
     const handleCreateAccount = () => {
-        navigation.navigate('Login', { mode: 'signup' });
+        navigation.navigate('Login', { mode: 'signup', isModal: true });
     };
 
     const handleClearGuestData = () => {
