@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, SessionHistoryEntry } from '../types/Session';
-import { SESSIONS } from '../content/sessions';
-import { PREMIUM_SESSIONS } from '../content/premiumRoutines';
+import { SESSIONS } from '../appContent/sessions';
+import { PREMIUM_SESSIONS } from '../appContent/premiumRoutines';
 import { auth, db, firestore } from './firebaseConfig';
 import { 
     calculateCheckinScore, 
