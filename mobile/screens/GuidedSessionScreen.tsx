@@ -473,7 +473,10 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 {phase === 'after_checkin' && renderCheckin(false)}
 
                 {phase === 'active' && currentStep && (
-                    <View style={styles.activeSessionArea}>
+                    <ScrollView 
+                        style={styles.activeSessionArea}
+                        contentContainerStyle={styles.activeSessionScroll}
+                    >
                         <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#000', opacity: dimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }) }]} />
 
                         <View style={styles.stepInfo}>
@@ -572,7 +575,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                                 <Text style={styles.endSessionText}>End Session</Text>
                             </Pressable>
                         </View>
-                    </View>
+                    </ScrollView>
                 )}
             </View>
 
@@ -711,7 +714,8 @@ const styles = StyleSheet.create({
     skipButton: { marginTop: 16, alignSelf: 'center', padding: 10 },
     skipText: { ...FONTS.body, color: COLORS.textSecondary },
 
-    activeSessionArea: { flex: 1, justifyContent: 'space-between', paddingVertical: 10 },
+    activeSessionArea: { flex: 1 },
+    activeSessionScroll: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 10 },
     stepInfo: { paddingHorizontal: 30, alignItems: 'center', marginTop: 10 },
     sessionStepTitle: { ...FONTS.tiny, color: COLORS.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
     stepTitle: { ...FONTS.h2, color: '#17212F', textAlign: 'center', marginBottom: 12 },
