@@ -8,16 +8,20 @@ import { useSubscription } from '../components/SubscriptionManager';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROUTINE_CATEGORIES } from '../appContent/routineCategories';
 import { RoutineCategory } from '../types/Session';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+    OUTDOOR_CONFIDENCE_LEVELS,
+    getOutdoorConfidenceLevel,
+    getOutdoorConfidenceProgressionState,
+    getPreviousOutdoorConfidenceLevel
+} from '../appContent/outdoorConfidenceLevels';
 
-const LEVEL_LABELS: Record<string, string> = {
-    doorway_calm: "Stayed calm near the door",
-    open_edge: "Handled the door opening",
-    one_step: "Took one calm step",
-    short_pause: "Paused briefly outside",
-    few_steps: "Walked a few calm steps away",
-    hundred_steps: "Managed around 100 steps",
-    ten_min_walk: "Managed an easy 10-minute walk"
-};
+const LEVEL_LABELS: Record<string, string> = OUTDOOR_CONFIDENCE_LEVELS.reduce((acc, lvl) => {
+    acc[lvl.id] = lvl.label;
+    return acc;
+}, {} as Record<string, string>);
+
+const OUTDOOR_LEVELS = OUTDOOR_CONFIDENCE_LEVELS.map(lvl => lvl.id);
 
 export default function SessionPreviewScreen({ navigation, route }: any) {
     const insets = useSafeAreaInsets();
@@ -31,6 +35,12 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
     const [isNavigating, setIsNavigating] = React.useState(false);
     const navigationTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
+    const [unlockedLevels, setUnlockedLevels] = React.useState<string[]>(['doorway_calm']);
+    const [newlyUnlockedLevel, setNewlyUnlockedLevel] = React.useState<string | null>(null);
+    const [showBanner, setShowBanner] = React.useState(false);
+    const [isSignsIncreased, setIsSignsIncreased] = React.useState(false);
+    const [selectedLevel, setSelectedLevel] = React.useState<string>('doorway_calm');
+
     React.useEffect(() => {
         return () => {
             if (navigationTimeoutRef.current) {
@@ -39,16 +49,77 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
         };
     }, []);
 
-    const handlePrimaryAction = () => {
+    const handleSelectLevel = async (lvl: string) => {
+        setSelectedLevel(lvl);
+        await AsyncStorage.setItem(`chillpup_selected_outdoor_confidence_level_${petId}`, lvl);
+    };
+
+    React.useEffect(() => {
+        const loadProgress = async () => {
+            if (!petId) return;
+            try {
+                const state = await getOutdoorConfidenceProgressionState(petId);
+                setUnlockedLevels(state.unlockedLevels);
+                setIsSignsIncreased(state.isSignsIncreased);
+
+                // Load initial selected level
+                const initialLevel = route.params?.level || state.selectedLevel || 'doorway_calm';
+                setSelectedLevel(initialLevel);
+
+                // Show newly unlocked level banner
+                if (state.newlyUnlockedLevel && state.unlockedLevels.includes(state.newlyUnlockedLevel) && state.newlyUnlockedLevel !== state.acknowledgedLevel) {
+                    setNewlyUnlockedLevel(state.newlyUnlockedLevel);
+                    setShowBanner(true);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        loadProgress();
+    }, [petId, route.params?.level]);
+
+    const handleBannerPrimary = async () => {
+        setShowBanner(false);
+        if (newlyUnlockedLevel) {
+            await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel);
+            if (isSignsIncreased) {
+                await handleSelectLevel('doorway_calm');
+            } else {
+                await handleSelectLevel(newlyUnlockedLevel);
+            }
+        }
+    };
+
+    const handleBannerSecondary = async () => {
+        setShowBanner(false);
+        if (newlyUnlockedLevel) {
+            await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel);
+            if (isSignsIncreased) {
+                await handleSelectLevel(newlyUnlockedLevel);
+            } else {
+                const prev = getPreviousOutdoorConfidenceLevel(newlyUnlockedLevel);
+                await handleSelectLevel(prev ? prev.id : 'doorway_calm');
+            }
+        }
+    };
+
+    const handlePrimaryAction = async () => {
         if (!session || isNavigatingRef.current) return;
 
         isNavigatingRef.current = true;
         setIsNavigating(true);
 
+        if (newlyUnlockedLevel) {
+            AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel).catch(console.error);
+        }
+
         if (isLocked) {
             navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
         } else {
-            navigation.navigate('GuidedSession', { sessionId, petId, level: route.params?.level });
+            if (sessionId === 'outdoor_confidence_reset') {
+                AsyncStorage.setItem(`chillpup_selected_outdoor_confidence_level_${petId}`, selectedLevel).catch(console.error);
+            }
+            navigation.navigate('GuidedSession', { sessionId, petId, level: selectedLevel });
         }
 
         navigationTimeoutRef.current = setTimeout(() => {
@@ -81,6 +152,57 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     { paddingBottom: insets.bottom + 120 } // Ensure content is not hidden by sticky footer
                 ]}
             >
+                {showBanner && newlyUnlockedLevel && (
+                    <View style={[
+                        styles.notificationBanner,
+                        isSignsIncreased ? styles.notificationBannerWarning : styles.notificationBannerInfo
+                    ]}>
+                        <View style={styles.notificationHeader}>
+                            <Ionicons 
+                                name={isSignsIncreased ? "alert-circle" : "sparkles"} 
+                                size={20} 
+                                color={isSignsIncreased ? "#B7791F" : "#0F766E"} 
+                            />
+                            <Text style={[
+                                styles.notificationTitle,
+                                { color: isSignsIncreased ? "#B7791F" : "#0F766E" }
+                            ]}>
+                                {isSignsIncreased ? "Easier step suggested" : "New step available"}
+                            </Text>
+                        </View>
+                        <Text style={[
+                            styles.notificationBody,
+                            { color: isSignsIncreased ? "#6B4A1D" : "#12312E" }
+                        ]}>
+                            {isSignsIncreased 
+                                ? "Recent signs looked stronger. You can still see the new step, but repeating an easier one may be safer today."
+                                : `${LEVEL_LABELS[newlyUnlockedLevel] || newlyUnlockedLevel} is available for next time. You can try it today, or repeat an easier step.`
+                            }
+                        </Text>
+                        <View style={styles.notificationActions}>
+                            <Pressable 
+                                style={[
+                                    styles.notificationBtn,
+                                    isSignsIncreased ? styles.notificationBtnWarning : styles.notificationBtnInfo
+                                ]}
+                                onPress={handleBannerPrimary}
+                            >
+                                <Text style={styles.notificationBtnText}>
+                                    {isSignsIncreased ? "Show easier steps" : "Show new step"}
+                                </Text>
+                            </Pressable>
+                            <Pressable 
+                                style={styles.notificationBtnSecondary}
+                                onPress={handleBannerSecondary}
+                            >
+                                <Text style={styles.notificationBtnTextSecondary}>
+                                    {isSignsIncreased ? "Review new step" : "Stay with easier step"}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                )}
+
                 {route.params?.unlockedAfterPurchase && (
                     <View style={styles.celebrationBanner}>
                         <Ionicons name="sparkles" size={20} color="#11866F" />
@@ -145,7 +267,58 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
 
-                {route.params?.level && LEVEL_LABELS[route.params.level] && (
+                {/* Outdoor Confidence Levels Selector */}
+                {sessionId === 'outdoor_confidence_reset' && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Outdoor Confidence level</Text>
+                        <Text style={styles.helperText}>Choose today’s outdoor level. This level changes one practice step inside the session. Repeating an easier level is always okay.</Text>
+                        <View style={styles.levelLadder}>
+                            {OUTDOOR_LEVELS.map((lvl) => {
+                                const isUnlocked = unlockedLevels.includes(lvl);
+                                const isSelected = selectedLevel === lvl;
+                                const isNew = newlyUnlockedLevel === lvl;
+
+                                return (
+                                    <Pressable
+                                        key={lvl}
+                                        disabled={!isUnlocked}
+                                        style={[
+                                            styles.ladderStep,
+                                            isSelected && styles.ladderStepSelected,
+                                            !isUnlocked && styles.ladderStepLocked
+                                        ]}
+                                        onPress={() => handleSelectLevel(lvl)}
+                                    >
+                                        <View style={styles.ladderStepLeft}>
+                                            <Ionicons 
+                                                name={isUnlocked ? (isSelected ? "radio-button-on" : "radio-button-off") : "lock-closed"} 
+                                                size={18} 
+                                                color={isUnlocked ? (isSelected ? COLORS.primary : COLORS.textSecondary) : "#A3A3A3"} 
+                                            />
+                                            <Text style={[
+                                                styles.ladderStepLabel,
+                                                isSelected && styles.ladderStepLabelSelected,
+                                                !isUnlocked && styles.ladderStepLabelLocked
+                                            ]}>
+                                                {(() => {
+                                                    const info = getOutdoorConfidenceLevel(lvl);
+                                                    return info ? `Level ${info.levelIndex} of 7: ${info.label}` : LEVEL_LABELS[lvl];
+                                                })()}
+                                            </Text>
+                                        </View>
+                                        {isNew && (
+                                            <View style={styles.newBadge}>
+                                                <Text style={styles.newBadgeText}>New</Text>
+                                            </View>
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                    </View>
+                )}
+
+                {sessionId !== 'outdoor_confidence_reset' && route.params?.level && LEVEL_LABELS[route.params.level] && (
                     <View style={styles.levelTargetBanner}>
                         <Ionicons name="flag-outline" size={20} color="#0F766E" />
                         <Text style={styles.levelTargetText}>
@@ -389,6 +562,130 @@ const styles = StyleSheet.create({
     silentText: {
         fontSize: 13,
         color: '#4B5563',
+        fontWeight: '500',
+    },
+    levelLadder: {
+        marginTop: 10,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        gap: 8,
+    },
+    ladderStep: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    ladderStepSelected: {
+        backgroundColor: '#EEF8F6',
+        borderColor: '#CDECE5',
+    },
+    ladderStepLocked: {
+        opacity: 0.6,
+        backgroundColor: '#F3F4F6',
+    },
+    ladderStepLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        flex: 1,
+    },
+    ladderStepLabel: {
+        fontSize: 14,
+        color: COLORS.text,
+        fontWeight: '500',
+    },
+    ladderStepLabelSelected: {
+        color: COLORS.primary,
+        fontWeight: '700',
+    },
+    ladderStepLabelLocked: {
+        color: '#737373',
+    },
+    newBadge: {
+        backgroundColor: '#10B981',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    newBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    helperText: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+        marginBottom: 8,
+    },
+    notificationBanner: {
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        gap: 8,
+    },
+    notificationBannerInfo: {
+        backgroundColor: '#EEF8F6',
+        borderColor: '#CDECE5',
+    },
+    notificationBannerWarning: {
+        backgroundColor: '#FFF8E8',
+        borderColor: '#F4D08A',
+    },
+    notificationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    notificationTitle: {
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    notificationBody: {
+        fontSize: 13.5,
+        lineHeight: 18.5,
+    },
+    notificationActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 8,
+    },
+    notificationBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 18,
+    },
+    notificationBtnInfo: {
+        backgroundColor: COLORS.primary,
+    },
+    notificationBtnWarning: {
+        backgroundColor: '#B7791F',
+    },
+    notificationBtnSecondary: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 18,
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+    },
+    notificationBtnText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: 'bold',
+    },
+    notificationBtnTextSecondary: {
+        color: COLORS.text,
+        fontSize: 13,
         fontWeight: '500',
     },
 });

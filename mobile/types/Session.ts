@@ -139,6 +139,7 @@ export interface SessionHistoryEntry {
     updatedAt?: string;
     syncStatus?: 'pending' | 'synced';
     outdoorMilestone?: string;
+    outdoorMilestones?: string[];
 }
 
 export type StressSignsTrendStatus =

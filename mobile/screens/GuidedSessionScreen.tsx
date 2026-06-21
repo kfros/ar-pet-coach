@@ -9,13 +9,14 @@ import SessionService from '../services/sessionService';
 import { useCalmAudio } from '../hooks/useCalmAudio';
 import { Session, SessionStep, AnxietyLevel, AnxietySign, PositiveSign, CheckIn, CheckInProfile, CheckInSignOption } from '../types/Session';
 import { getCheckInProfile } from '../appContent/checkInProfiles';
-import { 
-    MEDICAL_SEVERE_SIGNS, 
-    BEHAVIORAL_SEVERE_SIGNS, 
+import {
+    MEDICAL_SEVERE_SIGNS,
+    BEHAVIORAL_SEVERE_SIGNS,
     SEVERE_SIGN_LOGIC,
     IN_SESSION_SAFETY_PROMPT
 } from '../appContent/routineSafety';
 import { calculateCheckinScore } from '../services/progressScoring';
+import { getOutdoorConfidenceLevel } from '../appContent/outdoorConfidenceLevels';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -75,7 +76,7 @@ const MILESTONE_OPTIONS = [
 const MILESTONE_EXPLANATIONS: Record<string, { title: string, body: string, primaryCTA: string, secondaryCTA?: string }> = {
     none_yet: {
         title: "That is useful information",
-        body: "Next time, make the step easier. Try staying farther from the exit, opening the door less, or shortening the session.",
+        body: "Next time, make the step easier. Try staying further from the exit, opening the door less, or shortening the session.",
         primaryCTA: "See easier options"
     },
     doorway_calm: {
@@ -132,6 +133,13 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Collapsible check-in section expansion states
+    const [beforeStressExpanded, setBeforeStressExpanded] = useState(true);
+    const [beforeSafetyExpanded, setBeforeSafetyExpanded] = useState(false);
+    const [afterStressExpanded, setAfterStressExpanded] = useState(true);
+    const [afterPositiveExpanded, setAfterPositiveExpanded] = useState(true);
+    const [afterSafetyExpanded, setAfterSafetyExpanded] = useState(false);
+
     const sessionPolicy = session?.backgroundSoundPolicy;
     const initialAudioEnabled = sessionPolicy ? sessionPolicy.defaultEnabled : true;
     const [audioEnabled, setAudioEnabled] = useState(initialAudioEnabled);
@@ -140,8 +148,21 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
     // Milestone progression prompt state
     const [showMilestonePrompt, setShowMilestonePrompt] = useState(false);
-    const [selectedMilestone, setSelectedMilestone] = useState<string | null>(null);
+    const [selectedMilestones, setSelectedMilestones] = useState<string[]>([]);
     const [milestoneExplanation, setMilestoneExplanation] = useState<any | null>(null);
+    const handleToggleMilestone = (id: string) => {
+        setSelectedMilestones((prev) => {
+            if (id === 'none_yet') {
+                return ['none_yet'];
+            }
+            const filtered = prev.filter(x => x !== 'none_yet');
+            if (filtered.includes(id)) {
+                return filtered.filter(x => x !== id);
+            } else {
+                return [...filtered, id];
+            }
+        });
+    };
     const [showEasierHelperModal, setShowEasierHelperModal] = useState(false);
     const [entryId] = useState(() => `session_${Date.now()}`);
     const profile = getCheckInProfile(session?.checkInProfileId);
@@ -150,7 +171,38 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const savedAfterCheckinRef = useRef<CheckIn | undefined>(undefined);
     const savedCompletedAtRef = useRef<string | undefined>(undefined);
 
-    const steps = session?.steps || [];
+    const [selectedLevelId, setSelectedLevelId] = useState<string>(route.params?.level || 'doorway_calm');
+
+    useEffect(() => {
+        const loadSelectedLevel = async () => {
+            if (sessionId === 'outdoor_confidence_reset') {
+                const stored = await AsyncStorage.getItem(`chillpup_selected_outdoor_confidence_level_${petId}`);
+                if (stored) {
+                    setSelectedLevelId(stored);
+                }
+            }
+        };
+        loadSelectedLevel();
+    }, [petId, sessionId, route.params?.level]);
+
+    const getDynamicSteps = () => {
+        const rawSteps = session?.steps || [];
+        if (sessionId === 'outdoor_confidence_reset' && rawSteps.length === 6) {
+            const updatedSteps = [...rawSteps];
+            const levelInfo = getOutdoorConfidenceLevel(selectedLevelId);
+            if (levelInfo) {
+                updatedSteps[3] = {
+                    ...updatedSteps[3],
+                    title: levelInfo.label,
+                    instruction: levelInfo.description
+                };
+            }
+            return updatedSteps;
+        }
+        return rawSteps;
+    };
+
+    const steps = getDynamicSteps();
     const currentStep = steps[currentStepIndex];
 
     const stepPolicy = currentStep?.backgroundSoundPolicy;
@@ -180,12 +232,26 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
     useEffect(() => {
         const loadSettings = async () => {
-            const hintDismissed = await AsyncStorage.getItem(HINT_STORAGE_KEY);
             const repeatOn = await AsyncStorage.getItem(REPEAT_STORAGE_KEY);
-            if (!hintDismissed) setShowHint(true);
             if (repeatOn === 'true') setRepeatEnabled(true);
         };
         loadSettings();
+
+        return () => {
+            try {
+                stopAudio();
+            } catch (e) {
+                console.error(e);
+            }
+            if (pulseLoop.current) {
+                pulseLoop.current.stop();
+            }
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+            setShowNextStepPrompt(false);
+        };
     }, []);
 
     useEffect(() => {
@@ -283,7 +349,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             // On resume: don't reset values. On new step: reset.
             const isNewStep = pulseStartedForStep.current !== currentStepIndex;
             pulseStartedForStep.current = currentStepIndex;
-            startPulsing(isNewStep);
+            // focus circle is disabled by default
+            // startPulsing(isNewStep);
         }
     }, [isPaused, phase, currentStepIndex]);
 
@@ -307,7 +374,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const togglePause = async () => {
         const newPaused = !isPaused;
         setIsPaused(newPaused);
-        
+
         if (newPaused) {
             // Pausing
             wasSoundPlayingBeforePause.current = isPlaying;
@@ -395,9 +462,26 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
-    const saveSession = async (stoppedEarly = false, milestone?: string | null) => {
+    const saveSession = async (stoppedEarly = false, milestonesToSave?: string[] | null) => {
         if (!session) return;
         setIsSaving(true);
+
+        // Stop audio immediately
+        try {
+            stopAudio();
+        } catch (e) {
+            console.error('Error stopping audio:', e);
+        }
+        if (pulseLoop.current) {
+            pulseLoop.current.stop();
+        }
+        // Stop timer and next step prompt immediately
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+        setShowNextStepPrompt(false);
+        setIsPaused(true);
 
         let beforeCheckin = savedBeforeCheckinRef.current;
         if (!beforeCheckin && beforeLevel) {
@@ -434,6 +518,33 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             savedCompletedAtRef.current = completedAt;
         }
 
+        let highestMilestone: string | undefined = undefined;
+        let milestonesArr: string[] = [];
+
+        if (milestonesToSave && milestonesToSave.length > 0) {
+            milestonesArr = milestonesToSave;
+            const OUTDOOR_LEVELS = [
+                'doorway_calm',
+                'open_edge',
+                'one_step',
+                'short_pause',
+                'few_steps',
+                'hundred_steps',
+                'ten_min_walk'
+            ];
+            let maxIndex = -1;
+            for (const m of milestonesToSave) {
+                const idx = OUTDOOR_LEVELS.indexOf(m);
+                if (idx > maxIndex) {
+                    maxIndex = idx;
+                    highestMilestone = m;
+                }
+            }
+            if (milestonesToSave.includes('none_yet')) {
+                highestMilestone = 'none_yet';
+            }
+        }
+
         try {
             await SessionService.saveSessionHistory({
                 id: entryId,
@@ -445,7 +556,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 stoppedEarly: stoppedEarly,
                 beforeCheckin: beforeCheckin,
                 afterCheckin: afterCheckin,
-                outdoorMilestone: milestone || undefined
+                outdoorMilestone: highestMilestone || undefined,
+                outdoorMilestones: milestonesArr.length > 0 ? milestonesArr : undefined
             });
 
             await trackCalmingSession();
@@ -457,68 +569,116 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             const hasAfterSevere = afterSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s as any) || BEHAVIORAL_SEVERE_SIGNS.includes(s as any));
 
             if (sessionId === 'outdoor_confidence_reset' && !stoppedEarly) {
-                if (milestone === null || milestone === undefined) {
+                if (milestonesToSave === null || milestonesToSave === undefined) {
                     setShowMilestonePrompt(true);
+                } else {
+                    // Load currently unlocked levels using routine-specific storage key
+                    const unlockedData = await AsyncStorage.getItem(`chillpup_outdoor_confidence_levels_${petId}`);
+                    let unlockedLevelsList = ['doorway_calm'];
+                    if (unlockedData) {
+                        unlockedLevelsList = JSON.parse(unlockedData);
+                    }
+
+                    let newLvlUnlocked: string | null = null;
+                    if (highestMilestone && highestMilestone !== 'none_yet') {
+                        const OUTDOOR_LEVELS = [
+                            'doorway_calm',
+                            'open_edge',
+                            'one_step',
+                            'short_pause',
+                            'few_steps',
+                            'hundred_steps',
+                            'ten_min_walk'
+                        ];
+                        const idx = OUTDOOR_LEVELS.indexOf(highestMilestone);
+                        if (idx >= 0) {
+                            // Backfill levels up to idx
+                            const achieved = OUTDOOR_LEVELS.slice(0, idx + 1);
+                            // Unlock next level (idx + 1)
+                            const nextLvl = idx < OUTDOOR_LEVELS.length - 1 ? OUTDOOR_LEVELS[idx + 1] : null;
+
+                            const levelsToUnlock = [...achieved];
+                            if (nextLvl) {
+                                levelsToUnlock.push(nextLvl);
+                            }
+
+                            // Build unique list of newly unlocked levels
+                            const updatedUnlockedList = Array.from(new Set([...unlockedLevelsList, ...levelsToUnlock]));
+                            await AsyncStorage.setItem(`chillpup_outdoor_confidence_levels_${petId}`, JSON.stringify(updatedUnlockedList));
+
+                            // If the next level was NOT previously unlocked, it is newly available!
+                            if (nextLvl && !unlockedLevelsList.includes(nextLvl)) {
+                                newLvlUnlocked = nextLvl;
+                                await AsyncStorage.setItem(`chillpup_newly_unlocked_outdoor_confidence_level_${petId}`, nextLvl);
+                            }
+                        }
+                    }
+
+                    // Check if trend is increased
+                    const trend = typeof SessionService.getStressSignsTrend === 'function'
+                        ? await SessionService.getStressSignsTrend(petId)
+                        : null;
+                    const isTrendIncreased = trend && (trend.status === 'increased' || trend.status === 'severe');
+                    const stressSignsIncreased = worsened || hasAfterSevere || isTrendIncreased;
+
+                    let explanationCopy;
+                    if (highestMilestone === 'none_yet') {
+                        explanationCopy = {
+                            title: "That is useful information",
+                            body: "Nothing new needs to be unlocked today. Next time, make the level easier and end while your dog can still recover.",
+                            primaryCTA: "Done",
+                            secondaryCTA: "Review easier steps"
+                        };
+                    } else if (stressSignsIncreased) {
+                        explanationCopy = {
+                            title: "Use an easier step next time",
+                            body: "You saved this session. Next time, make the setup easier, shorter, or farther from the outdoor edge.",
+                            primaryCTA: "Done",
+                            secondaryCTA: "Review easier steps"
+                        };
+                    } else if (newLvlUnlocked) {
+                        explanationCopy = {
+                            title: "New level available for next time",
+                            body: "Based on what you logged today, another outdoor level is available. You do not need to try it today. Repeating an easier level is always okay.",
+                            primaryCTA: "Done",
+                            secondaryCTA: "Review progress"
+                        };
+                    } else {
+                        explanationCopy = {
+                            title: "Progress saved",
+                            body: "This session was saved. Next time, keep the step small and easy enough for your dog to recover.",
+                            primaryCTA: "Done"
+                        };
+                    }
+
+                    setMilestoneExplanation(explanationCopy);
                 }
             } else {
                 if (!stoppedEarly && (worsened || hasAfterSevere)) {
                     setShowFinalSafetyPrompt(true);
                 } else {
-                    navigation.replace('Dashboard');
+                    navigation.navigate('Dashboard');
                 }
             }
         } catch (error) {
             console.error('Error saving session:', error);
-            navigation.replace('Dashboard');
+            navigation.navigate('Dashboard');
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleCTANavigation = (ctaText: string, levelId: string) => {
+    const handleCTANavigation = (ctaText: string) => {
         setShowMilestonePrompt(false);
         setMilestoneExplanation(null);
-        setSelectedMilestone(null);
+        setSelectedMilestones([]);
 
-        const OUTDOOR_LEVELS = [
-            'doorway_calm',
-            'open_edge',
-            'one_step',
-            'short_pause',
-            'few_steps',
-            'hundred_steps',
-            'ten_min_walk'
-        ];
-
-        if (ctaText === 'See easier options') {
-            // Priority: Previous Outdoor Confidence level preview -> Current repeat preview -> Daily Calm Reset fallback
-            let referenceLevel: string | undefined = route.params?.level;
-            if (!referenceLevel && levelId && levelId !== 'none_yet') {
-                referenceLevel = levelId;
-            }
-
-            if (referenceLevel && OUTDOOR_LEVELS.includes(referenceLevel)) {
-                const index = OUTDOOR_LEVELS.indexOf(referenceLevel);
-                if (index > 0) {
-                    navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId, level: OUTDOOR_LEVELS[index - 1] });
-                    return;
-                }
-            }
-            // Fallback
-            navigation.replace('SessionPreview', { sessionId: 'daily_calm_reset', petId });
-        } else if (ctaText === 'Repeat this level') {
-            navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId, level: levelId });
-        } else if (ctaText === 'View next level' || ctaText === 'See next level') {
-            const index = OUTDOOR_LEVELS.indexOf(levelId);
-            if (index >= 0 && index < OUTDOOR_LEVELS.length - 1) {
-                navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId, level: OUTDOOR_LEVELS[index + 1] });
-            } else {
-                navigation.replace('Dashboard');
-            }
-        } else if (ctaText === 'Review levels') {
-            navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId });
+        if (ctaText === 'Done') {
+            navigation.navigate('Dashboard');
+        } else if (ctaText === 'Review progress' || ctaText === 'Review easier steps') {
+            navigation.navigate('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId });
         } else {
-            navigation.replace('Dashboard');
+            navigation.navigate('Dashboard');
         }
     };
 
@@ -530,6 +690,103 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         const selectableSigns = [...profile.stressSigns, ...profile.severeSigns];
         const positiveSigns = profile.positiveSigns || [];
         const selectedOptionsWithHelper = selectableSigns.filter(s => signs.includes(s.id) && s.helperText);
+
+        const renderCollapsibleSection = (
+            id: string,
+            title: string,
+            items: CheckInSignOption[],
+            selectedIds: string[],
+            isExpanded: boolean,
+            onToggle: () => void,
+            isCaution: boolean = false,
+            isPositive: boolean = false
+        ) => {
+            const selectedCount = selectedIds.length;
+            const selectedItems = items.filter(item => selectedIds.includes(item.id));
+
+            return (
+                <View style={styles.collapsibleSectionContainer} key={id}>
+                    <Pressable
+                        style={[
+                            styles.sectionHeader,
+                            isCaution && styles.sectionHeaderCaution
+                        ]}
+                        onPress={onToggle}
+                        testID={`section-header-${id}`}
+                    >
+                        <Text style={[
+                            styles.sectionHeaderTitle,
+                            isCaution && styles.sectionHeaderTitleCaution
+                        ]}>
+                            {selectedCount > 0 ? `${title} · ${selectedCount} selected` : title}
+                        </Text>
+                        <View style={styles.sectionHeaderRight}>
+                            <Text style={[
+                                styles.expandCollapseLabel,
+                                isCaution && styles.expandCollapseLabelCaution
+                            ]}>
+                                {isExpanded ? 'Hide' : 'Show'}
+                            </Text>
+                            <Ionicons
+                                name={isExpanded ? "chevron-up" : "chevron-down"}
+                                size={16}
+                                color={isCaution ? "#9A5B00" : COLORS.textSecondary}
+                            />
+                        </View>
+                    </Pressable>
+
+                    {isExpanded ? (
+                        <View style={styles.sectionContent}>
+                            <View style={styles.signsContainer}>
+                                {items.map((sign) => {
+                                    const isSelected = selectedIds.includes(sign.id);
+                                    return (
+                                        <Pressable
+                                            key={sign.id}
+                                            style={[
+                                                styles.signChip,
+                                                isSelected && (isPositive ? styles.positiveSignChipSelected : styles.signChipSelected)
+                                            ]}
+                                            onPress={() => isPositive ? togglePositiveSign(sign.id) : toggleSign(sign.id, isBefore)}
+                                        >
+                                            <Text style={[
+                                                styles.signText,
+                                                isSelected && (isPositive ? styles.positiveSignTextSelected : styles.signTextSelected)
+                                            ]}>
+                                                {sign.label}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    ) : (
+                        selectedCount > 0 && (
+                            <View style={styles.sectionContentCollapsed}>
+                                <View style={styles.signsContainerCollapsed}>
+                                    {selectedItems.map((sign) => (
+                                        <View
+                                            key={sign.id}
+                                            style={[
+                                                styles.signChipCollapsed,
+                                                isPositive && styles.positiveSignChipCollapsed
+                                            ]}
+                                        >
+                                            <Text style={[
+                                                styles.signTextCollapsed,
+                                                isPositive && styles.positiveSignTextCollapsed
+                                            ]}>
+                                                {sign.label}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )
+                    )}
+                </View>
+            );
+        };
 
         return (
             <ScrollView contentContainerStyle={styles.checkinScroll}>
@@ -551,20 +808,61 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     ))}
                 </View>
 
-                <Text style={styles.signsTitle}>Signs Noted (optional)</Text>
-                <View style={styles.signsContainer}>
-                    {selectableSigns.map((sign) => (
-                        <Pressable
-                            key={sign.id}
-                            style={[
-                                styles.signChip,
-                                signs.includes(sign.id) && styles.signChipSelected
-                            ]}
-                            onPress={() => toggleSign(sign.id, isBefore)}
-                        >
-                            <Text style={[styles.signText, signs.includes(sign.id) && styles.signTextSelected]}>{sign.label}</Text>
-                        </Pressable>
-                    ))}
+                <View style={{ marginTop: 16 }}>
+                    {isBefore ? (
+                        <>
+                            {renderCollapsibleSection(
+                                'stress_signs',
+                                'Stress signs',
+                                profile.stressSigns,
+                                beforeSigns.filter(id => profile.stressSigns.some(s => s.id === id)),
+                                beforeStressExpanded,
+                                () => setBeforeStressExpanded(!beforeStressExpanded)
+                            )}
+
+                            {renderCollapsibleSection(
+                                'safety_stop_signs',
+                                'Safety / stop signs',
+                                profile.severeSigns,
+                                beforeSigns.filter(id => profile.severeSigns.some(s => s.id === id)),
+                                beforeSafetyExpanded,
+                                () => setBeforeSafetyExpanded(!beforeSafetyExpanded),
+                                true
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {renderCollapsibleSection(
+                                'stress_signs',
+                                'Stress signs still present',
+                                profile.stressSigns,
+                                afterSigns.filter(id => profile.stressSigns.some(s => s.id === id)),
+                                afterStressExpanded,
+                                () => setAfterStressExpanded(!afterStressExpanded)
+                            )}
+
+                            {profile.showPositiveSignsAfter && positiveSigns.length > 0 && renderCollapsibleSection(
+                                'positive_recovery_signs',
+                                'Recovery signs',
+                                positiveSigns,
+                                afterPositiveSigns,
+                                afterPositiveExpanded,
+                                () => setAfterPositiveExpanded(!afterPositiveExpanded),
+                                false,
+                                true
+                            )}
+
+                            {renderCollapsibleSection(
+                                'safety_stop_signs',
+                                'Safety / stop signs',
+                                profile.severeSigns,
+                                afterSigns.filter(id => profile.severeSigns.some(s => s.id === id)),
+                                afterSafetyExpanded,
+                                () => setAfterSafetyExpanded(!afterSafetyExpanded),
+                                true
+                            )}
+                        </>
+                    )}
                 </View>
 
                 {selectedOptionsWithHelper.map((s) => (
@@ -573,26 +871,6 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                         <Text style={styles.signHelperText}>{s.helperText}</Text>
                     </View>
                 ))}
-
-                {!isBefore && profile.showPositiveSignsAfter && positiveSigns.length > 0 && (
-                    <>
-                        <Text style={styles.signsTitle}>Positive Signs (optional)</Text>
-                        <View style={styles.signsContainer}>
-                            {positiveSigns.map((sign) => (
-                                <Pressable
-                                    key={sign.id}
-                                    style={[
-                                        styles.signChip,
-                                        afterPositiveSigns.includes(sign.id) && styles.positiveSignChipSelected
-                                    ]}
-                                    onPress={() => togglePositiveSign(sign.id)}
-                                >
-                                    <Text style={[styles.signText, afterPositiveSigns.includes(sign.id) && styles.positiveSignTextSelected]}>{sign.label}</Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </>
-                )}
 
                 <Pressable
                     style={styles.checkinNextButton}
@@ -637,7 +915,20 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                         <View style={styles.progressBarBg}>
                             <View style={[styles.progressBarFill, { width: `${((currentStepIndex + 1) / steps.length) * 100}%` }]} />
                         </View>
-                        <Text style={styles.progressText}>Step {currentStepIndex + 1} of {steps.length}</Text>
+                        <Text style={styles.progressText}>
+                            {sessionId === 'outdoor_confidence_reset'
+                                ? `Routine step ${currentStepIndex + 1} of ${steps.length}`
+                                : `Step ${currentStepIndex + 1} of ${steps.length}`
+                            }
+                        </Text>
+                        {sessionId === 'outdoor_confidence_reset' && (() => {
+                            const lvlInfo = getOutdoorConfidenceLevel(selectedLevelId);
+                            return lvlInfo ? (
+                                <Text style={styles.outdoorProgressSubText}>
+                                    {`Outdoor level ${lvlInfo.levelIndex} of 7: ${lvlInfo.label}`}
+                                </Text>
+                            ) : null;
+                        })()}
                     </View>
                 )}
                 <View style={{ width: 28 }} />
@@ -648,7 +939,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 {phase === 'after_checkin' && renderCheckin(false)}
 
                 {phase === 'active' && currentStep && (
-                    <ScrollView 
+                    <ScrollView
                         style={styles.activeSessionArea}
                         contentContainerStyle={styles.activeSessionScroll}
                     >
@@ -656,10 +947,18 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
                         <View style={styles.stepInfo}>
                             <Text style={styles.sessionStepTitle}>{session.title}</Text>
+                            {sessionId === 'outdoor_confidence_reset' && currentStepIndex === 3 && (() => {
+                                const lvlInfo = getOutdoorConfidenceLevel(selectedLevelId);
+                                return lvlInfo ? (
+                                    <Text style={styles.dynamicStepHeader} testID="dynamic-step-header">
+                                        {`Today’s outdoor level: ${lvlInfo.label}`}
+                                    </Text>
+                                ) : null;
+                            })()}
                             <Text style={styles.stepTitle}>{currentStep.title}</Text>
                             <Text style={styles.stepInstruction}>{currentStep.instruction}</Text>
                             {currentStep.id === 'outdoor_check_body' && (
-                                <Pressable 
+                                <Pressable
                                     style={styles.easierHelperLink}
                                     onPress={() => setShowEasierHelperModal(true)}
                                 >
@@ -678,15 +977,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             </View>
 
                             <View style={styles.visualArea}>
-                                {sessionId !== 'outdoor_confidence_reset' && (
-                                    <Animated.View
-                                        testID="focus-pulse-circle"
-                                        style={[
-                                            styles.mainCircle,
-                                            { transform: [{ scale: pulseAnim }], opacity: opacityAnim }
-                                        ]}
-                                    />
-                                )}
+                                {/* focus-pulse-circle is disabled by default */}
                                 {isPaused && (
                                     <View style={styles.pausedOverlay}>
                                         <Ionicons name="pause" size={48} color={COLORS.primary} />
@@ -765,8 +1056,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             )}
 
                             <View style={styles.stepControlsRow}>
-                                <Pressable 
-                                    style={[styles.stepNavBtn, currentStepIndex === 0 && styles.stepNavBtnDisabled]} 
+                                <Pressable
+                                    style={[styles.stepNavBtn, currentStepIndex === 0 && styles.stepNavBtnDisabled]}
                                     disabled={currentStepIndex === 0}
                                     onPress={handlePrevStep}
                                 >
@@ -831,10 +1122,10 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={[styles.modalIcon, showSafetyNotice?.type === 'medical' ? { backgroundColor: '#FEE2E2' } : { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons 
-                                name={showSafetyNotice?.type === 'medical' ? "medical-outline" : "alert-circle-outline"} 
-                                size={40} 
-                                color={showSafetyNotice?.type === 'medical' ? "#EF4444" : "#D97706"} 
+                            <Ionicons
+                                name={showSafetyNotice?.type === 'medical' ? "medical-outline" : "alert-circle-outline"}
+                                size={40}
+                                color={showSafetyNotice?.type === 'medical' ? "#EF4444" : "#D97706"}
                             />
                         </View>
                         <Text style={styles.modalTitle}>{showSafetyNotice?.title}</Text>
@@ -842,11 +1133,11 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
                         <View style={{ width: '100%', gap: 12 }}>
                             {showSafetyNotice?.type === 'behavioral' && (
-                                <Pressable 
-                                    style={styles.modalBtn} 
+                                <Pressable
+                                    style={styles.modalBtn}
                                     onPress={() => {
                                         setShowSafetyNotice(null);
-                                        navigation.replace('SessionPreview', { sessionId: 'daily_calm_reset', petId });
+                                        navigation.navigate('SessionPreview', { sessionId: 'daily_calm_reset', petId });
                                     }}
                                 >
                                     <Text style={styles.modalBtnText}>{SEVERE_SIGN_LOGIC.behavioral.primaryCTA}</Text>
@@ -886,7 +1177,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             }
                         </Text>
 
-                        <Pressable style={styles.modalBtn} onPress={() => navigation.replace('Dashboard')}>
+                        <Pressable style={styles.modalBtn} onPress={() => navigation.navigate('Dashboard')}>
                             <Text style={styles.modalBtnText}>{IN_SESSION_SAFETY_PROMPT.primaryCTA}</Text>
                         </Pressable>
                     </View>
@@ -928,59 +1219,66 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             {/* Outdoor Confidence progression prompt */}
             <Modal visible={showMilestonePrompt} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalCard, { maxHeight: '90%', width: '90%' }]}>
+                    <View style={[styles.modalCard, { maxHeight: '90%', width: '90%', padding: 20 }]}>
                         {!milestoneExplanation ? (
                             <>
-                                <View style={[styles.modalIcon, { backgroundColor: '#E6F7F2' }]}>
-                                    <Ionicons name="trophy-outline" size={40} color={COLORS.primary} />
+                                <View style={[styles.modalIcon, { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E6F7F2', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }]}>
+                                    <Ionicons name="trophy-outline" size={22} color={COLORS.primary} />
                                 </View>
-                                <Text style={styles.modalTitle}>What did your dog manage today?</Text>
-                                <Text style={[styles.modalBody, { marginBottom: 15 }]}>
-                                    Unlocking milestones helps track progression. You can always repeat easier steps.
+                                <Text style={[styles.modalTitle, { fontSize: 18, marginBottom: 6 }]}>What did your dog manage today?</Text>
+                                <Text style={[styles.modalBody, { fontSize: 13, marginBottom: 8 }]}>
+                                    Choose everything your dog managed. You can always repeat easier steps.
+                                </Text>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 8, alignSelf: 'flex-start' }}>
+                                    Choose all that apply.
                                 </Text>
 
-                                <ScrollView 
-                                    style={{ width: '100%', maxHeight: 220, marginBottom: 20 }} 
+                                <ScrollView
+                                    style={{ width: '100%', maxHeight: 320, marginBottom: 16 }}
                                     showsVerticalScrollIndicator={true}
                                 >
-                                    {MILESTONE_OPTIONS.map((opt) => (
-                                        <Pressable
-                                            key={opt.id}
-                                            style={[
-                                                styles.milestoneOption,
-                                                selectedMilestone === opt.id && styles.milestoneOptionSelected
-                                            ]}
-                                            onPress={() => setSelectedMilestone(opt.id)}
-                                        >
-                                            <Text style={[
-                                                styles.milestoneOptionText,
-                                                selectedMilestone === opt.id && styles.milestoneOptionTextSelected
-                                            ]}>{opt.label}</Text>
-                                            {selectedMilestone === opt.id && (
-                                                <Ionicons name="checkmark" size={18} color="#fff" />
-                                            )}
-                                        </Pressable>
-                                    ))}
+                                    {MILESTONE_OPTIONS.map((opt) => {
+                                        const isSelected = selectedMilestones.includes(opt.id);
+                                        return (
+                                            <Pressable
+                                                key={opt.id}
+                                                style={[
+                                                    styles.milestoneOption,
+                                                    isSelected && styles.milestoneOptionSelected
+                                                ]}
+                                                onPress={() => handleToggleMilestone(opt.id)}
+                                            >
+                                                <Ionicons 
+                                                    name={isSelected ? "checkbox" : "square-outline"} 
+                                                    size={20} 
+                                                    color={isSelected ? "#fff" : COLORS.textSecondary} 
+                                                    style={{ marginRight: 10 }}
+                                                />
+                                                <Text style={[
+                                                    styles.milestoneOptionText,
+                                                    isSelected && styles.milestoneOptionTextSelected
+                                                ]}>{opt.label}</Text>
+                                            </Pressable>
+                                        );
+                                    })}
                                 </ScrollView>
 
                                 <View style={{ width: '100%', gap: 10 }}>
-                                    <Pressable 
-                                        style={[styles.modalBtn, !selectedMilestone && { opacity: 0.5 }]} 
-                                        disabled={!selectedMilestone}
+                                    <Pressable
+                                        style={[styles.modalBtn, selectedMilestones.length === 0 && { opacity: 0.5 }]}
+                                        disabled={selectedMilestones.length === 0}
                                         onPress={async () => {
-                                            if (!selectedMilestone) return;
-                                            await saveSession(false, selectedMilestone);
-                                            const explanation = MILESTONE_EXPLANATIONS[selectedMilestone];
-                                            setMilestoneExplanation(explanation);
+                                            if (selectedMilestones.length === 0) return;
+                                            await saveSession(false, selectedMilestones);
                                         }}
                                     >
-                                        <Text style={styles.modalBtnText}>Continue</Text>
+                                        <Text style={styles.modalBtnText}>Save Progress</Text>
                                     </Pressable>
                                     <Pressable style={styles.modalSkipBtn} onPress={() => {
                                         setShowMilestonePrompt(false);
                                         setMilestoneExplanation(null);
-                                        setSelectedMilestone(null);
-                                        navigation.replace('Dashboard');
+                                        setSelectedMilestones([]);
+                                        navigation.navigate('Dashboard');
                                     }}>
                                         <Text style={styles.modalSkipBtnText}>Skip</Text>
                                     </Pressable>
@@ -988,28 +1286,28 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             </>
                         ) : (
                             <>
-                                <View style={[styles.modalIcon, { backgroundColor: '#E6F7F2' }]}>
-                                    <Ionicons name="star-outline" size={40} color={COLORS.primary} />
+                                <View style={[styles.modalIcon, { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E6F7F2', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }]}>
+                                    <Ionicons name="star-outline" size={22} color={COLORS.primary} />
                                 </View>
-                                <Text style={styles.modalTitle}>{milestoneExplanation.title}</Text>
-                                <Text style={[styles.modalBody, { marginBottom: 30 }]}>
+                                <Text style={[styles.modalTitle, { fontSize: 18, marginBottom: 12 }]}>{milestoneExplanation.title}</Text>
+                                <Text style={[styles.modalBody, { fontSize: 14, marginBottom: 20 }]}>
                                     {milestoneExplanation.body}
                                 </Text>
 
                                 <View style={{ width: '100%', gap: 12 }}>
-                                    <Pressable 
-                                        style={styles.modalBtn} 
+                                    <Pressable
+                                        style={styles.modalBtn}
                                         onPress={() => {
-                                            handleCTANavigation(milestoneExplanation.primaryCTA, selectedMilestone!);
+                                            handleCTANavigation(milestoneExplanation.primaryCTA);
                                         }}
                                     >
                                         <Text style={styles.modalBtnText}>{milestoneExplanation.primaryCTA}</Text>
                                     </Pressable>
                                     {milestoneExplanation.secondaryCTA && (
-                                        <Pressable 
-                                            style={[styles.modalBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border }]} 
+                                        <Pressable
+                                            style={[styles.modalBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border }]}
                                             onPress={() => {
-                                                handleCTANavigation(milestoneExplanation.secondaryCTA!, selectedMilestone!);
+                                                handleCTANavigation(milestoneExplanation.secondaryCTA!);
                                             }}
                                         >
                                             <Text style={[styles.modalBtnText, { color: COLORS.textSecondary }]}>{milestoneExplanation.secondaryCTA}</Text>
@@ -1065,6 +1363,18 @@ const styles = StyleSheet.create({
     activeSessionScroll: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 10 },
     stepInfo: { paddingHorizontal: 30, alignItems: 'center', marginTop: 10 },
     sessionStepTitle: { ...FONTS.tiny, color: COLORS.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+    selectedLevelBadge: {
+        backgroundColor: '#E6F7F2',
+        color: COLORS.primary,
+        fontSize: 12,
+        fontWeight: 'bold',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5
+    },
     stepTitle: { ...FONTS.h2, color: '#17212F', textAlign: 'center', marginBottom: 12 },
     stepInstruction: { ...FONTS.body, color: '#52616B', textAlign: 'center', lineHeight: 24 },
 
@@ -1216,5 +1526,106 @@ const styles = StyleSheet.create({
         color: '#9A5B00',
         fontWeight: '500',
         lineHeight: 18,
+    },
+    collapsibleSectionContainer: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        marginBottom: 14,
+        overflow: 'hidden',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        backgroundColor: '#F9FAFB',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    sectionHeaderCaution: {
+        backgroundColor: '#FFF8E8',
+        borderBottomColor: '#F4D08A',
+    },
+    sectionHeaderTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+    },
+    sectionHeaderTitleCaution: {
+        color: '#9A5B00',
+    },
+    sectionHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    expandCollapseLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.primary,
+    },
+    expandCollapseLabelCaution: {
+        color: '#9A5B00',
+    },
+    sectionContent: {
+        padding: 16,
+    },
+    sectionContentCollapsed: {
+        paddingTop: 0,
+        paddingBottom: 14,
+        paddingHorizontal: 16,
+    },
+    signsContainerCollapsed: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 8,
+    },
+    signChipCollapsed: {
+        backgroundColor: '#EEF2F6',
+        borderRadius: 12,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#D2D9E2',
+    },
+    positiveSignChipCollapsed: {
+        backgroundColor: '#ECFDF5',
+        borderColor: '#A7F3D0',
+    },
+    signTextCollapsed: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+    },
+    positiveSignTextCollapsed: {
+        color: '#065F46',
+    },
+    outdoorProgressSubText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#0F766E',
+        marginTop: 2,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    dynamicStepHeader: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#0F766E',
+        backgroundColor: '#EEF8F6',
+        borderColor: '#CDECE5',
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        alignSelf: 'flex-start',
+        marginBottom: 10,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
 });
