@@ -63,8 +63,7 @@ export default function PaywallScreen({ navigation, route }: any) {
     const [purchasing, setPurchasing] = useState(false);
 
     const insets = useSafeAreaInsets();
-    const { refreshEntitlement } = useSubscription();
-    const [subscriptionStatus, setSubscriptionStatus] = useState<{ isPremium: boolean, isTrial: boolean, daysLeft: number | null } | null>(null);
+    const { isPremium, refreshEntitlement } = useSubscription();
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
     // Fallback states
@@ -105,21 +104,16 @@ export default function PaywallScreen({ navigation, route }: any) {
         }
     };
 
-    const checkSubscription = async () => {
-        const status = await RevenueCatService.getSubscriptionStatus();
+    const checkSubscription = () => {
         const { sessionId, petId } = route.params || {};
 
-        if (status.isPremium) {
+        if (isPremium) {
             if (sessionId) {
-                // If user was trying to access a session, go to preview
                 navigation.replace('SessionPreview', { sessionId, petId });
                 return;
             }
-            // If user is already premium, redirect to status screen
             navigation.replace('PremiumStatus', { source: 'settings' });
-            return;
         }
-        setSubscriptionStatus(status as any);
     };
 
     const checkPackageForTrial = (pack: PurchasesPackage) => {
@@ -220,7 +214,7 @@ export default function PaywallScreen({ navigation, route }: any) {
         try {
             const customerInfo = await RevenueCatService.purchasePackage(selectedPackage);
             const { sessionId, petId } = route.params || {};
-            
+
             // Refresh global entitlement state
             await refreshEntitlement();
 
@@ -382,7 +376,7 @@ export default function PaywallScreen({ navigation, route }: any) {
                     </Pressable>
                 </View>
 
-                <ScrollView 
+                <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={[
                         styles.container,
@@ -461,8 +455,8 @@ export default function PaywallScreen({ navigation, route }: any) {
                                 </Text>
                                 {selectedPackage && !isFallback && (
                                     <Text style={styles.ctaSubtext}>
-                                        {hasSelectedTrial 
-                                            ? `Then ${selectedPackage.product.priceString}/${selectedPackage.packageType === 'ANNUAL' ? 'year' : 'month'}` 
+                                        {hasSelectedTrial
+                                            ? `Then ${selectedPackage.product.priceString}/${selectedPackage.packageType === 'ANNUAL' ? 'year' : 'month'}`
                                             : `Get Premium for ${selectedPackage.product.priceString}`}
                                     </Text>
                                 )}

@@ -99,11 +99,11 @@ describe('Suite 03: Session Mechanics', () => {
     expect(queryByTestId('microphone-view')).toBeNull();
   });
 
-  test('guided_focus_002: Focus circle is rendered with correct testID', async () => {
-    const { getByTestId, getByText } = await renderSession();
+  test('guided_focus_002: Focus circle is disabled by default', async () => {
+    const { queryByTestId, getByText } = await renderSession();
 
     fireEvent.press(getByText(/Start Session/i));
-    expect(getByTestId('focus-pulse-circle')).toBeTruthy();
+    expect(queryByTestId('focus-pulse-circle')).toBeNull();
   });
 
   test('guided_focus_003: Step instructions update after handling next', async () => {
@@ -156,7 +156,7 @@ describe('Suite 03: Session Mechanics', () => {
     expect(SessionService.saveSessionHistory).toHaveBeenCalledWith(expect.objectContaining({
         stoppedEarly: true
     }));
-    expect(mockNavigation.replace).toHaveBeenCalledWith('Dashboard');
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('Dashboard');
   });
 
   test('guided_focus_005: Background Sound toggle controls audio state clearly', async () => {
@@ -188,7 +188,7 @@ describe('Suite 03: Session Mechanics', () => {
     await act(async () => {});
 
     expect(SessionService.saveSessionHistory).toHaveBeenCalled();
-    expect(mockNavigation.replace).toHaveBeenCalledWith('Dashboard');
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('Dashboard');
   });
 
   test('guided_focus_006: Next Sound button cycles track through handleNext', async () => {
