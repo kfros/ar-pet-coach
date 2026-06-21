@@ -1,4 +1,4 @@
-import { AnxietyLevel, AnxietySign, CheckIn, PositiveSign } from '../types/Session';
+import { AnxietyLevel, AnxietySign, CheckIn, PositiveSign, CheckInProfile } from '../types/Session';
 
 export interface ScoreResult {
     score: number;
@@ -70,7 +70,7 @@ export const MEDICAL_SEVERE_SIGNS: AnxietySign[] = [
 const BEHAVIORAL_NOTE = "For panic, aggression, self-injury, or escape attempts, stop the routine and get professional support.";
 const MEDICAL_NOTE = "For medical symptoms or severe distress, contact a veterinarian.";
 
-export const calculateCheckinScore = (checkin?: CheckIn): ScoreResult => {
+export const calculateCheckinScore = (checkin?: CheckIn, profile?: CheckInProfile): ScoreResult => {
     if (!checkin) {
         return { score: 0, hasSevereSigns: false, positiveSigns: [] };
     }
@@ -82,16 +82,41 @@ export const calculateCheckinScore = (checkin?: CheckIn): ScoreResult => {
     let severeCategory: 'behavioral' | 'medical' | undefined;
     let severeSignsNote: string | undefined;
 
+    // Build lookup maps from the profile if provided
+    const stressWeights: Record<string, number> = {};
+    const severeSafety: Record<string, 'behavioral_stop' | 'medical_stop' | 'caution' | 'none'> = {};
+    
+    if (profile) {
+        profile.stressSigns.forEach(s => {
+            stressWeights[s.id] = s.scoreWeight ?? 1;
+        });
+        profile.severeSigns.forEach(s => {
+            stressWeights[s.id] = s.scoreWeight ?? 1;
+            severeSafety[s.id] = s.safetyLevel ?? 'none';
+        });
+    } else {
+        // Fallback to original STRESS_SIGN_WEIGHTS
+        Object.entries(STRESS_SIGN_WEIGHTS).forEach(([id, weight]) => {
+            stressWeights[id] = weight;
+        });
+        BEHAVIORAL_SEVERE_SIGNS.forEach(id => {
+            severeSafety[id] = 'behavioral_stop';
+        });
+        MEDICAL_SEVERE_SIGNS.forEach(id => {
+            severeSafety[id] = 'medical_stop';
+        });
+    }
+
     if (checkin.selectedSigns) {
         checkin.selectedSigns.forEach(sign => {
-            stressSignScore += STRESS_SIGN_WEIGHTS[sign] ?? 1;
+            stressSignScore += stressWeights[sign] ?? 1;
             
-            if (MEDICAL_SEVERE_SIGNS.includes(sign)) {
+            const safety = severeSafety[sign];
+            if (safety === 'medical_stop') {
                 hasSevereSigns = true;
                 severeCategory = 'medical';
                 severeSignsNote = MEDICAL_NOTE;
-            } else if (BEHAVIORAL_SEVERE_SIGNS.includes(sign) && severeCategory !== 'medical') {
-                // Medical takes precedence for the note if both exist
+            } else if (safety === 'behavioral_stop' && severeCategory !== 'medical') {
                 hasSevereSigns = true;
                 severeCategory = 'behavioral';
                 severeSignsNote = BEHAVIORAL_NOTE;
@@ -101,11 +126,25 @@ export const calculateCheckinScore = (checkin?: CheckIn): ScoreResult => {
 
     let rawPositiveBonus = 0;
     const positiveSignsStrings: string[] = [];
-    if (checkin.positiveSigns) {
-        checkin.positiveSigns.forEach(sign => {
-            rawPositiveBonus += POSITIVE_SIGN_WEIGHTS[sign] ?? 1;
-            positiveSignsStrings.push(sign.replace(/_/g, ' '));
-        });
+    
+    if (profile) {
+        if (profile.showPositiveSignsAfter && profile.positiveSigns && checkin.positiveSigns) {
+            const positiveWeights: Record<string, number> = {};
+            profile.positiveSigns.forEach(s => {
+                positiveWeights[s.id] = s.scoreWeight ?? 1;
+            });
+            checkin.positiveSigns.forEach(sign => {
+                rawPositiveBonus += positiveWeights[sign] ?? 1;
+                positiveSignsStrings.push(sign.replace(/_/g, ' '));
+            });
+        }
+    } else {
+        if (checkin.positiveSigns) {
+            checkin.positiveSigns.forEach(sign => {
+                rawPositiveBonus += POSITIVE_SIGN_WEIGHTS[sign] ?? 1;
+                positiveSignsStrings.push(sign.replace(/_/g, ' '));
+            });
+        }
     }
 
     const positiveBonus = Math.min(rawPositiveBonus, 2);

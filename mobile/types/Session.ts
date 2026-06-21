@@ -44,6 +44,29 @@ export interface CheckIn {
 
 export type VisualCue = 'pulse' | 'dim' | 'pause' | 'reward' | 'observe';
 
+export type RoutineCategory =
+    | 'foundation'
+    | 'walk_fear'
+    | 'noise_support'
+    | 'home_triggers'
+    | 'alone_time'
+    | 'care_handling';
+
+export type BackgroundSoundMode =
+    | 'none'
+    | 'calm_music'
+    | 'white_noise'
+    | 'brown_noise'
+    | 'owner_choice';
+
+export interface BackgroundSoundPolicy {
+    mode: BackgroundSoundMode;
+    defaultEnabled: boolean;
+    showControls: boolean;
+    label?: string;
+    helperText?: string;
+}
+
 export interface SessionStep {
     id: string;
     title: string;
@@ -51,6 +74,7 @@ export interface SessionStep {
     durationSeconds: number;
     visualCue: VisualCue;
     canSkip: boolean;
+    backgroundSoundPolicy?: BackgroundSoundPolicy;
 }
 
 export interface Session {
@@ -71,7 +95,11 @@ export interface Session {
     recommendedForTriggers: string[];
     
     // New fields for premium routines
-    category?: string;
+    category?: RoutineCategory | string;
+    categoryLabel?: string;
+    categoryOrder?: number;
+    displayOrder?: number;
+    backgroundSoundPolicy?: BackgroundSoundPolicy;
     estimatedDurationSeconds?: number;
     suggestedTimeCopy?: string;
     description?: string;
@@ -84,6 +112,8 @@ export interface Session {
     severeNoticeEnabled?: boolean;
     iconKey?: string;
     fallbacks?: SessionFallback[];
+    schemaVersion?: number;
+    checkInProfileId?: CheckInProfileId;
 }
 
 export interface SessionFallback {
@@ -104,4 +134,81 @@ export interface SessionHistoryEntry {
     beforeCheckin?: CheckIn;
     afterCheckin?: CheckIn;
     resultSummary?: string;
+    schemaVersion?: number;
+    createdAt?: string;
+    updatedAt?: string;
+    syncStatus?: 'pending' | 'synced';
+    outdoorMilestone?: string;
 }
+
+export type StressSignsTrendStatus =
+  | 'not_enough_data'
+  | 'easing'
+  | 'same'
+  | 'increased'
+  | 'mixed'
+  | 'severe';
+
+export type StressSignsTrendPoint = {
+  id: string;
+  sessionId: string;
+  sessionTitle?: string;
+  completedAt: string;
+  sequenceNumber: number;
+  stressSignsScore: number;
+  levelLabel: string;
+  stoppedEarly: boolean;
+  hasSevereSigns: boolean;
+  source: 'after_checkin' | 'before_checkin';
+};
+
+export type StressSignsTrendSummary = {
+  status: StressSignsTrendStatus;
+  componentTitle: 'Stress Signs Trend';
+  statusTitle: string;
+  body: string;
+  helper?: string;
+  points: StressSignsTrendPoint[];
+  latestScore: number | null;
+  previousScore: number | null;
+  averageDelta: number | null;
+  latestCompletedAt: string | null;
+  minRequiredCheckins: number;
+  hasEnoughData: boolean;
+  legend: string;
+};
+
+export type CheckInProfileId =
+  | 'general_calm'
+  | 'outdoor_confidence'
+  | 'noise_support'
+  | 'visitors'
+  | 'being_alone'
+  | 'care_handling';
+
+export type CheckInSignKind =
+  | 'stress'
+  | 'positive'
+  | 'severe';
+
+export interface CheckInSignOption {
+  id: string;
+  label: string;
+  kind: CheckInSignKind;
+  scoreWeight?: number;
+  safetyLevel?: 'none' | 'caution' | 'behavioral_stop' | 'medical_stop';
+  helperText?: string;
+}
+
+export interface CheckInProfile {
+  id: CheckInProfileId;
+  title: string;
+  beforePrompt: string;
+  afterPrompt: string;
+  stressSigns: CheckInSignOption[];
+  positiveSigns?: CheckInSignOption[];
+  severeSigns: CheckInSignOption[];
+  showPositiveSignsAfter: boolean;
+  milestonePromptEnabled?: boolean;
+}
+

@@ -76,6 +76,9 @@ export const SESSIONS: Session[] = [
             'Repeat later only if your dog recovered comfortably.'
         ],
         tags: ['free', 'foundation', 'daily', 'calm'],
+        category: 'foundation',
+        categoryLabel: 'Start Here',
+        categoryOrder: 10,
         recommendedForTriggers: ['not_sure', 'general_anxiety', 'visitors', 'loud_noises', 'being_alone', 'new_places'],
         iconKey: 'leaf'
     },
@@ -88,6 +91,9 @@ export const SESSIONS: Session[] = [
         difficulty: 'easy',
         trigger: 'loud_noises',
         goal: 'Help the owner reduce pressure during loud noises and guide the dog toward a safer, quieter setup without forced exposure.',
+        category: 'noise_support',
+        categoryLabel: 'Noise & Fireworks',
+        categoryOrder: 30,
         beforeYouStart: [
             'Move to the quietest safe area available.',
             'Close windows and curtains if possible.',

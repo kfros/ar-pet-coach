@@ -7,7 +7,8 @@ import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
 import { useCalmAudio } from '../hooks/useCalmAudio';
-import { Session, SessionStep, AnxietyLevel, AnxietySign, PositiveSign, CheckIn } from '../types/Session';
+import { Session, SessionStep, AnxietyLevel, AnxietySign, PositiveSign, CheckIn, CheckInProfile, CheckInSignOption } from '../types/Session';
+import { getCheckInProfile } from '../appContent/checkInProfiles';
 import { 
     MEDICAL_SEVERE_SIGNS, 
     BEHAVIORAL_SEVERE_SIGNS, 
@@ -60,6 +61,67 @@ const POSITIVE_SIGNS: { id: PositiveSign; label: string }[] = [
 const HINT_STORAGE_KEY = 'guidedFocusCircleHintDismissed';
 const REPEAT_STORAGE_KEY = 'backgroundSoundRepeatEnabled';
 
+const MILESTONE_OPTIONS = [
+    { id: "doorway_calm", label: "Stayed calm near the door" },
+    { id: "open_edge", label: "Handled the door opening" },
+    { id: "one_step", label: "Took one calm step" },
+    { id: "short_pause", label: "Paused briefly outside" },
+    { id: "few_steps", label: "Walked a few calm steps away" },
+    { id: "hundred_steps", label: "Managed around 100 steps" },
+    { id: "ten_min_walk", label: "Managed an easy 10-minute walk" },
+    { id: "none_yet", label: "None of these yet" }
+];
+
+const MILESTONE_EXPLANATIONS: Record<string, { title: string, body: string, primaryCTA: string, secondaryCTA?: string }> = {
+    none_yet: {
+        title: "That is useful information",
+        body: "Next time, make the step easier. Try staying farther from the exit, opening the door less, or shortening the session.",
+        primaryCTA: "See easier options"
+    },
+    doorway_calm: {
+        title: "Good starting point",
+        body: "Repeat this same easy edge once more before making it harder.",
+        primaryCTA: "Repeat this level",
+        secondaryCTA: "See next level"
+    },
+    open_edge: {
+        title: "Next level available",
+        body: "You can try one tiny step next time. Keep it optional and stop before panic.",
+        primaryCTA: "View next level",
+        secondaryCTA: "Repeat this level"
+    },
+    one_step: {
+        title: "Tiny step logged",
+        body: "Repeat one calm step before asking for more distance.",
+        primaryCTA: "Repeat this level",
+        secondaryCTA: "View next level"
+    },
+    short_pause: {
+        title: "Short pause logged",
+        body: "Next time, you can repeat the short outside pause or try a few calm steps away if your dog stays comfortable.",
+        primaryCTA: "Repeat this level",
+        secondaryCTA: "View next level"
+    },
+    few_steps: {
+        title: "First steps logged",
+        body: "Keep this route easy. If signs stay low, the next target can be around 100 calm steps.",
+        primaryCTA: "Repeat this level",
+        secondaryCTA: "View next level"
+    },
+    hundred_steps: {
+        title: "Longer distance logged",
+        body: "Repeat this before aiming for an easy 10-minute walk.",
+        primaryCTA: "Repeat this level",
+        secondaryCTA: "View next level"
+    },
+    ten_min_walk: {
+        title: "Easy walk logged",
+        body: "Keep using easy routes and return to shorter levels whenever signs look stronger.",
+        primaryCTA: "Done",
+        secondaryCTA: "Review levels"
+    }
+};
+
 export default function GuidedSessionScreen({ navigation, route }: any) {
     const { sessionId, petId } = route.params;
     const session = SessionService.getSessionById(sessionId);
@@ -69,18 +131,43 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [timeLeft, setTimeLeft] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
-    const [audioEnabled, setAudioEnabled] = useState(true);
+
+    const sessionPolicy = session?.backgroundSoundPolicy;
+    const initialAudioEnabled = sessionPolicy ? sessionPolicy.defaultEnabled : true;
+    const [audioEnabled, setAudioEnabled] = useState(initialAudioEnabled);
     const [repeatEnabled, setRepeatEnabled] = useState(false);
     const [showHint, setShowHint] = useState(false);
 
+    // Milestone progression prompt state
+    const [showMilestonePrompt, setShowMilestonePrompt] = useState(false);
+    const [selectedMilestone, setSelectedMilestone] = useState<string | null>(null);
+    const [milestoneExplanation, setMilestoneExplanation] = useState<any | null>(null);
+    const [showEasierHelperModal, setShowEasierHelperModal] = useState(false);
+    const [entryId] = useState(() => `session_${Date.now()}`);
+    const profile = getCheckInProfile(session?.checkInProfileId);
+
+    const savedBeforeCheckinRef = useRef<CheckIn | undefined>(undefined);
+    const savedAfterCheckinRef = useRef<CheckIn | undefined>(undefined);
+    const savedCompletedAtRef = useRef<string | undefined>(undefined);
+
+    const steps = session?.steps || [];
+    const currentStep = steps[currentStepIndex];
+
+    const stepPolicy = currentStep?.backgroundSoundPolicy;
+    const currentSoundMode = stepPolicy?.mode || sessionPolicy?.mode || 'calm_music';
+    const isSoundAllowed = currentSoundMode !== 'none';
+    const showAudioControls = stepPolicy ? stepPolicy.showControls : (sessionPolicy ? sessionPolicy.showControls : true);
+
     // Audio Hook
-    const { isPlaying, stopAudio, handleNext, pauseAudio, resumeAudio } = useCalmAudio(phase === 'active' && audioEnabled);
+    const { isPlaying, stopAudio, handleNext, pauseAudio, resumeAudio } = useCalmAudio(
+        phase === 'active' && audioEnabled && isSoundAllowed
+    );
     const wasSoundPlayingBeforePause = useRef(false);
     const [beforeLevel, setBeforeLevel] = useState<AnxietyLevel | null>(null);
-    const [beforeSigns, setBeforeSigns] = useState<AnxietySign[]>([]);
+    const [beforeSigns, setBeforeSigns] = useState<string[]>([]);
     const [afterLevel, setAfterLevel] = useState<AnxietyLevel | null>(null);
-    const [afterSigns, setAfterSigns] = useState<AnxietySign[]>([]);
-    const [afterPositiveSigns, setAfterPositiveSigns] = useState<PositiveSign[]>([]);
+    const [afterSigns, setAfterSigns] = useState<string[]>([]);
+    const [afterPositiveSigns, setAfterPositiveSigns] = useState<string[]>([]);
 
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const opacityAnim = useRef(new Animated.Value(1)).current;
@@ -90,9 +177,6 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [showNextStepPrompt, setShowNextStepPrompt] = useState(false);
     const [showSafetyNotice, setShowSafetyNotice] = useState<{ title: string, body: string, type: 'medical' | 'behavioral' } | null>(null);
     const [showFinalSafetyPrompt, setShowFinalSafetyPrompt] = useState(false);
-
-    const steps = session?.steps || [];
-    const currentStep = steps[currentStepIndex];
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -108,6 +192,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         if (phase === 'active' && currentStep) {
             startStep(currentStep);
         }
+
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
@@ -211,6 +296,14 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
+    const handlePrevStep = () => {
+        setShowNextStepPrompt(false);
+        if (currentStepIndex > 0) {
+            setCurrentStepIndex(currentStepIndex - 1);
+            setIsPaused(false);
+        }
+    };
+
     const togglePause = async () => {
         const newPaused = !isPaused;
         setIsPaused(newPaused);
@@ -255,7 +348,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         setPhase('active');
     };
 
-    const toggleSign = (sign: AnxietySign, isBefore: boolean) => {
+    const toggleSign = (sign: string, isBefore: boolean) => {
         const current = isBefore ? beforeSigns : afterSigns;
         const setter = isBefore ? setBeforeSigns : setAfterSigns;
         if (current.includes(sign)) {
@@ -266,8 +359,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
             // GFM-005: Severe sign logic
             if (isBefore && session?.severeNoticeEnabled) {
-                const hasMedical = newSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s));
-                const hasBehavioral = newSigns.some(s => BEHAVIORAL_SEVERE_SIGNS.includes(s));
+                const hasMedical = newSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s as any));
+                const hasBehavioral = newSigns.some(s => BEHAVIORAL_SEVERE_SIGNS.includes(s as any));
 
                 if (hasMedical) {
                     setShowSafetyNotice({
@@ -286,7 +379,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
-    const togglePositiveSign = (sign: PositiveSign) => {
+    const togglePositiveSign = (sign: string) => {
         if (afterPositiveSigns.includes(sign)) {
             setAfterPositiveSigns(afterPositiveSigns.filter(s => s !== sign));
         } else {
@@ -302,56 +395,77 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
-    const saveSession = async (stoppedEarly = false) => {
+    const saveSession = async (stoppedEarly = false, milestone?: string | null) => {
         if (!session) return;
         setIsSaving(true);
 
-        const beforeCheckin: CheckIn = {
-            id: `before_${Date.now()}`,
-            petId,
-            sessionId,
-            timestamp: new Date().toISOString(),
-            phase: 'before',
-            overallLevel: beforeLevel || 'calm',
-            selectedSigns: beforeSigns
-        };
-
-        const afterCheckin: CheckIn = {
-            id: `after_${Date.now()}`,
-            petId,
-            sessionId,
-            timestamp: new Date().toISOString(),
-            phase: 'after',
-            overallLevel: afterLevel || 'calm',
-            selectedSigns: afterSigns,
-            positiveSigns: afterPositiveSigns
-        };
-
-        try {
-            const result = await SessionService.saveSessionHistory({
-                id: `session_${Date.now()}`,
+        let beforeCheckin = savedBeforeCheckinRef.current;
+        if (!beforeCheckin && beforeLevel) {
+            beforeCheckin = {
+                id: `before_${Date.now()}`,
                 petId,
                 sessionId,
-                completedAt: new Date().toISOString(),
+                timestamp: new Date().toISOString(),
+                phase: 'before',
+                overallLevel: beforeLevel || 'calm',
+                selectedSigns: beforeSigns as any
+            };
+            savedBeforeCheckinRef.current = beforeCheckin;
+        }
+
+        let afterCheckin = savedAfterCheckinRef.current;
+        if (!afterCheckin && !stoppedEarly && afterLevel) {
+            afterCheckin = {
+                id: `after_${Date.now()}`,
+                petId,
+                sessionId,
+                timestamp: new Date().toISOString(),
+                phase: 'after',
+                overallLevel: afterLevel || 'calm',
+                selectedSigns: afterSigns as any,
+                positiveSigns: afterPositiveSigns as any
+            };
+            savedAfterCheckinRef.current = afterCheckin;
+        }
+
+        let completedAt = savedCompletedAtRef.current;
+        if (!completedAt) {
+            completedAt = new Date().toISOString();
+            savedCompletedAtRef.current = completedAt;
+        }
+
+        try {
+            await SessionService.saveSessionHistory({
+                id: entryId,
+                petId,
+                sessionId,
+                completedAt,
                 durationSeconds: steps.slice(0, currentStepIndex + 1).reduce((acc, s) => acc + s.durationSeconds, 0),
                 completed: !stoppedEarly,
                 stoppedEarly: stoppedEarly,
-                beforeCheckin: beforeLevel ? beforeCheckin : undefined,
-                afterCheckin: !stoppedEarly && afterLevel ? afterCheckin : undefined
+                beforeCheckin: beforeCheckin,
+                afterCheckin: afterCheckin,
+                outdoorMilestone: milestone || undefined
             });
 
             await trackCalmingSession();
 
-            // Check if we should show safety prompt
-            const scoreResult = calculateCheckinScore(afterCheckin);
-            const prevScore = beforeLevel ? calculateCheckinScore(beforeCheckin) : null;
+            // Calculate check-in scores using profile
+            const scoreResult = calculateCheckinScore(afterCheckin, profile);
+            const prevScore = beforeLevel ? calculateCheckinScore(beforeCheckin, profile) : null;
             const worsened = prevScore !== null && (scoreResult.score - prevScore.score) >= 2;
-            const hasAfterSevere = afterSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s) || BEHAVIORAL_SEVERE_SIGNS.includes(s));
+            const hasAfterSevere = afterSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s as any) || BEHAVIORAL_SEVERE_SIGNS.includes(s as any));
 
-            if (!stoppedEarly && (worsened || hasAfterSevere)) {
-                setShowFinalSafetyPrompt(true);
+            if (sessionId === 'outdoor_confidence_reset' && !stoppedEarly) {
+                if (milestone === null || milestone === undefined) {
+                    setShowMilestonePrompt(true);
+                }
             } else {
-                navigation.replace('Dashboard');
+                if (!stoppedEarly && (worsened || hasAfterSevere)) {
+                    setShowFinalSafetyPrompt(true);
+                } else {
+                    navigation.replace('Dashboard');
+                }
             }
         } catch (error) {
             console.error('Error saving session:', error);
@@ -361,15 +475,66 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
+    const handleCTANavigation = (ctaText: string, levelId: string) => {
+        setShowMilestonePrompt(false);
+        setMilestoneExplanation(null);
+        setSelectedMilestone(null);
+
+        const OUTDOOR_LEVELS = [
+            'doorway_calm',
+            'open_edge',
+            'one_step',
+            'short_pause',
+            'few_steps',
+            'hundred_steps',
+            'ten_min_walk'
+        ];
+
+        if (ctaText === 'See easier options') {
+            // Priority: Previous Outdoor Confidence level preview -> Current repeat preview -> Daily Calm Reset fallback
+            let referenceLevel: string | undefined = route.params?.level;
+            if (!referenceLevel && levelId && levelId !== 'none_yet') {
+                referenceLevel = levelId;
+            }
+
+            if (referenceLevel && OUTDOOR_LEVELS.includes(referenceLevel)) {
+                const index = OUTDOOR_LEVELS.indexOf(referenceLevel);
+                if (index > 0) {
+                    navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId, level: OUTDOOR_LEVELS[index - 1] });
+                    return;
+                }
+            }
+            // Fallback
+            navigation.replace('SessionPreview', { sessionId: 'daily_calm_reset', petId });
+        } else if (ctaText === 'Repeat this level') {
+            navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId, level: levelId });
+        } else if (ctaText === 'View next level' || ctaText === 'See next level') {
+            const index = OUTDOOR_LEVELS.indexOf(levelId);
+            if (index >= 0 && index < OUTDOOR_LEVELS.length - 1) {
+                navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId, level: OUTDOOR_LEVELS[index + 1] });
+            } else {
+                navigation.replace('Dashboard');
+            }
+        } else if (ctaText === 'Review levels') {
+            navigation.replace('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId });
+        } else {
+            navigation.replace('Dashboard');
+        }
+    };
+
     const renderCheckin = (isBefore: boolean) => {
         const level = isBefore ? beforeLevel : afterLevel;
         const setLevel = isBefore ? setBeforeLevel : setAfterLevel;
         const signs = isBefore ? beforeSigns : afterSigns;
 
+        const selectableSigns = [...profile.stressSigns, ...profile.severeSigns];
+        const positiveSigns = profile.positiveSigns || [];
+        const selectedOptionsWithHelper = selectableSigns.filter(s => signs.includes(s.id) && s.helperText);
+
         return (
             <ScrollView contentContainerStyle={styles.checkinScroll}>
                 <Text style={styles.checkinTitle}>{isBefore ? 'Calm Check-In' : 'After-Session Check-In'}</Text>
-                <Text style={styles.checkinSubtitle}>{isBefore ? 'How is your dog right now?' : 'How is your dog after the routine?'}</Text>
+                <Text style={styles.checkinSubtitle}>{isBefore ? profile.beforePrompt : profile.afterPrompt}</Text>
 
                 <View style={styles.levelContainer}>
                     {ANXIETY_LEVELS.map((lvl) => (
@@ -388,7 +553,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
                 <Text style={styles.signsTitle}>Signs Noted (optional)</Text>
                 <View style={styles.signsContainer}>
-                    {ANXIETY_SIGNS.map((sign) => (
+                    {selectableSigns.map((sign) => (
                         <Pressable
                             key={sign.id}
                             style={[
@@ -402,11 +567,18 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     ))}
                 </View>
 
-                {!isBefore && (
+                {selectedOptionsWithHelper.map((s) => (
+                    <View key={s.id} style={styles.signHelperBox}>
+                        <Ionicons name="information-circle-outline" size={16} color="#9A5B00" style={{ marginRight: 6 }} />
+                        <Text style={styles.signHelperText}>{s.helperText}</Text>
+                    </View>
+                ))}
+
+                {!isBefore && profile.showPositiveSignsAfter && positiveSigns.length > 0 && (
                     <>
                         <Text style={styles.signsTitle}>Positive Signs (optional)</Text>
                         <View style={styles.signsContainer}>
-                            {POSITIVE_SIGNS.map((sign) => (
+                            {positiveSigns.map((sign) => (
                                 <Pressable
                                     key={sign.id}
                                     style={[
@@ -427,12 +599,15 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     onPress={() => {
                         if (isBefore) {
                             if (showSafetyNotice?.type === 'medical' && SEVERE_SIGN_LOGIC.medical.blockStart) {
-                                // Blocked
                                 return;
                             }
                             setPhase('active');
                         } else {
-                            saveSession();
+                            if (sessionId === 'outdoor_confidence_reset') {
+                                saveSession(false, null);
+                            } else {
+                                saveSession();
+                            }
                         }
                     }}
                 >
@@ -483,6 +658,15 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             <Text style={styles.sessionStepTitle}>{session.title}</Text>
                             <Text style={styles.stepTitle}>{currentStep.title}</Text>
                             <Text style={styles.stepInstruction}>{currentStep.instruction}</Text>
+                            {currentStep.id === 'outdoor_check_body' && (
+                                <Pressable 
+                                    style={styles.easierHelperLink}
+                                    onPress={() => setShowEasierHelperModal(true)}
+                                >
+                                    <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
+                                    <Text style={styles.easierHelperLinkText}>How to make it easier</Text>
+                                </Pressable>
+                            )}
                         </View>
 
                         <View style={styles.visualAreaWrapper}>
@@ -494,13 +678,15 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             </View>
 
                             <View style={styles.visualArea}>
-                                <Animated.View
-                                    testID="focus-pulse-circle"
-                                    style={[
-                                        styles.mainCircle,
-                                        { transform: [{ scale: pulseAnim }], opacity: opacityAnim }
-                                    ]}
-                                />
+                                {sessionId !== 'outdoor_confidence_reset' && (
+                                    <Animated.View
+                                        testID="focus-pulse-circle"
+                                        style={[
+                                            styles.mainCircle,
+                                            { transform: [{ scale: pulseAnim }], opacity: opacityAnim }
+                                        ]}
+                                    />
+                                )}
                                 {isPaused && (
                                     <View style={styles.pausedOverlay}>
                                         <Ionicons name="pause" size={48} color={COLORS.primary} />
@@ -511,65 +697,90 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                         </View>
 
                         <View style={styles.controls}>
-                            <View style={styles.controlGrid}>
-                                <Pressable
-                                    style={styles.controlToggle}
-                                    onPress={() => setAudioEnabled(!audioEnabled)}
+                            {showAudioControls ? (
+                                <View style={styles.controlGrid}>
+                                    <Pressable
+                                        style={styles.controlToggle}
+                                        onPress={() => setAudioEnabled(!audioEnabled)}
+                                    >
+                                        <Ionicons
+                                            name={audioEnabled ? "volume-medium" : "volume-mute"}
+                                            size={18}
+                                            color={audioEnabled ? COLORS.primary : COLORS.textSecondary}
+                                        />
+                                        <View>
+                                            <Text style={[styles.controlLabel, !audioEnabled && { color: COLORS.textSecondary }]}>Sound</Text>
+                                            <Text style={[styles.controlState, !audioEnabled && { color: COLORS.textSecondary }]}>{audioEnabled ? 'On' : 'Off'}</Text>
+                                        </View>
+                                    </Pressable>
+
+                                    <Pressable
+                                        style={styles.controlToggle}
+                                        onPress={toggleRepeat}
+                                    >
+                                        <Ionicons
+                                            name="refresh"
+                                            size={18}
+                                            color={repeatEnabled ? COLORS.primary : COLORS.textSecondary}
+                                        />
+                                        <View>
+                                            <Text style={[styles.controlLabel, !repeatEnabled && { color: COLORS.textSecondary }]}>Repeat</Text>
+                                            <Text style={[styles.controlState, !repeatEnabled && { color: COLORS.textSecondary }]}>{repeatEnabled ? 'On' : 'Off'}</Text>
+                                        </View>
+                                    </Pressable>
+
+                                    <Pressable
+                                        style={styles.controlToggle}
+                                        onPress={handleNext}
+                                    >
+                                        <Ionicons name="play-skip-forward" size={18} color={COLORS.primary} />
+                                        <View>
+                                            <Text style={styles.controlLabel}>Next</Text>
+                                            <Text style={styles.controlState}>Sound</Text>
+                                        </View>
+                                    </Pressable>
+
+                                    <Pressable
+                                        style={styles.controlToggle}
+                                        onPress={togglePause}
+                                    >
+                                        <Ionicons name={isPaused ? "play" : "pause"} size={18} color={COLORS.primary} />
+                                        <View>
+                                            <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
+                                        </View>
+                                    </Pressable>
+                                </View>
+                            ) : (
+                                <View style={styles.controlGrid}>
+                                    <Pressable
+                                        style={[styles.controlToggle, { width: '97%', justifyContent: 'center', alignItems: 'center' }]}
+                                        onPress={togglePause}
+                                    >
+                                        <Ionicons name={isPaused ? "play" : "pause"} size={18} color={COLORS.primary} style={{ marginRight: 8 }} />
+                                        <View>
+                                            <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
+                                        </View>
+                                    </Pressable>
+                                </View>
+                            )}
+
+                            <View style={styles.stepControlsRow}>
+                                <Pressable 
+                                    style={[styles.stepNavBtn, currentStepIndex === 0 && styles.stepNavBtnDisabled]} 
+                                    disabled={currentStepIndex === 0}
+                                    onPress={handlePrevStep}
                                 >
-                                    <Ionicons
-                                        name={audioEnabled ? "volume-medium" : "volume-mute"}
-                                        size={18}
-                                        color={audioEnabled ? COLORS.primary : COLORS.textSecondary}
-                                    />
-                                    <View>
-                                        <Text style={[styles.controlLabel, !audioEnabled && { color: COLORS.textSecondary }]}>Sound</Text>
-                                        <Text style={[styles.controlState, !audioEnabled && { color: COLORS.textSecondary }]}>{audioEnabled ? 'On' : 'Off'}</Text>
-                                    </View>
+                                    <Ionicons name="chevron-back" size={18} color={currentStepIndex === 0 ? '#A1B1B8' : COLORS.primary} />
+                                    <Text style={[styles.stepNavBtnText, currentStepIndex === 0 && { color: '#A1B1B8' }]}>Previous</Text>
                                 </Pressable>
 
-                                <Pressable
-                                    style={styles.controlToggle}
-                                    onPress={toggleRepeat}
-                                >
-                                    <Ionicons
-                                        name="refresh"
-                                        size={18}
-                                        color={repeatEnabled ? COLORS.primary : COLORS.textSecondary}
-                                    />
-                                    <View>
-                                        <Text style={[styles.controlLabel, !repeatEnabled && { color: COLORS.textSecondary }]}>Repeat</Text>
-                                        <Text style={[styles.controlState, !repeatEnabled && { color: COLORS.textSecondary }]}>{repeatEnabled ? 'On' : 'Off'}</Text>
-                                    </View>
-                                </Pressable>
-
-                                <Pressable
-                                    style={styles.controlToggle}
-                                    onPress={handleNext}
-                                >
-                                    <Ionicons name="play-skip-forward" size={18} color={COLORS.primary} />
-                                    <View>
-                                        <Text style={styles.controlLabel}>Next</Text>
-                                        <Text style={styles.controlState}>Sound</Text>
-                                    </View>
-                                </Pressable>
-
-                                <Pressable
-                                    style={styles.controlToggle}
-                                    onPress={togglePause}
-                                >
-                                    <Ionicons name={isPaused ? "play" : "pause"} size={18} color={COLORS.primary} />
-                                    <View>
-                                        <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
-                                    </View>
+                                <Pressable style={styles.primaryActionBtn} onPress={handleNextStep}>
+                                    <Text style={styles.primaryActionBtnText}>
+                                        {currentStepIndex < steps.length - 1 ? 'Next Step' : 'Finish Session'}
+                                    </Text>
+                                    <Ionicons name="chevron-forward" size={18} color="#fff" />
                                 </Pressable>
                             </View>
-
-                            <Pressable style={styles.primaryActionBtn} onPress={handleNextStep}>
-                                <Text style={styles.primaryActionBtnText}>
-                                    {currentStepIndex < steps.length - 1 ? 'Next Step' : 'Finish Session'}
-                                </Text>
-                                <Ionicons name="chevron-forward" size={18} color="#fff" />
-                            </Pressable>
 
                             <Pressable style={styles.endSessionBtn} onPress={handleEndSession}>
                                 <Text style={styles.endSessionText}>End Session</Text>
@@ -633,7 +844,10 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             {showSafetyNotice?.type === 'behavioral' && (
                                 <Pressable 
                                     style={styles.modalBtn} 
-                                    onPress={() => setShowSafetyNotice(null)}
+                                    onPress={() => {
+                                        setShowSafetyNotice(null);
+                                        navigation.replace('SessionPreview', { sessionId: 'daily_calm_reset', petId });
+                                    }}
                                 >
                                     <Text style={styles.modalBtnText}>{SEVERE_SIGN_LOGIC.behavioral.primaryCTA}</Text>
                                 </Pressable>
@@ -645,7 +859,6 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                                     if (showSafetyNotice?.type === 'medical' && SEVERE_SIGN_LOGIC.medical.blockStart) {
                                         navigation.goBack();
                                     } else {
-                                        // End session for behavioral secondary
                                         navigation.goBack();
                                     }
                                 }}
@@ -666,11 +879,145 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                             <Ionicons name="leaf-outline" size={40} color="#D97706" />
                         </View>
                         <Text style={styles.modalTitle}>{IN_SESSION_SAFETY_PROMPT.title}</Text>
-                        <Text style={styles.modalBody}>{IN_SESSION_SAFETY_PROMPT.body}</Text>
+                        <Text style={styles.modalBody}>
+                            {sessionId === 'outdoor_confidence_reset'
+                                ? "Recent check-ins show stronger stress signs. We suggest returning to an easier level next time. Move at your dog's pace."
+                                : IN_SESSION_SAFETY_PROMPT.body
+                            }
+                        </Text>
 
                         <Pressable style={styles.modalBtn} onPress={() => navigation.replace('Dashboard')}>
                             <Text style={styles.modalBtnText}>{IN_SESSION_SAFETY_PROMPT.primaryCTA}</Text>
                         </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Easier setup helper modal */}
+            <Modal visible={showEasierHelperModal} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={[styles.modalIcon, { backgroundColor: '#E0F2FE' }]}>
+                            <Ionicons name="information-circle-outline" size={40} color={COLORS.primary} />
+                        </View>
+                        <Text style={styles.modalTitle}>How to make it easier</Text>
+                        <ScrollView style={{ width: '100%', maxHeight: 220, marginBottom: 20 }} showsVerticalScrollIndicator={true}>
+                            {[
+                                "Move farther from the door or exit.",
+                                "Practice with the door closed first.",
+                                "Open the door only a crack.",
+                                "Stay inside and only look toward the exit.",
+                                "Choose a quieter time of day.",
+                                "Use a calmer hallway, porch, yard, or building exit.",
+                                "Shorten the session to 10–20 seconds.",
+                                "End while your dog can still recover."
+                            ].map((item, index) => (
+                                <View key={index} style={styles.helperItemRow}>
+                                    <Text style={styles.helperItemDot}>•</Text>
+                                    <Text style={styles.helperItemText}>{item}</Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+                        <Pressable style={styles.modalBtn} onPress={() => setShowEasierHelperModal(false)}>
+                            <Text style={styles.modalBtnText}>Got it</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Outdoor Confidence progression prompt */}
+            <Modal visible={showMilestonePrompt} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalCard, { maxHeight: '90%', width: '90%' }]}>
+                        {!milestoneExplanation ? (
+                            <>
+                                <View style={[styles.modalIcon, { backgroundColor: '#E6F7F2' }]}>
+                                    <Ionicons name="trophy-outline" size={40} color={COLORS.primary} />
+                                </View>
+                                <Text style={styles.modalTitle}>What did your dog manage today?</Text>
+                                <Text style={[styles.modalBody, { marginBottom: 15 }]}>
+                                    Unlocking milestones helps track progression. You can always repeat easier steps.
+                                </Text>
+
+                                <ScrollView 
+                                    style={{ width: '100%', maxHeight: 220, marginBottom: 20 }} 
+                                    showsVerticalScrollIndicator={true}
+                                >
+                                    {MILESTONE_OPTIONS.map((opt) => (
+                                        <Pressable
+                                            key={opt.id}
+                                            style={[
+                                                styles.milestoneOption,
+                                                selectedMilestone === opt.id && styles.milestoneOptionSelected
+                                            ]}
+                                            onPress={() => setSelectedMilestone(opt.id)}
+                                        >
+                                            <Text style={[
+                                                styles.milestoneOptionText,
+                                                selectedMilestone === opt.id && styles.milestoneOptionTextSelected
+                                            ]}>{opt.label}</Text>
+                                            {selectedMilestone === opt.id && (
+                                                <Ionicons name="checkmark" size={18} color="#fff" />
+                                            )}
+                                        </Pressable>
+                                    ))}
+                                </ScrollView>
+
+                                <View style={{ width: '100%', gap: 10 }}>
+                                    <Pressable 
+                                        style={[styles.modalBtn, !selectedMilestone && { opacity: 0.5 }]} 
+                                        disabled={!selectedMilestone}
+                                        onPress={async () => {
+                                            if (!selectedMilestone) return;
+                                            await saveSession(false, selectedMilestone);
+                                            const explanation = MILESTONE_EXPLANATIONS[selectedMilestone];
+                                            setMilestoneExplanation(explanation);
+                                        }}
+                                    >
+                                        <Text style={styles.modalBtnText}>Continue</Text>
+                                    </Pressable>
+                                    <Pressable style={styles.modalSkipBtn} onPress={() => {
+                                        setShowMilestonePrompt(false);
+                                        setMilestoneExplanation(null);
+                                        setSelectedMilestone(null);
+                                        navigation.replace('Dashboard');
+                                    }}>
+                                        <Text style={styles.modalSkipBtnText}>Skip</Text>
+                                    </Pressable>
+                                </View>
+                            </>
+                        ) : (
+                            <>
+                                <View style={[styles.modalIcon, { backgroundColor: '#E6F7F2' }]}>
+                                    <Ionicons name="star-outline" size={40} color={COLORS.primary} />
+                                </View>
+                                <Text style={styles.modalTitle}>{milestoneExplanation.title}</Text>
+                                <Text style={[styles.modalBody, { marginBottom: 30 }]}>
+                                    {milestoneExplanation.body}
+                                </Text>
+
+                                <View style={{ width: '100%', gap: 12 }}>
+                                    <Pressable 
+                                        style={styles.modalBtn} 
+                                        onPress={() => {
+                                            handleCTANavigation(milestoneExplanation.primaryCTA, selectedMilestone!);
+                                        }}
+                                    >
+                                        <Text style={styles.modalBtnText}>{milestoneExplanation.primaryCTA}</Text>
+                                    </Pressable>
+                                    {milestoneExplanation.secondaryCTA && (
+                                        <Pressable 
+                                            style={[styles.modalBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border }]} 
+                                            onPress={() => {
+                                                handleCTANavigation(milestoneExplanation.secondaryCTA!, selectedMilestone!);
+                                            }}
+                                        >
+                                            <Text style={[styles.modalBtnText, { color: COLORS.textSecondary }]}>{milestoneExplanation.secondaryCTA}</Text>
+                                        </Pressable>
+                                    )}
+                                </View>
+                            </>
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -735,7 +1082,7 @@ const styles = StyleSheet.create({
     controlLabel: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
     controlState: { fontSize: 10, fontWeight: '600', color: COLORS.textSecondary },
 
-    primaryActionBtn: { backgroundColor: COLORS.primary, width: '100%', height: 56, borderRadius: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...SHADOWS.medium },
+    primaryActionBtn: { flex: 2, backgroundColor: COLORS.primary, height: 56, borderRadius: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...SHADOWS.medium },
     primaryActionBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
 
     endSessionBtn: { padding: 12 },
@@ -744,11 +1091,130 @@ const styles = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 30 },
     modalCard: { backgroundColor: '#fff', borderRadius: 24, padding: 30, alignItems: 'center', width: '100%', ...SHADOWS.large },
     modalIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#DDF4EF', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-    modalTitle: { ...FONTS.h2, color: COLORS.text, marginBottom: 12 },
+    modalTitle: { ...FONTS.h2, color: COLORS.text, marginBottom: 12, textAlign: 'center' },
     modalBody: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 30 },
-    modalBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 40, paddingVertical: 14, borderRadius: 25 },
-    modalBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+    modalBtn: { backgroundColor: COLORS.primary, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', width: '100%' },
+    modalBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' },
 
     saveOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
-    saveText: { marginTop: 16, ...FONTS.body, color: COLORS.text }
+    saveText: { marginTop: 16, ...FONTS.body, color: COLORS.text },
+
+    // Milestone selection options styling
+    milestoneOption: {
+        width: '100%',
+        padding: 14,
+        borderRadius: 12,
+        backgroundColor: '#F3F4F6',
+        marginBottom: 8,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB'
+    },
+    milestoneOptionSelected: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary
+    },
+    milestoneOptionText: {
+        fontSize: 14,
+        color: COLORS.text,
+        fontWeight: '500',
+        flex: 1
+    },
+    milestoneOptionTextSelected: {
+        color: '#fff',
+        fontWeight: '700'
+    },
+    stepControlsRow: {
+        flexDirection: 'row',
+        width: '100%',
+        justifyContent: 'space-between',
+        gap: 12,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    stepNavBtn: {
+        flex: 1,
+        height: 56,
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    stepNavBtnDisabled: {
+        backgroundColor: '#F3F4F6',
+        borderColor: '#E5E7EB',
+    },
+    stepNavBtnText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: COLORS.primary,
+    },
+    modalSkipBtn: {
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        marginTop: 4,
+    },
+    modalSkipBtnText: {
+        color: COLORS.textSecondary,
+        fontWeight: '600',
+        fontSize: 15,
+        textAlign: 'center',
+    },
+    easierHelperLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+        padding: 6,
+    },
+    easierHelperLinkText: {
+        color: COLORS.primary,
+        fontSize: 14,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+    },
+    helperItemRow: {
+        flexDirection: 'row',
+        marginBottom: 8,
+        alignItems: 'flex-start',
+        paddingHorizontal: 10,
+        width: '100%',
+    },
+    helperItemDot: {
+        fontSize: 16,
+        color: COLORS.primary,
+        marginRight: 8,
+        lineHeight: 18,
+    },
+    helperItemText: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        flex: 1,
+        lineHeight: 20,
+    },
+    signHelperBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF8E8',
+        borderWidth: 1,
+        borderColor: '#F4D08A',
+        borderRadius: 12,
+        padding: 12,
+        marginVertical: 12,
+        width: '100%',
+    },
+    signHelperText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#9A5B00',
+        fontWeight: '500',
+        lineHeight: 18,
+    },
 });
