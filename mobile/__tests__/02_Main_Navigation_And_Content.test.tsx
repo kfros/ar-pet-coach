@@ -132,6 +132,123 @@ describe('Suite 02: Main Navigation And Content', () => {
     expect(getByText(/Start Session/i)).toBeTruthy();
     expect(queryByText(/Unlock with Premium/i)).toBeNull();
   });
+
+  test('session_premium_003: Locked premium session CTA navigates to Paywall and not to SessionPreview', async () => {
+    mockNavigation.navigate.mockClear();
+    const { useSubscription } = require('../components/SubscriptionManager');
+    useSubscription.mockReturnValue({
+      isPremium: false,
+      checkPaywallTrigger: jest.fn(),
+      trackCalmingSession: jest.fn(),
+    });
+
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <SessionPreviewScreen 
+            navigation={mockNavigation} 
+            route={{ params: { sessionId: 'fireworks_prep_routine', petId: 'test-pet' } }} 
+          />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+
+    const unlockButton = getByText(/Unlock with Premium/i);
+    fireEvent.press(unlockButton);
+
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', expect.objectContaining({
+      source: 'premium_session',
+      sessionId: 'fireworks_prep_routine',
+      petId: 'test-pet',
+    }));
+    expect(mockNavigation.navigate).not.toHaveBeenCalledWith('SessionPreview', expect.anything());
+  });
+
+  test('session_premium_004: Repeated fast taps call navigate exactly once', async () => {
+    mockNavigation.navigate.mockClear();
+    const { useSubscription } = require('../components/SubscriptionManager');
+    useSubscription.mockReturnValue({
+      isPremium: false,
+      checkPaywallTrigger: jest.fn(),
+      trackCalmingSession: jest.fn(),
+    });
+
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <SessionPreviewScreen 
+            navigation={mockNavigation} 
+            route={{ params: { sessionId: 'fireworks_prep_routine', petId: 'test-pet' } }} 
+          />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+
+    const unlockButton = getByText(/Unlock with Premium/i);
+    fireEvent.press(unlockButton);
+    fireEvent.press(unlockButton);
+    fireEvent.press(unlockButton);
+
+    expect(mockNavigation.navigate).toHaveBeenCalledTimes(1);
+  });
+
+  test('session_premium_005: Premium user CTA navigates to GuidedSession', async () => {
+    mockNavigation.navigate.mockClear();
+    const { useSubscription } = require('../components/SubscriptionManager');
+    useSubscription.mockReturnValue({
+      isPremium: true,
+      checkPaywallTrigger: jest.fn(),
+      trackCalmingSession: jest.fn(),
+    });
+
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <SessionPreviewScreen 
+            navigation={mockNavigation} 
+            route={{ params: { sessionId: 'fireworks_prep_routine', petId: 'test-pet' } }} 
+          />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+
+    const startButton = getByText(/Start Session/i);
+    fireEvent.press(startButton);
+
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('GuidedSession', expect.objectContaining({
+      sessionId: 'fireworks_prep_routine',
+      petId: 'test-pet',
+    }));
+  });
+
+  test('session_free_003: Free routine CTA navigates to GuidedSession', async () => {
+    mockNavigation.navigate.mockClear();
+    const { useSubscription } = require('../components/SubscriptionManager');
+    useSubscription.mockReturnValue({
+      isPremium: false,
+      checkPaywallTrigger: jest.fn(),
+      trackCalmingSession: jest.fn(),
+    });
+
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <SessionPreviewScreen 
+            navigation={mockNavigation} 
+            route={{ params: { sessionId: 'daily_calm_reset', petId: 'test-pet' } }} 
+          />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+
+    const startButton = getByText(/Start Session/i);
+    fireEvent.press(startButton);
+
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('GuidedSession', expect.objectContaining({
+      sessionId: 'daily_calm_reset',
+      petId: 'test-pet',
+    }));
+  });
 });
 
 // Note: I added a simple mock for SubscriptionProvider in SubscriptionManager.tsx or I'll need to mock the hook.

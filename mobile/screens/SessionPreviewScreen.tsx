@@ -27,6 +27,36 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
 
     const isLocked = session?.accessLevel === 'premium' && !isPremium;
 
+    const isNavigatingRef = React.useRef(false);
+    const [isNavigating, setIsNavigating] = React.useState(false);
+    const navigationTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    React.useEffect(() => {
+        return () => {
+            if (navigationTimeoutRef.current) {
+                clearTimeout(navigationTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const handlePrimaryAction = () => {
+        if (!session || isNavigatingRef.current) return;
+
+        isNavigatingRef.current = true;
+        setIsNavigating(true);
+
+        if (isLocked) {
+            navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
+        } else {
+            navigation.navigate('GuidedSession', { sessionId, petId, level: route.params?.level });
+        }
+
+        navigationTimeoutRef.current = setTimeout(() => {
+            isNavigatingRef.current = false;
+            setIsNavigating(false);
+        }, 500);
+    };
+
     if (!session) {
         return (
             <View style={styles.center}>
@@ -45,9 +75,9 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                 <Text style={styles.headerTitle}>Session Preview</Text>
             </View>
 
-            <ScrollView 
+            <ScrollView
                 contentContainerStyle={[
-                    styles.scrollContent, 
+                    styles.scrollContent,
                     { paddingBottom: insets.bottom + 120 } // Ensure content is not hidden by sticky footer
                 ]}
             >
@@ -69,16 +99,16 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                         </View>
                         {session.accessLevel === 'premium' && (
                             <View style={[
-                                styles.previewBadge, 
+                                styles.previewBadge,
                                 isLocked ? styles.previewBadgeLocked : styles.previewBadgeUnlocked
                             ]}>
-                                <Ionicons 
-                                    name={isLocked ? "lock-closed" : "checkmark-circle"} 
-                                    size={12} 
-                                    color={isLocked ? "#fff" : "#0F766E"} 
+                                <Ionicons
+                                    name={isLocked ? "lock-closed" : "checkmark-circle"}
+                                    size={12}
+                                    color={isLocked ? "#fff" : "#0F766E"}
                                 />
                                 <Text style={[
-                                    styles.previewBadgeText, 
+                                    styles.previewBadgeText,
                                     { color: isLocked ? "#fff" : "#0F766E" }
                                 ]}>
                                     {isLocked ? 'PREMIUM' : 'INCLUDED'}
@@ -87,7 +117,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                         )}
                     </View>
                     <Text style={styles.subtitle}>{session.subtitle}</Text>
-                    
+
                     <View style={styles.metaRow}>
                         <View style={styles.metaItem}>
                             <Ionicons name="time-outline" size={16} color={COLORS.primary} />
@@ -152,8 +182,8 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Try instead</Text>
                         {session.fallbacks.map((fallback: any, index: number) => (
-                            <Pressable 
-                                key={index} 
+                            <Pressable
+                                key={index}
                                 style={[
                                     styles.fallbackCard,
                                     fallback.type === 'info' && { opacity: 0.9 }
@@ -200,7 +230,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                         ))}
                     </View>
                 )}
-                
+
                 <View style={styles.disclaimer}>
                     <Text style={styles.disclaimerText}>
                         ChillPup routines are gentle practice guides based on owner observations. They are not a diagnosis, treatment plan, or substitute for advice from a veterinarian or qualified behavior professional.
@@ -211,17 +241,12 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
                 <Pressable
                     style={({ pressed }) => [
-                        styles.startButton, 
+                        styles.startButton,
                         isLocked && { backgroundColor: '#D97706' },
-                        pressed && { opacity: 0.8 }
+                        (pressed || isNavigating) && { opacity: 0.8 }
                     ]}
-                    onPress={() => {
-                        if (isLocked) {
-                            navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
-                        } else {
-                            navigation.navigate('GuidedSession', { sessionId, petId, level: route.params?.level });
-                        }
-                    }}
+                    onPress={handlePrimaryAction}
+                    disabled={isNavigating}
                 >
                     <Text style={styles.startButtonText}>
                         {isLocked ? 'Unlock with Premium' : 'Start Session'}
@@ -260,12 +285,12 @@ const styles = StyleSheet.create({
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
     heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
     titleContainer: { flex: 1, marginRight: 12 },
-    previewBadge: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 4, 
-        paddingHorizontal: 10, 
-        paddingVertical: 6, 
+    previewBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
         borderRadius: 12,
         borderWidth: 1,
     },
@@ -281,13 +306,13 @@ const styles = StyleSheet.create({
     safetySection: { backgroundColor: '#FFF8E8', borderRadius: SIZES.radius, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#F4D08A' },
     safetyTitle: { ...FONTS.h3, color: '#9A5B00', marginBottom: 12 },
     safetyText: { ...FONTS.body, color: '#6B4A1D', flex: 1, lineHeight: 22 },
-    fallbackCard: { 
-        backgroundColor: '#EEF8F6', 
-        borderRadius: 16, 
-        padding: 16, 
-        marginBottom: 12, 
-        borderWidth: 1, 
-        borderColor: '#CDECE5' 
+    fallbackCard: {
+        backgroundColor: '#EEF8F6',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#CDECE5'
     },
     fallbackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
     fallbackTitle: { ...FONTS.body, fontWeight: '700', color: '#12312E' },
