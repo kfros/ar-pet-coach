@@ -102,7 +102,7 @@ describe('Suite 08: Fade And Positive Signs', () => {
     jest.useRealTimers();
 
     expect(getByText(/Finish & Save/i)).toBeTruthy();
-    expect(getByText(/Positive Signs \(optional\)/i)).toBeTruthy();
+    expect(getByText(/Recovery signs/i)).toBeTruthy();
   });
 
   test('test_after_checkin_positive_signs_save: CHECKIN-001', async () => {
