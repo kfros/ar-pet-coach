@@ -3,8 +3,8 @@ import SessionService from '../services/sessionService';
 describe('Premium Routines Data Integrity', () => {
     const premiumRoutines = SessionService.getSessions().filter(s => s.accessLevel === 'premium');
 
-    test('all 4 premium routines exist', () => {
-        const expectedIds = ['fireworks_prep_routine', 'visitors_at_home', 'being_alone', 'vet_visit_prep'];
+    test('all 5 premium routines exist', () => {
+        const expectedIds = ['fireworks_prep_routine', 'visitors_at_home', 'being_alone', 'vet_visit_prep', 'outdoor_confidence_reset'];
         expectedIds.forEach(id => {
             const routine = premiumRoutines.find(r => r.id === id);
             expect(routine).toBeDefined();

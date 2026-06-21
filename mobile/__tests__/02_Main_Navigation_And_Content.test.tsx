@@ -39,7 +39,7 @@ describe('Suite 02: Main Navigation And Content', () => {
     );
     
     expect(await findByText(/Buddy/)).toBeTruthy();
-    expect(await findByText(/ChillPup/)).toBeTruthy();
+    expect(await findByText('ChillPup')).toBeTruthy();
   });
 
   test('recommended_calming_session_card_is_visible', async () => {

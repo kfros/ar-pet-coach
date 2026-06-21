@@ -6,6 +6,18 @@ import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import SessionService from '../services/sessionService';
 import { useSubscription } from '../components/SubscriptionManager';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ROUTINE_CATEGORIES } from '../appContent/routineCategories';
+import { RoutineCategory } from '../types/Session';
+
+const LEVEL_LABELS: Record<string, string> = {
+    doorway_calm: "Stayed calm near the door",
+    open_edge: "Handled the door opening",
+    one_step: "Took one calm step",
+    short_pause: "Paused briefly outside",
+    few_steps: "Walked a few calm steps away",
+    hundred_steps: "Managed around 100 steps",
+    ten_min_walk: "Managed an easy 10-minute walk"
+};
 
 export default function SessionPreviewScreen({ navigation, route }: any) {
     const insets = useSafeAreaInsets();
@@ -48,6 +60,11 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                 <View style={styles.heroCard}>
                     <View style={styles.heroHeader}>
                         <View style={styles.titleContainer}>
+                            {session.category && (
+                                <Text style={styles.categoryLabel}>
+                                    {ROUTINE_CATEGORIES[session.category as RoutineCategory]?.title || session.category}
+                                </Text>
+                            )}
                             <Text style={styles.title} numberOfLines={2}>{session.title}</Text>
                         </View>
                         {session.accessLevel === 'premium' && (
@@ -81,11 +98,35 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                             <Text style={styles.metaText}>{session.difficulty}</Text>
                         </View>
                     </View>
+                    {session.backgroundSoundPolicy?.mode === 'none' && (
+                        <View style={styles.silentBadge}>
+                            <Ionicons name="volume-mute" size={16} color="#6B7280" />
+                            <Text style={styles.silentText}>No background sound needed for this routine.</Text>
+                        </View>
+                    )}
                 </View>
+
+                {sessionId === 'outdoor_confidence_reset' && (
+                    <View style={styles.outdoorWarningBanner}>
+                        <Ionicons name="alert-circle" size={20} color="#9A5B00" />
+                        <Text style={styles.outdoorWarningText}>
+                            This routine is for threshold practice at the safest edge, not a full walk.
+                        </Text>
+                    </View>
+                )}
+
+                {route.params?.level && LEVEL_LABELS[route.params.level] && (
+                    <View style={styles.levelTargetBanner}>
+                        <Ionicons name="flag-outline" size={20} color="#0F766E" />
+                        <Text style={styles.levelTargetText}>
+                            Target step today: {LEVEL_LABELS[route.params.level]}
+                        </Text>
+                    </View>
+                )}
 
                 {session.suitableFor && session.suitableFor.length > 0 && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Suitable For</Text>
+                        <Text style={styles.sectionTitle}>Best for</Text>
                         {session.suitableFor.map((item, index) => (
                             <View key={index} style={styles.listItem}>
                                 <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.success} />
@@ -141,7 +182,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                         <Text style={styles.safetyTitle}>Before you start</Text>
                         {session.safetyNotes.map((item, index) => (
                             <View key={index} style={styles.listItem}>
-                                <Ionicons name="alert-circle" size={18} color="#B7791F" />
+                                <Ionicons name="alert-circle" size={18} color="#9A5B00" />
                                 <Text style={styles.safetyText}>{item}</Text>
                             </View>
                         ))}
@@ -153,7 +194,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                         <Text style={styles.safetyTitle}>Stop the session if:</Text>
                         {session.stopIf.map((item, index) => (
                             <View key={index} style={styles.listItem}>
-                                <Ionicons name="alert-circle" size={18} color="#B7791F" />
+                                <Ionicons name="alert-circle" size={18} color="#9A5B00" />
                                 <Text style={styles.safetyText}>{item}</Text>
                             </View>
                         ))}
@@ -178,7 +219,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                         if (isLocked) {
                             navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
                         } else {
-                            navigation.navigate('GuidedSession', { sessionId, petId });
+                            navigation.navigate('GuidedSession', { sessionId, petId, level: route.params?.level });
                         }
                     }}
                 >
@@ -266,5 +307,63 @@ const styles = StyleSheet.create({
         color: '#065F46',
         fontWeight: '600',
         fontSize: 14,
+    },
+    categoryLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.primary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 4,
+    },
+    outdoorWarningBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF8E8',
+        padding: 14,
+        borderRadius: SIZES.radius,
+        marginBottom: 24,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#F4D08A',
+    },
+    outdoorWarningText: {
+        color: '#9A5B00',
+        fontWeight: '600',
+        fontSize: 14,
+        flex: 1,
+        lineHeight: 20,
+    },
+    levelTargetBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EEF8F6',
+        padding: 14,
+        borderRadius: SIZES.radius,
+        marginBottom: 24,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#CDECE5',
+    },
+    levelTargetText: {
+        color: '#0F766E',
+        fontWeight: '600',
+        fontSize: 14,
+        flex: 1,
+        lineHeight: 20,
+    },
+    silentBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 16,
+        padding: 10,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
+    },
+    silentText: {
+        fontSize: 13,
+        color: '#4B5563',
+        fontWeight: '500',
     },
 });

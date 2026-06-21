@@ -19,8 +19,12 @@ const CROSSFADE_DURATION = 1500;
  * Premium Audio Hook for the Calm session.
  * Handles preloading, sequential randomization with cross-session memory,
  * and smooth transitions using expo-av.
+ * 
+ * Future Release Sound Modes candidates (design-only / no assets):
+ * - white_noise (id: 'soft_white_noise', source: require('../assets/white_noise.mp3'))
+ * - brown_noise (id: 'soft_brown_noise', source: require('../assets/brown_noise.mp3'))
  */
-export const useCalmAudio = (isActive: boolean) => {
+export const useCalmAudio = (isActive: boolean, mode: string = 'calm_music') => {
   const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 

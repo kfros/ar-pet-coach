@@ -6,6 +6,8 @@ export const PREMIUM_SESSIONS: Session[] = [
         title: "Fireworks Prep Routine",
         accessLevel: 'premium',
         category: "noise_support",
+        categoryLabel: "Noise & Fireworks",
+        categoryOrder: 30,
         estimatedDurationSeconds: 300,
         suggestedTimeCopy: "About 5 min",
         durationMinutes: 5,
@@ -61,6 +63,11 @@ export const PREMIUM_SESSIONS: Session[] = [
         tags: ['premium', 'noise', 'fireworks'],
         recommendedForTriggers: ['loud_noises', 'fireworks'],
         iconKey: 'sparkles',
+        backgroundSoundPolicy: {
+            mode: 'calm_music',
+            defaultEnabled: true,
+            showControls: true
+        },
         fallbacks: [
             {
                 type: 'routine',
@@ -81,7 +88,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Choose a calm room. Keep the sound off for now. Have tiny high-value treats ready if your dog can eat calmly.",
                 durationSeconds: 45,
                 visualCue: 'observe',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'fireworks_prep_baseline',
@@ -89,7 +97,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Let your dog settle near you. Look for soft body, normal breathing, and easy attention before you continue.",
                 durationSeconds: 45,
                 visualCue: 'pulse',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'fireworks_prep_tiny_sound',
@@ -97,7 +106,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Play a very quiet firework-like sound for a moment. It should be barely noticeble. Reward calm noticing.",
                 durationSeconds: 45,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'fireworks_prep_pause',
@@ -105,7 +115,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Stop the sound. Let your dog return to neutral. If signs increased, end here and use an easier setup next time.",
                 durationSeconds: 45,
                 visualCue: 'pause',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'fireworks_prep_repeat_easy',
@@ -113,7 +124,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Repeat the same quiet sound only if your dog stayed relaxed. Do not raise volume today unless this felt easy.",
                 durationSeconds: 60,
                 visualCue: 'pulse',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'fireworks_prep_finish',
@@ -121,7 +133,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Finish with calm praise, a reward, or quiet time. Progress means your dog stayed comfortable, not that the sound got louder.",
                 durationSeconds: 60,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             }
         ]
     },
@@ -130,6 +143,8 @@ export const PREMIUM_SESSIONS: Session[] = [
         title: "Visitors at Home",
         accessLevel: 'premium',
         category: "home_triggers",
+        categoryLabel: "Home & Visitors",
+        categoryOrder: 40,
         estimatedDurationSeconds: 300,
         suggestedTimeCopy: "About 5 min",
         durationMinutes: 5,
@@ -184,6 +199,11 @@ export const PREMIUM_SESSIONS: Session[] = [
         tags: ['premium', 'visitors'],
         recommendedForTriggers: ['visitors'],
         iconKey: 'notifications',
+        backgroundSoundPolicy: {
+            mode: 'none',
+            defaultEnabled: false,
+            showControls: false
+        },
         fallbacks: [
             {
                 type: 'routine',
@@ -204,7 +224,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Start far from the door or guest area. Your dog should have space to move away and should not be asked to greet anyone.",
                 durationSeconds: 45,
                 visualCue: 'observe',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'visitors_calm_baseline',
@@ -212,7 +233,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Wait for easy breathing, softer body, or calm attention. Reward calm presence before adding any guest-like cue.",
                 durationSeconds: 45,
                 visualCue: 'pulse',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'visitors_soft_door_cue',
@@ -220,7 +242,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Make one very soft knock or door sound. Reward calm noticing. If your dog startles or barks hard, make it easier next time.",
                 durationSeconds: 45,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'visitors_no_pressure_rule',
@@ -228,7 +251,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Imagine a visitor ignoring your dog: no staring, no reaching, no leaning. Reward your dog for staying calm at a distance.",
                 durationSeconds: 45,
                 visualCue: 'pause',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'visitors_brief_movement',
@@ -236,7 +260,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Take one calm step near the guest area, then return. Keep it boring and easy. Stop if your dog becomes tense or cannot eat.",
                 durationSeconds: 60,
                 visualCue: 'pulse',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'visitors_finish',
@@ -244,7 +269,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "End while your dog is still comfortable. A short calm practice is better than pushing into barking, hiding, or freezing.",
                 durationSeconds: 60,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             }
         ]
     },
@@ -253,6 +279,8 @@ export const PREMIUM_SESSIONS: Session[] = [
         title: "Being Alone",
         accessLevel: 'premium',
         category: "alone_time",
+        categoryLabel: "Being Alone",
+        categoryOrder: 50,
         estimatedDurationSeconds: 300,
         suggestedTimeCopy: "About 5 min",
         durationMinutes: 5,
@@ -309,6 +337,11 @@ export const PREMIUM_SESSIONS: Session[] = [
         tags: ['premium', 'alone'],
         recommendedForTriggers: ['being_alone'],
         iconKey: 'home',
+        backgroundSoundPolicy: {
+            mode: 'calm_music',
+            defaultEnabled: true,
+            showControls: true
+        },
         fallbacks: [
             {
                 type: 'routine',
@@ -329,7 +362,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Begin in a calm spot your dog already likes. Do not close them in a crate or room if that makes them worried.",
                 durationSeconds: 45,
                 visualCue: 'observe',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'alone_baseline_calm',
@@ -337,7 +371,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Wait for calm signs: softer body, normal breathing, or relaxed attention. Reward quietly if your dog can eat calmly.",
                 durationSeconds: 45,
                 visualCue: 'pulse',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'alone_one_step',
@@ -345,7 +380,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Move one step away, then return before your dog worries. This should feel almost too easy.",
                 durationSeconds: 45,
                 visualCue: 'pause',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'alone_turn_away',
@@ -353,7 +389,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Turn your body away for a moment, then return to neutral. Reward calm staying, not chasing or worried following.",
                 durationSeconds: 45,
                 visualCue: 'pulse',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'alone_touch_door',
@@ -361,7 +398,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Touch the door handle or entry area, then come back. Do not leave yet. Stop if your dog becomes alert or tense.",
                 durationSeconds: 60,
                 visualCue: 'observe',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             },
             {
                 id: 'alone_finish_easy',
@@ -369,7 +407,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Finish while your dog is still comfortable. Progress means staying relaxed, not being left for longer.",
                 durationSeconds: 60,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'calm_music', defaultEnabled: true, showControls: true }
             }
         ]
     },
@@ -378,6 +417,8 @@ export const PREMIUM_SESSIONS: Session[] = [
         title: "Vet Visit Prep",
         accessLevel: 'premium',
         category: "care_handling",
+        categoryLabel: "Care & Handling",
+        categoryOrder: 60,
         estimatedDurationSeconds: 360,
         suggestedTimeCopy: "About 6 min",
         durationMinutes: 6,
@@ -434,6 +475,11 @@ export const PREMIUM_SESSIONS: Session[] = [
         tags: ['premium', 'vet'],
         recommendedForTriggers: ['vet_visits'],
         iconKey: 'medkit',
+        backgroundSoundPolicy: {
+            mode: 'none',
+            defaultEnabled: false,
+            showControls: false
+        },
         fallbacks: [
             {
                 type: 'routine',
@@ -454,7 +500,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Place a mat or blanket your dog already likes. Let your dog choose to step onto it. Do not pull or place them there.",
                 durationSeconds: 45,
                 visualCue: 'observe',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'vet_reward_station',
@@ -462,7 +509,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Reward your dog for staying comfortably on the mat. Calm sitting, standing, or lying down are all okay.",
                 durationSeconds: 45,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'vet_hand_near_body',
@@ -470,7 +518,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Move your hand toward your dog’s shoulder, then reward. You do not need to touch yet. Keep the movement slow and small.",
                 durationSeconds: 45,
                 visualCue: 'pulse',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'vet_tiny_touch',
@@ -478,7 +527,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Touch a comfortable area for one second, then reward. Avoid paws, ears, mouth, or painful areas unless your dog is fully relaxed.",
                 durationSeconds: 60,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'vet_pause_choice',
@@ -486,7 +536,8 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "Pause and let your dog reset. If they move away, turn away, freeze, or refuse food, respect the break and end easier.",
                 durationSeconds: 60,
                 visualCue: 'pause',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
             },
             {
                 id: 'vet_finish_plan',
@@ -494,7 +545,197 @@ export const PREMIUM_SESSIONS: Session[] = [
                 instruction: "End with something easy. For real visits, bring treats, a familiar blanket, and tell the clinic if your dog needs extra space.",
                 durationSeconds: 105,
                 visualCue: 'reward',
-                canSkip: false
+                canSkip: false,
+                backgroundSoundPolicy: { mode: 'none', defaultEnabled: false, showControls: false }
+            }
+        ]
+    },
+    {
+        id: "outdoor_confidence_reset",
+        title: "Outdoor Confidence Reset",
+        subtitle: "Tiny steps from the safest outdoor edge.",
+        description: "A short routine for practicing near the first place your dog can still feel safe, without forcing a full walk.",
+        goal: "Help the owner practice tiny, low-pressure outdoor confidence steps while stopping before panic.",
+        durationMinutes: 5,
+        estimatedDurationSeconds: 300,
+        suggestedTimeCopy: "About 5 min",
+        difficulty: "moderate",
+        trigger: "new_places",
+        category: "walk_fear",
+        categoryLabel: "Walk Fear & Outdoor Confidence",
+        categoryOrder: 20,
+        accessLevel: "premium",
+        checkInProfileId: "outdoor_confidence",
+        tags: [
+            "premium",
+            "walk_fear",
+            "outdoor",
+            "threshold"
+        ],
+        recommendedForTriggers: [
+            "new_places",
+            "traffic_car_horns",
+            "nighttime",
+            "not_sure"
+        ],
+        suitableFor: [
+            "Dogs who hesitate at the door, hallway, yard, porch, or building exit.",
+            "Mild outdoor worry where your dog can still recover.",
+            "Short practice before trying a normal walk again."
+        ],
+        notFor: [
+            "Limping, yelping, collapse, breathing trouble, vomiting, diarrhea, or other medical symptoms.",
+            "Sudden confusion or major behavior change in a senior dog.",
+            "Panic with escape attempts near roads.",
+            "Aggression, self-injury, or unsafe pulling.",
+            "Straining, urinary pain, or inability to urinate."
+        ],
+        sourcePrinciples: [
+            "Start below the fear threshold.",
+            "Use the smallest safe version of outside.",
+            "Let retreat be part of the routine.",
+            "Do not drag, force, flood, scold, or rush.",
+            "Progress means comfort, not distance.",
+            "Stop or backtrack when stress signs appear."
+        ],
+        safetyNotes: [
+            "Practice only where you can stay safely away from traffic.",
+            "Do not drag or pull your dog across the threshold.",
+            "Stop if your dog freezes hard, panics, tries to bolt, or cannot recover.",
+            "For medical symptoms, pain, collapse, repeated vomiting or diarrhea, or breathing trouble, contact a veterinarian."
+        ],
+        beforeYouStart: [
+            "Choose the easiest safe edge: inside the doorway, hallway, porch, yard, or a quiet exit.",
+            "Use secure, properly fitted gear if you are near any outdoor escape risk.",
+            "Keep the session tiny. This is not a full walk.",
+            "Do not practice near traffic or intense triggers."
+        ],
+        beforeCheckinEnabled: true,
+        afterCheckinEnabled: true,
+        severeNoticeEnabled: true,
+        iconKey: "walk",
+        backgroundSoundPolicy: {
+            mode: "none",
+            defaultEnabled: false,
+            showControls: false
+        },
+        stopIf: [
+            "freezing",
+            "trembling_or_shaking",
+            "panting",
+            "pacing_or_restless",
+            "scanning_or_alert",
+            "bolting_or_escape_attempts",
+            "not_accepting_treats",
+            "aggression",
+            "self_harm",
+            "collapse_or_breathing_trouble",
+            "repeated_vomiting_or_diarrhea"
+        ],
+        whatToWatchFor: [
+            "Soft body at the chosen starting point.",
+            "Ability to look around without panic.",
+            "Taking treats calmly if food is offered.",
+            "Choosing to step forward or retreat without pressure.",
+            "Recovering quickly after the tiny step."
+        ],
+        afterSession: [
+            "Log where your dog first stayed comfortable.",
+            "Progress means a calmer edge, not a longer walk.",
+            "Repeat the same easy step before making it harder."
+        ],
+        fallbacks: [
+            {
+                type: "routine",
+                routineId: "daily_calm_reset",
+                title: "Daily Calm Reset",
+                body: "Use a familiar indoor calm routine before trying the outdoor edge."
+            },
+            {
+                type: "info",
+                title: "Check safety first",
+                body: "For pain, collapse, breathing trouble, escape attempts, self-injury, or severe distress, stop the routine and contact appropriate professional support."
+            }
+        ],
+        steps: [
+            {
+                id: "outdoor_setup_safe_edge",
+                title: "Choose the safe edge",
+                instruction: "Pick the easiest place where your dog can still feel safe: inside the doorway, hallway, porch, yard, or quiet exit. Stay away from traffic.",
+                durationSeconds: 45,
+                visualCue: "observe",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false,
+                    helperText: "No background sound is needed for this outdoor threshold step."
+                }
+            },
+            {
+                id: "outdoor_check_body",
+                title: "Check before moving",
+                instruction: "Look for easy breathing, softer body, and the ability to notice you. If your dog is already tense, make the setup easier.",
+                durationSeconds: 45,
+                visualCue: "pulse",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "outdoor_open_or_look",
+                title: "Open the edge",
+                instruction: "Open the door, look toward the exit, or stand near the edge for a moment. Reward calm noticing if your dog can eat calmly.",
+                durationSeconds: 45,
+                visualCue: "reward",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "outdoor_tiny_step",
+                title: "Try one tiny step",
+                instruction: "Invite one tiny step toward the edge only if your dog is still comfortable. Do not pull. One calm step is enough.",
+                durationSeconds: 45,
+                visualCue: "observe",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "outdoor_retreat_is_ok",
+                title: "Return calmly",
+                instruction: "Let your dog turn back or return inside. Retreating calmly is part of the practice, not a failure.",
+                durationSeconds: 60,
+                visualCue: "pause",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "outdoor_finish_easy",
+                title: "End while it is easy",
+                instruction: "Finish before things get hard. Next time, repeat the same easy edge before asking for anything more.",
+                durationSeconds: 60,
+                visualCue: "reward",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
             }
         ]
     }
