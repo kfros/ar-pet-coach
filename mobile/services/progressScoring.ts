@@ -147,7 +147,7 @@ export const calculateCheckinScore = (checkin?: CheckIn, profile?: CheckInProfil
         }
     }
 
-    const positiveBonus = Math.min(rawPositiveBonus, 2);
+    const positiveBonus = (profile && profile.id === 'outdoor_confidence') ? 0 : Math.min(rawPositiveBonus, 2);
     const rawScore = base + stressSignScore - positiveBonus;
     const score = Math.max(0, Math.min(10, rawScore));
 

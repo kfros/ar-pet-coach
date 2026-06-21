@@ -78,7 +78,7 @@ export const CHECKIN_PROFILES: Record<CheckInProfileId, CheckInProfile> = {
         title: "Outdoor signs",
         beforePrompt: "What signs do you notice before this outdoor step?",
         afterPrompt: "What signs did you still notice after the step?",
-        showPositiveSignsAfter: false,
+        showPositiveSignsAfter: true,
         milestonePromptEnabled: true,
         stressSigns: [
             { id: "freezing_at_threshold", label: "Freezing at the edge", kind: "stress", scoreWeight: 2 },
@@ -93,7 +93,18 @@ export const CHECKIN_PROFILES: Record<CheckInProfileId, CheckInProfile> = {
             { id: "unable_to_recover", label: "Could not settle after returning", kind: "stress", scoreWeight: 2 },
             { id: "other", label: "Other", kind: "stress", scoreWeight: 1 }
         ],
-        positiveSigns: [],
+        positiveSigns: [
+            { id: "looked_back_at_owner", label: "Looked back at me", kind: "positive", scoreWeight: 1 },
+            { id: "took_treats_calmly", label: "Took treats calmly", kind: "positive", scoreWeight: 1 },
+            { id: "looser_body", label: "Body looked a little softer", kind: "positive", scoreWeight: 1 },
+            { id: "sniffed_or_explored", label: "Sniffed or explored briefly", kind: "positive", scoreWeight: 1 },
+            { id: "voluntary_step", label: "Moved voluntarily", kind: "positive", scoreWeight: 1 },
+            { id: "paused_without_panic", label: "Paused without panic", kind: "positive", scoreWeight: 1 },
+            { id: "returned_calmly", label: "Returned calmly", kind: "positive", scoreWeight: 1 },
+            { id: "recovered_after_retreat", label: "Recovered after retreat", kind: "positive", scoreWeight: 1 },
+            { id: "noticed_trigger_and_recovered", label: "Noticed something and recovered", kind: "positive", scoreWeight: 1 },
+            { id: "checked_in_after_step", label: "Checked in after the step", kind: "positive", scoreWeight: 1 }
+        ],
         severeSigns: GLOBAL_SEVERE_SIGNS
     },
     // Placeholders mapping to general_calm for safety and completeness
