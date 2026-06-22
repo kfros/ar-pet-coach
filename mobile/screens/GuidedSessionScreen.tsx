@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Animated, Easing, ActivityIndicator, Dimensions, Alert, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
@@ -16,9 +16,14 @@ import {
     IN_SESSION_SAFETY_PROMPT
 } from '../appContent/routineSafety';
 import { calculateCheckinScore } from '../services/progressScoring';
-import { getOutdoorConfidenceLevel } from '../appContent/outdoorConfidenceLevels';
+import {
+    getOutdoorConfidenceLevel,
+    getOutdoorConfidenceProgressionState,
+    resolveOutdoorActiveLevel
+} from '../appContent/outdoorConfidenceLevels';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const FOOTER_SPACE = 230;
 
 const ANXIETY_LEVELS: { id: AnxietyLevel; label: string; color: string }[] = [
     { id: 'calm', label: 'Calm', color: '#10B981' },
@@ -124,6 +129,7 @@ const MILESTONE_EXPLANATIONS: Record<string, { title: string, body: string, prim
 };
 
 export default function GuidedSessionScreen({ navigation, route }: any) {
+    const insets = useSafeAreaInsets();
     const { sessionId, petId } = route.params;
     const session = SessionService.getSessionById(sessionId);
     const { trackCalmingSession } = useSubscription();
@@ -176,9 +182,19 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     useEffect(() => {
         const loadSelectedLevel = async () => {
             if (sessionId === 'outdoor_confidence_reset') {
-                const stored = await AsyncStorage.getItem(`chillpup_selected_outdoor_confidence_level_${petId}`);
-                if (stored) {
-                    setSelectedLevelId(stored);
+                try {
+                    const state = await getOutdoorConfidenceProgressionState(petId);
+                    const resolved = resolveOutdoorActiveLevel({
+                        requestedLevel: route.params?.level,
+                        storedSelectedLevel: state.storedSelectedLevel,
+                        achievedLevel: state.achievedLevel,
+                        unlockedLevels: state.unlockedLevels,
+                        newlyUnlockedLevel: state.newlyUnlockedLevel
+                    });
+                    setSelectedLevelId(resolved);
+                } catch (e) {
+                    console.error(e);
+                    setSelectedLevelId(route.params?.level || 'doorway_calm');
                 }
             }
         };
@@ -194,7 +210,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 updatedSteps[3] = {
                     ...updatedSteps[3],
                     title: levelInfo.label,
-                    instruction: levelInfo.description
+                    instruction: levelInfo.description,
+                    durationSeconds: levelInfo.durationSeconds || 45
                 };
             }
             return updatedSteps;
@@ -270,7 +287,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     }, [isPaused]);
 
     const startStep = (step: SessionStep) => {
-        setTimeLeft(step.durationSeconds);
+        setTimeLeft(step.durationSeconds || 0);
         setShowNextStepPrompt(false);
 
         // GFM-001: Smooth transition for visual cues
@@ -287,19 +304,21 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
         // Start Timer
         if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            if (isPausedRef.current) return;
+        if (step.durationSeconds && step.durationSeconds > 0) {
+            timerRef.current = setInterval(() => {
+                if (isPausedRef.current) return;
 
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timerRef.current);
-                    // GFM-003: Show prompt instead of auto-advancing
-                    setShowNextStepPrompt(true);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+                setTimeLeft((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(timerRef.current);
+                        // GFM-003: Show prompt instead of auto-advancing
+                        setShowNextStepPrompt(true);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
     };
 
     const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
@@ -551,7 +570,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 petId,
                 sessionId,
                 completedAt,
-                durationSeconds: steps.slice(0, currentStepIndex + 1).reduce((acc, s) => acc + s.durationSeconds, 0),
+                durationSeconds: steps.slice(0, currentStepIndex + 1).reduce((acc, s) => acc + (s.durationSeconds || 0), 0),
                 completed: !stoppedEarly,
                 stoppedEarly: stoppedEarly,
                 beforeCheckin: beforeCheckin,
@@ -581,6 +600,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
 
                     let newLvlUnlocked: string | null = null;
                     if (highestMilestone && highestMilestone !== 'none_yet') {
+                        await AsyncStorage.setItem(`chillpup_outdoor_confidence_achieved_level_${petId}`, highestMilestone);
                         const OUTDOOR_LEVELS = [
                             'doorway_calm',
                             'open_edge',
@@ -939,55 +959,85 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                 {phase === 'after_checkin' && renderCheckin(false)}
 
                 {phase === 'active' && currentStep && (
-                    <ScrollView
-                        style={styles.activeSessionArea}
-                        contentContainerStyle={styles.activeSessionScroll}
-                    >
-                        <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#000', opacity: dimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }) }]} />
+                    <View style={{ flex: 1, position: 'relative' }}>
+                        <ScrollView
+                            style={styles.activeSessionArea}
+                            contentContainerStyle={[
+                                styles.activeSessionScroll,
+                                { paddingBottom: FOOTER_SPACE + Math.max(insets.bottom, 20) }
+                            ]}
+                        >
+                            <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#000', opacity: dimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }) }]} />
 
-                        <View style={styles.stepInfo}>
-                            <Text style={styles.sessionStepTitle}>{session.title}</Text>
-                            {sessionId === 'outdoor_confidence_reset' && currentStepIndex === 3 && (() => {
-                                const lvlInfo = getOutdoorConfidenceLevel(selectedLevelId);
-                                return lvlInfo ? (
-                                    <Text style={styles.dynamicStepHeader} testID="dynamic-step-header">
-                                        {`Today’s outdoor level: ${lvlInfo.label}`}
-                                    </Text>
-                                ) : null;
-                            })()}
-                            <Text style={styles.stepTitle}>{currentStep.title}</Text>
-                            <Text style={styles.stepInstruction}>{currentStep.instruction}</Text>
-                            {currentStep.id === 'outdoor_check_body' && (
-                                <Pressable
-                                    style={styles.easierHelperLink}
-                                    onPress={() => setShowEasierHelperModal(true)}
-                                >
-                                    <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
-                                    <Text style={styles.easierHelperLinkText}>How to make it easier</Text>
-                                </Pressable>
-                            )}
-                        </View>
-
-                        <View style={styles.visualAreaWrapper}>
-                            <View style={styles.timerWrapper} testID="session-step-timer">
-                                <Ionicons name="time-outline" size={16} color={COLORS.textSecondary} />
-                                <Text style={styles.timerText}>
-                                    Suggested time: about {timeLeft > 60 ? `${Math.ceil(timeLeft / 60)} min` : `${timeLeft} sec`}
-                                </Text>
-                            </View>
-
-                            <View style={styles.visualArea}>
-                                {/* focus-pulse-circle is disabled by default */}
-                                {isPaused && (
-                                    <View style={styles.pausedOverlay}>
-                                        <Ionicons name="pause" size={48} color={COLORS.primary} />
-                                        <Text style={styles.pausedText}>Paused</Text>
-                                    </View>
+                            <View style={styles.stepInfo}>
+                                <Text style={styles.sessionStepTitle}>{session.title}</Text>
+                                {sessionId === 'outdoor_confidence_reset' && currentStepIndex === 3 && (() => {
+                                    const lvlInfo = getOutdoorConfidenceLevel(selectedLevelId);
+                                    return lvlInfo ? (
+                                        <Text style={styles.dynamicStepHeader} testID="dynamic-step-header">
+                                            {`Today’s outdoor level: ${lvlInfo.label}`}
+                                        </Text>
+                                    ) : null;
+                                })()}
+                                <Text style={styles.stepTitle}>{currentStep.title}</Text>
+                                <Text style={styles.stepInstruction}>{currentStep.instruction}</Text>
+                                {currentStep.id === 'outdoor_check_body' && (
+                                    <Pressable
+                                        style={styles.easierHelperLink}
+                                        onPress={() => setShowEasierHelperModal(true)}
+                                    >
+                                        <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
+                                        <Text style={styles.easierHelperLinkText}>How to make it easier</Text>
+                                    </Pressable>
                                 )}
                             </View>
-                        </View>
 
-                        <View style={styles.controls}>
+                            <View style={styles.visualAreaWrapper}>
+                                {(() => {
+                                    const isSpecialOutdoorLevel = sessionId === 'outdoor_confidence_reset' && 
+                                        currentStepIndex === 3 && 
+                                        (selectedLevelId === 'hundred_steps' || selectedLevelId === 'ten_min_walk');
+
+                                    const hasValidDuration = currentStep?.durationSeconds > 0;
+
+                                    if (isSpecialOutdoorLevel) {
+                                        return (
+                                            <View style={styles.timerWrapper} testID="session-step-timer">
+                                                <Ionicons name="time-outline" size={16} color={COLORS.textSecondary} />
+                                                <Text style={styles.timerText}>Keep it short and easy today.</Text>
+                                            </View>
+                                        );
+                                    }
+
+                                    if (hasValidDuration && timeLeft > 0) {
+                                        return (
+                                            <View style={styles.timerWrapper} testID="session-step-timer">
+                                                <Ionicons name="time-outline" size={16} color={COLORS.textSecondary} />
+                                                <Text style={styles.timerText}>
+                                                    {timeLeft > 60
+                                                        ? `Suggested time: about ${Math.ceil(timeLeft / 60)} min`
+                                                        : `Suggested time: about ${timeLeft} sec`}
+                                                </Text>
+                                            </View>
+                                        );
+                                    }
+
+                                    return null;
+                                })()}
+
+                                <View style={[styles.visualArea, { height: sessionId === 'outdoor_confidence_reset' ? 100 : 220 }]}>
+                                    {/* focus-pulse-circle is disabled by default */}
+                                    {isPaused && (
+                                        <View style={styles.pausedOverlay}>
+                                            <Ionicons name="pause" size={48} color={COLORS.primary} />
+                                            <Text style={styles.pausedText}>Paused</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        </ScrollView>
+
+                        <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                             {showAudioControls ? (
                                 <View style={styles.controlGrid}>
                                     <Pressable
@@ -1077,7 +1127,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                                 <Text style={styles.endSessionText}>End Session</Text>
                             </Pressable>
                         </View>
-                    </ScrollView>
+                    </View>
                 )}
             </View>
 
@@ -1386,6 +1436,20 @@ const styles = StyleSheet.create({
     pausedOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(246, 250, 248, 0.8)', justifyContent: 'center', alignItems: 'center', borderRadius: 110 },
     pausedText: { ...FONTS.small, fontWeight: '700', color: COLORS.primary, marginTop: 4 },
 
+    stickyFooter: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#F6FAF8',
+        paddingTop: 12,
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        alignItems: 'center',
+        gap: 12,
+    },
     controls: { paddingHorizontal: 20, alignItems: 'center', gap: 12, paddingBottom: 20 },
     controlGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%', justifyContent: 'center' },
     controlToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '47%', minHeight: 52, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#fff', borderRadius: 24, ...SHADOWS.small },
