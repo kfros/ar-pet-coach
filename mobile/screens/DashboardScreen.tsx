@@ -37,6 +37,10 @@ export default function DashboardScreen({ navigation }: any) {
     const [trendSummary, setTrendSummary] = useState<StressSignsTrendSummary | null>(null);
     const [recommendedSession, setRecommendedSession] = useState<any>(null);
     const [recommendationReason, setRecommendationReason] = useState<string>('');
+    const [showTrendDetails, setShowTrendDetails] = useState(false);
+    const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+    const [hasInitializedCategories, setHasInitializedCategories] = useState(false);
+    const lastPetIdRef = React.useRef<string | null>(null);
 
     const { isPremium, isLoading: subLoading } = useSubscription();
     const insets = useSafeAreaInsets();
@@ -117,6 +121,22 @@ export default function DashboardScreen({ navigation }: any) {
 
                 setRecommendedSession(recommended);
                 setRecommendationReason(reason);
+
+                const currentPetId = pet.id || 'guest_pet';
+                const isNewPet = lastPetIdRef.current !== currentPetId;
+                lastPetIdRef.current = currentPetId;
+
+                // Initialize expandedCategories once if not yet initialized or if pet changed
+                if (!hasInitializedCategories || isNewPet) {
+                    const initialExpanded: Record<string, boolean> = {
+                        foundation: true,
+                    };
+                    if (recommended && recommended.category) {
+                        initialExpanded[recommended.category] = true;
+                    }
+                    setExpandedCategories(initialExpanded);
+                    setHasInitializedCategories(true);
+                }
             } else {
                 setPetData(null);
                 setPetId(null);
@@ -316,6 +336,10 @@ export default function DashboardScreen({ navigation }: any) {
                 const chartPadding = 12;
                 const chartWidth = SCREEN_WIDTH - 72;
 
+                const shortHelper = trendSummary 
+                    ? (trendSummary.helper || (trendSummary.status === 'severe' ? 'Stop the routine if strong signs appear.' : 'Recent check-ins look fairly steady.')) 
+                    : 'No sessions yet. Complete at least 2 check-ins to see a trend.';
+
                 const renderTrendChart = () => {
                     if (!trendSummary || !trendSummary.hasEnoughData || trendSummary.points.length === 0) return null;
                     const points = trendSummary.points;
@@ -389,44 +413,69 @@ export default function DashboardScreen({ navigation }: any) {
                                     </Text>
                                 ))}
                             </View>
-                            <Text style={styles.trendLegendText}>{trendSummary.legend}</Text>
+                            {showTrendDetails && <Text style={styles.trendLegendText}>{trendSummary.legend}</Text>}
                         </View>
                     );
                 };
 
                 return (
                     <View style={[styles.progressSummaryCard, { backgroundColor: theme.bg, borderLeftColor: theme.border }]}>
-                        <View style={styles.row}>
-                            <Ionicons name={theme.icon as any} size={20} color={theme.text} />
-                            <Text style={[styles.progressSummaryTitle, { color: theme.text }]}>
-                                Stress Signs Trend
-                            </Text>
+                        <View style={styles.trendHeaderRow}>
+                            <View style={styles.row}>
+                                <Ionicons name={theme.icon as any} size={20} color={theme.text} />
+                                <Text style={[styles.progressSummaryTitle, { color: theme.text }]}>
+                                    Stress Signs Trend
+                                </Text>
+                            </View>
+                            <Pressable 
+                                style={styles.detailsToggleBtn} 
+                                onPress={() => setShowTrendDetails(!showTrendDetails)}
+                                testID="trend-details-toggle"
+                            >
+                                <Text style={styles.detailsToggleText}>
+                                    {showTrendDetails ? 'Hide details' : 'Details'}
+                                </Text>
+                                <Ionicons 
+                                    name={showTrendDetails ? 'chevron-up' : 'chevron-down'} 
+                                    size={14} 
+                                    color={theme.text} 
+                                />
+                            </Pressable>
                         </View>
                         
                         <View style={{ marginTop: 8 }}>
                             <Text style={[styles.trendStatusTitle, { color: theme.text }]}>
                                 {trendSummary ? trendSummary.statusTitle : 'Not enough data yet'}
                             </Text>
-                            <Text style={styles.progressSummaryBody}>
-                                {trendSummary ? (trendSummary.status === 'severe' ? 'Stop the routine if strong signs appear.' : trendSummary.body) : 'No sessions yet. Complete at least 2 check-ins to see a trend.'}
+                            <Text style={styles.trendHelperText}>
+                                {shortHelper}
                             </Text>
-                            {trendSummary?.helper && (
-                                <Text style={styles.trendHelperText}>
-                                    {trendSummary.helper}
-                                </Text>
-                            )}
                         </View>
 
-                        {trendSummary?.hasEnoughData && renderTrendChart()}
-
-                        {/* Recent Progress details fallback & details rendering for testing & completeness */}
-                        {progressData && progressData.details && progressData.details.length > 0 && (
-                            <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 8 }}>
-                                {progressData.details.map((detail: string, index: number) => (
-                                    <Text key={index} style={styles.progressDetailText}>{detail}</Text>
-                                ))}
+                        {(showTrendDetails || (progressData && progressData.details && progressData.details.length > 0)) && (
+                            <View 
+                                style={[
+                                    styles.expandedTrendDetails, 
+                                    !showTrendDetails && { height: 0, opacity: 0, overflow: 'hidden', marginTop: 0, padding: 0 }
+                                ]}
+                                testID="expanded-trend-details"
+                            >
+                                {showTrendDetails && trendSummary?.body && (
+                                    <Text style={styles.progressSummaryBodyText}>
+                                        {trendSummary.body}
+                                    </Text>
+                                )}
+                                {progressData && progressData.details && progressData.details.length > 0 && (
+                                    <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 8 }}>
+                                        {progressData.details.map((detail: string, index: number) => (
+                                            <Text key={index} style={styles.progressDetailText}>{detail}</Text>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                         )}
+
+                        {trendSummary?.hasEnoughData && renderTrendChart()}
 
                         {progressData && progressData.hasSevereSigns && (
                             <View style={styles.severeSignsBox}>
@@ -474,24 +523,56 @@ export default function DashboardScreen({ navigation }: any) {
 
                     if (routines.length === 0) return null;
 
+                    const isExpanded = !!expandedCategories[catKey];
+                    const toggleCategory = () => {
+                        setExpandedCategories(prev => ({
+                            ...prev,
+                            [catKey]: !prev[catKey]
+                        }));
+                    };
+
+                    const routineCountText = routines.length === 1 
+                        ? '1 routine' 
+                        : `${routines.length} routines`;
+
                     return (
                         <View key={catKey} style={styles.categorySection}>
-                            <View style={styles.categoryHeader}>
-                                <Text style={styles.categoryTitle}>{catMeta.title}</Text>
-                                <Text style={styles.categorySubtitle}>{catMeta.subtitle}</Text>
-                            </View>
+                            <Pressable 
+                                style={styles.collapsibleCategoryHeader} 
+                                onPress={toggleCategory}
+                                testID={`category-header-${catKey}`}
+                            >
+                                <Text style={styles.categoryTitleText}>
+                                    {`${catMeta.title} · ${routineCountText}`}
+                                </Text>
+                                <View style={styles.categoryHeaderRight}>
+                                    <Text style={styles.categoryToggleActionText}>
+                                        {isExpanded ? 'Hide' : 'Show'}
+                                    </Text>
+                                    <Ionicons 
+                                        name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                                        size={16} 
+                                        color={COLORS.primary} 
+                                    />
+                                </View>
+                            </Pressable>
 
-                            {routines.length > 1 ? (
-                                <FlatList
-                                    data={routines}
-                                    renderItem={({ item }) => renderSessionCard(item, true)}
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    keyExtractor={item => item.id}
-                                    style={styles.horizontalList}
-                                />
-                            ) : (
-                                renderSessionCard(routines[0], false)
+                            {isExpanded && (
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={styles.categorySubtitle}>{catMeta.subtitle}</Text>
+                                    {routines.length > 1 ? (
+                                        <FlatList
+                                            data={routines}
+                                            renderItem={({ item }) => renderSessionCard(item, true)}
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            keyExtractor={item => item.id}
+                                            style={styles.horizontalList}
+                                        />
+                                    ) : (
+                                        renderSessionCard(routines[0], false)
+                                    )}
+                                </View>
                             )}
                         </View>
                     );
@@ -505,11 +586,11 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F6FAF8' },
     content: { padding: 20, paddingBottom: 40 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     greeting: { ...FONTS.small, color: COLORS.textSecondary, fontWeight: '600' },
     headerTitle: { ...FONTS.h1, color: COLORS.text },
     settingsButton: { padding: 4, justifyContent: 'center', alignItems: 'center' },
-    card: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, marginBottom: 24, ...SHADOWS.small },
+    card: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, marginBottom: 16, ...SHADOWS.small },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     row: { flexDirection: 'row', alignItems: 'center' },
     cardTitle: { ...FONTS.body, fontWeight: '600', color: COLORS.text },
@@ -527,7 +608,7 @@ const styles = StyleSheet.create({
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12, marginTop: 8 },
     sectionSubtitleText: { ...FONTS.small, color: COLORS.textSecondary, marginBottom: 4 },
 
-    heroCard: { backgroundColor: COLORS.primary, borderRadius: 24, padding: 24, marginBottom: 24, ...SHADOWS.medium },
+    heroCard: { backgroundColor: COLORS.primary, borderRadius: 24, padding: 24, marginBottom: 16, ...SHADOWS.medium },
     heroContent: { gap: 8 },
     recommendationBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
     recommendationBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700' },
@@ -538,7 +619,7 @@ const styles = StyleSheet.create({
     heroActionText: { fontSize: 14, color: COLORS.primary, fontWeight: '700' },
     heroDuration: { fontSize: 12, color: '#fff', fontWeight: '600' },
 
-    horizontalList: { marginHorizontal: -20, paddingHorizontal: 20, marginBottom: 24 },
+    horizontalList: { marginHorizontal: -20, paddingHorizontal: 20, marginBottom: 16 },
     sessionCardItem: { backgroundColor: '#fff', borderRadius: 20, padding: 16, ...SHADOWS.small, borderWidth: 1, borderColor: '#E3ECEF' },
     sessionCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
     sessionIconBg: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#DDF4EF', justifyContent: 'center', alignItems: 'center' },
@@ -551,7 +632,7 @@ const styles = StyleSheet.create({
     sessionCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 10 },
     sessionDuration: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
 
-    progressSummaryCard: { borderRadius: SIZES.radius, padding: 16, marginBottom: 20, borderLeftWidth: 4 },
+    progressSummaryCard: { borderRadius: SIZES.radius, padding: 16, marginBottom: 16, borderLeftWidth: 4 },
     progressSummaryTitle: { ...FONTS.body, fontWeight: '700', marginLeft: 8 },
     progressSummaryBody: { ...FONTS.body, fontWeight: '600', color: COLORS.text, marginTop: 4 },
     progressDetailText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4, paddingLeft: 4 },
@@ -568,12 +649,73 @@ const styles = StyleSheet.create({
     logoutButton: { padding: 8, justifyContent: 'center', alignItems: 'center' },
 
     // Grouped category sections
-    categorySection: { marginBottom: 24 },
+    categorySection: { marginBottom: 16 },
     categoryHeader: { marginBottom: 12, marginTop: 8 },
     categoryTitle: { ...FONTS.h3, color: COLORS.text, fontWeight: '700' },
     categorySubtitle: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 2 },
     cardCategoryLabel: { ...FONTS.caption, color: COLORS.primary, fontWeight: '600', marginBottom: 4 },
     trendStatusTitle: { ...FONTS.body, fontWeight: '700', marginTop: 4 },
     trendHelperText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4 },
-    trendLegendText: { fontSize: 10, color: COLORS.textSecondary, fontStyle: 'italic', alignSelf: 'flex-end', marginTop: 8 }
+    trendLegendText: { fontSize: 10, color: COLORS.textSecondary, fontStyle: 'italic', alignSelf: 'flex-end', marginTop: 8 },
+
+    // Collapsible Category Header & Spacing additions
+    collapsibleCategoryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#E3ECEF',
+        ...SHADOWS.small
+    },
+    categoryTitleText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.text
+    },
+    categoryHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6
+    },
+    categoryToggleActionText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.primary
+    },
+    trendHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        marginBottom: 8
+    },
+    detailsToggleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 12,
+        backgroundColor: 'rgba(0,0,0,0.05)'
+    },
+    detailsToggleText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textSecondary
+    },
+    expandedTrendDetails: {
+        marginTop: 8,
+        padding: 8,
+        backgroundColor: 'rgba(0,0,0,0.02)',
+        borderRadius: 10
+    },
+    progressSummaryBodyText: {
+        ...FONTS.small,
+        color: COLORS.textSecondary,
+        lineHeight: 18
+    }
 });

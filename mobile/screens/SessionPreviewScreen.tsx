@@ -13,7 +13,8 @@ import {
     OUTDOOR_CONFIDENCE_LEVELS,
     getOutdoorConfidenceLevel,
     getOutdoorConfidenceProgressionState,
-    getPreviousOutdoorConfidenceLevel
+    getPreviousOutdoorConfidenceLevel,
+    resolveOutdoorActiveLevel
 } from '../appContent/outdoorConfidenceLevels';
 
 const LEVEL_LABELS: Record<string, string> = OUTDOOR_CONFIDENCE_LEVELS.reduce((acc, lvl) => {
@@ -52,6 +53,11 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
     const handleSelectLevel = async (lvl: string) => {
         setSelectedLevel(lvl);
         await AsyncStorage.setItem(`chillpup_selected_outdoor_confidence_level_${petId}`, lvl);
+        if (newlyUnlockedLevel && lvl === newlyUnlockedLevel) {
+            await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel);
+            setNewlyUnlockedLevel(null);
+            setShowBanner(false);
+        }
     };
 
     React.useEffect(() => {
@@ -62,9 +68,15 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                 setUnlockedLevels(state.unlockedLevels);
                 setIsSignsIncreased(state.isSignsIncreased);
 
-                // Load initial selected level
-                const initialLevel = route.params?.level || state.selectedLevel || 'doorway_calm';
-                setSelectedLevel(initialLevel);
+                // Load initial selected level using resolveOutdoorActiveLevel helper
+                const resolved = resolveOutdoorActiveLevel({
+                    requestedLevel: route.params?.level,
+                    storedSelectedLevel: state.storedSelectedLevel,
+                    achievedLevel: state.achievedLevel,
+                    unlockedLevels: state.unlockedLevels,
+                    newlyUnlockedLevel: state.newlyUnlockedLevel
+                });
+                setSelectedLevel(resolved);
 
                 // Show newly unlocked level banner
                 if (state.newlyUnlockedLevel && state.unlockedLevels.includes(state.newlyUnlockedLevel) && state.newlyUnlockedLevel !== state.acknowledgedLevel) {
@@ -81,11 +93,16 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
     const handleBannerPrimary = async () => {
         setShowBanner(false);
         if (newlyUnlockedLevel) {
-            await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel);
+            const currentNew = newlyUnlockedLevel;
+            setNewlyUnlockedLevel(null);
+            await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, currentNew);
             if (isSignsIncreased) {
-                await handleSelectLevel('doorway_calm');
+                // Primary CTA: "Select easier level"
+                const prev = getPreviousOutdoorConfidenceLevel(currentNew);
+                await handleSelectLevel(prev ? prev.id : 'doorway_calm');
             } else {
-                await handleSelectLevel(newlyUnlockedLevel);
+                // Primary CTA: "Select new level"
+                await handleSelectLevel(currentNew);
             }
         }
     };
@@ -93,11 +110,15 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
     const handleBannerSecondary = async () => {
         setShowBanner(false);
         if (newlyUnlockedLevel) {
-            await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel);
+            const currentNew = newlyUnlockedLevel;
+            setNewlyUnlockedLevel(null);
+            await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, currentNew);
             if (isSignsIncreased) {
-                await handleSelectLevel(newlyUnlockedLevel);
+                // Secondary CTA: "Review new level"
+                await handleSelectLevel(currentNew);
             } else {
-                const prev = getPreviousOutdoorConfidenceLevel(newlyUnlockedLevel);
+                // Secondary CTA: "Stay with easier level"
+                const prev = getPreviousOutdoorConfidenceLevel(currentNew);
                 await handleSelectLevel(prev ? prev.id : 'doorway_calm');
             }
         }
@@ -109,15 +130,23 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
         isNavigatingRef.current = true;
         setIsNavigating(true);
 
-        if (newlyUnlockedLevel) {
-            AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel).catch(console.error);
+        if (newlyUnlockedLevel && selectedLevel === newlyUnlockedLevel) {
+            try {
+                await AsyncStorage.setItem(`chillpup_acknowledged_outdoor_confidence_level_${petId}`, newlyUnlockedLevel);
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         if (isLocked) {
             navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
         } else {
             if (sessionId === 'outdoor_confidence_reset') {
-                AsyncStorage.setItem(`chillpup_selected_outdoor_confidence_level_${petId}`, selectedLevel).catch(console.error);
+                try {
+                    await AsyncStorage.setItem(`chillpup_selected_outdoor_confidence_level_${petId}`, selectedLevel);
+                } catch (e) {
+                    console.error(e);
+                }
             }
             navigation.navigate('GuidedSession', { sessionId, petId, level: selectedLevel });
         }
@@ -152,57 +181,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     { paddingBottom: insets.bottom + 120 } // Ensure content is not hidden by sticky footer
                 ]}
             >
-                {showBanner && newlyUnlockedLevel && (
-                    <View style={[
-                        styles.notificationBanner,
-                        isSignsIncreased ? styles.notificationBannerWarning : styles.notificationBannerInfo
-                    ]}>
-                        <View style={styles.notificationHeader}>
-                            <Ionicons 
-                                name={isSignsIncreased ? "alert-circle" : "sparkles"} 
-                                size={20} 
-                                color={isSignsIncreased ? "#B7791F" : "#0F766E"} 
-                            />
-                            <Text style={[
-                                styles.notificationTitle,
-                                { color: isSignsIncreased ? "#B7791F" : "#0F766E" }
-                            ]}>
-                                {isSignsIncreased ? "Easier step suggested" : "New step available"}
-                            </Text>
-                        </View>
-                        <Text style={[
-                            styles.notificationBody,
-                            { color: isSignsIncreased ? "#6B4A1D" : "#12312E" }
-                        ]}>
-                            {isSignsIncreased 
-                                ? "Recent signs looked stronger. You can still see the new step, but repeating an easier one may be safer today."
-                                : `${LEVEL_LABELS[newlyUnlockedLevel] || newlyUnlockedLevel} is available for next time. You can try it today, or repeat an easier step.`
-                            }
-                        </Text>
-                        <View style={styles.notificationActions}>
-                            <Pressable 
-                                style={[
-                                    styles.notificationBtn,
-                                    isSignsIncreased ? styles.notificationBtnWarning : styles.notificationBtnInfo
-                                ]}
-                                onPress={handleBannerPrimary}
-                            >
-                                <Text style={styles.notificationBtnText}>
-                                    {isSignsIncreased ? "Show easier steps" : "Show new step"}
-                                </Text>
-                            </Pressable>
-                            <Pressable 
-                                style={styles.notificationBtnSecondary}
-                                onPress={handleBannerSecondary}
-                            >
-                                <Text style={styles.notificationBtnTextSecondary}>
-                                    {isSignsIncreased ? "Review new step" : "Stay with easier step"}
-                                </Text>
-                            </Pressable>
-                        </View>
-                    </View>
-                )}
-
+                {/* 1. Routine Summary Card */}
                 {route.params?.unlockedAfterPurchase && (
                     <View style={styles.celebrationBanner}>
                         <Ionicons name="sparkles" size={20} color="#11866F" />
@@ -258,16 +237,63 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     )}
                 </View>
 
-                {sessionId === 'outdoor_confidence_reset' && (
-                    <View style={styles.outdoorWarningBanner}>
-                        <Ionicons name="alert-circle" size={20} color="#9A5B00" />
-                        <Text style={styles.outdoorWarningText}>
-                            This routine is for threshold practice at the safest edge, not a full walk.
+                {/* 2. New Level Available banner, if applicable */}
+                {showBanner && newlyUnlockedLevel && (
+                    <View style={[
+                        styles.notificationBanner,
+                        isSignsIncreased ? styles.notificationBannerWarning : styles.notificationBannerInfo
+                    ]}>
+                        <View style={styles.notificationHeader}>
+                            <Ionicons 
+                                name={isSignsIncreased ? "alert-circle" : "sparkles"} 
+                                size={20} 
+                                color={isSignsIncreased ? "#B7791F" : "#0F766E"} 
+                            />
+                            <Text style={[
+                                styles.notificationTitle,
+                                { color: isSignsIncreased ? "#B7791F" : "#0F766E" }
+                            ]}>
+                                {isSignsIncreased ? "Easier level suggested" : "New level available"}
+                            </Text>
+                        </View>
+                        <Text style={[
+                            styles.notificationBody,
+                            { color: isSignsIncreased ? "#6B4A1D" : "#12312E" }
+                        ]}>
+                            {(() => {
+                                if (isSignsIncreased) {
+                                    return "Recent signs looked stronger. The new level is still available, but repeating an easier level may be safer today.";
+                                }
+                                const lvlInfo = getOutdoorConfidenceLevel(newlyUnlockedLevel);
+                                const levelLabel = lvlInfo ? `Level ${lvlInfo.levelIndex} of 7: ${lvlInfo.label}` : (LEVEL_LABELS[newlyUnlockedLevel] || newlyUnlockedLevel);
+                                return `${levelLabel} is available for next time. You can select it now, or stay with an easier level.`;
+                            })()}
                         </Text>
+                        <View style={styles.notificationActions}>
+                            <Pressable 
+                                style={[
+                                    styles.notificationBtn,
+                                    isSignsIncreased ? styles.notificationBtnWarning : styles.notificationBtnInfo
+                                ]}
+                                onPress={handleBannerPrimary}
+                            >
+                                <Text style={styles.notificationBtnText}>
+                                    {isSignsIncreased ? "Select easier level" : "Select new level"}
+                                </Text>
+                            </Pressable>
+                            <Pressable 
+                                style={styles.notificationBtnSecondary}
+                                onPress={handleBannerSecondary}
+                            >
+                                <Text style={styles.notificationBtnTextSecondary}>
+                                    {isSignsIncreased ? "Review new level" : "Stay with easier level"}
+                                </Text>
+                            </Pressable>
+                        </View>
                     </View>
                 )}
 
-                {/* Outdoor Confidence Levels Selector */}
+                {/* 3. Outdoor Confidence Level selector */}
                 {sessionId === 'outdoor_confidence_reset' && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Outdoor Confidence level</Text>
@@ -318,11 +344,22 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
 
+                {/* 4. Compact threshold/safety warning */}
+                {sessionId === 'outdoor_confidence_reset' && (
+                    <View style={styles.outdoorWarningBanner}>
+                        <Ionicons name="alert-circle" size={20} color="#9A5B00" />
+                        <Text style={styles.outdoorWarningText}>
+                            This routine is for threshold practice at the safest edge, not a full walk.
+                        </Text>
+                    </View>
+                )}
+
+                {/* 5. Best for / Use another option if / Try instead / Before you start */}
                 {sessionId !== 'outdoor_confidence_reset' && route.params?.level && LEVEL_LABELS[route.params.level] && (
                     <View style={styles.levelTargetBanner}>
                         <Ionicons name="flag-outline" size={20} color="#0F766E" />
                         <Text style={styles.levelTargetText}>
-                            Target step today: {LEVEL_LABELS[route.params.level]}
+                            Target level today: {LEVEL_LABELS[route.params.level]}
                         </Text>
                     </View>
                 )}
@@ -379,7 +416,6 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
 
-
                 {session.safetyNotes && session.safetyNotes.length > 0 && (
                     <View style={styles.safetySection}>
                         <Text style={styles.safetyTitle}>Before you start</Text>
@@ -404,6 +440,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
 
+                {/* 6. Disclaimer */}
                 <View style={styles.disclaimer}>
                     <Text style={styles.disclaimerText}>
                         ChillPup routines are gentle practice guides based on owner observations. They are not a diagnosis, treatment plan, or substitute for advice from a veterinarian or qualified behavior professional.

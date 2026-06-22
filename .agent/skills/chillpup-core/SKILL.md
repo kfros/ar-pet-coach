@@ -412,4 +412,38 @@ Whenever modifying a test file, report:
 - whether this reflects intentional product behavior or only a mock/test stability fix
 
 Do not modify tests silently.
+
+## React Navigation Discipline
+
+Do not use `navigation.replace()` as a way to “go back” to an existing screen.
+
+`replace()` removes the current route and inserts a new route. If the target screen already exists below the current screen, this can create duplicate screens in the stack.
+
+Example bad flow:
+
+[Dashboard] -> [SessionPreview] -> [GuidedSession]
+
+Calling:
+
+navigation.replace('SessionPreview')
+
+creates:
+
+[Dashboard] -> [SessionPreview] -> [SessionPreview]
+
+This causes repeated Back presses and stacked duplicate previews.
+
+Use navigation methods by intent:
+
+- Return to the previous screen: `navigation.goBack()`
+- Return to Dashboard/root: `navigation.popToTop()` or the app’s existing Dashboard navigation pattern
+- Open Paywall from preview: `navigation.navigate('Paywall', params)`
+- Start guided session from preview: `navigation.navigate('GuidedSession', params)`
+- Update an existing screen with params: prefer `navigation.navigate('ExistingScreen', params)` only after verifying it does not create duplicates in this navigator
+- Replace only when the current screen should truly be removed and replaced with a new route
+
+Never navigate from `SessionPreviewScreen` to another `SessionPreviewScreen` for the same session unless there is an explicit, tested reason.
+
+Never use `replace('Dashboard')` from a nested session flow if it creates `[Dashboard] -> [SessionPreview] -> [Dashboard]`.
+
 ---

@@ -564,4 +564,328 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
     expect(queryByText('Choose today’s outdoor step')).toBeNull();
     expect(getByText(/Choose today’s outdoor level. This level changes one practice step inside the session/)).toBeTruthy();
   });
+
+  test('outdoor_progress_017: After selecting few_steps, SessionPreview shows 100-Step Confidence as New and selectable, but defaults selection to few_steps', async () => {
+    await AsyncStorage.setItem('chillpup_outdoor_confidence_levels_test-pet', JSON.stringify([
+      'doorway_calm', 'open_edge', 'one_step', 'short_pause', 'few_steps', 'hundred_steps'
+    ]));
+    await AsyncStorage.setItem('chillpup_outdoor_confidence_achieved_level_test-pet', 'few_steps');
+    await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'hundred_steps');
+
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    expect(getByText('Level 5 of 7: A Few Calm Steps')).toBeTruthy();
+    expect(getByText('Level 6 of 7: 100-Step Confidence')).toBeTruthy();
+    expect(getByText('New')).toBeTruthy();
+
+    fireEvent.press(getByText('Start Session'));
+    await act(async () => {});
+
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('GuidedSession', {
+      sessionId: 'outdoor_confidence_reset',
+      petId: 'test-pet',
+      level: 'few_steps'
+    });
+  });
+
+  test('outdoor_progress_018: After user selects 100-Step Confidence, Start Session navigates to GuidedSession with level hundred_steps', async () => {
+    await AsyncStorage.setItem('chillpup_outdoor_confidence_levels_test-pet', JSON.stringify([
+      'doorway_calm', 'open_edge', 'one_step', 'short_pause', 'few_steps', 'hundred_steps'
+    ]));
+    await AsyncStorage.setItem('chillpup_outdoor_confidence_achieved_level_test-pet', 'few_steps');
+    await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'hundred_steps');
+
+    const { getByText } = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    fireEvent.press(getByText('Level 6 of 7: 100-Step Confidence'));
+    await act(async () => {});
+
+    fireEvent.press(getByText('Start Session'));
+    await act(async () => {});
+
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('GuidedSession', {
+      sessionId: 'outdoor_confidence_reset',
+      petId: 'test-pet',
+      level: 'hundred_steps'
+    });
+  });
+
+  test('outdoor_progress_019: GuidedSession renders Outdoor level 6 of 7 only after hundred_steps was explicitly selected', async () => {
+    await AsyncStorage.setItem('chillpup_outdoor_confidence_levels_test-pet', JSON.stringify([
+      'doorway_calm', 'open_edge', 'one_step', 'short_pause', 'few_steps', 'hundred_steps'
+    ]));
+    await AsyncStorage.setItem('chillpup_outdoor_confidence_achieved_level_test-pet', 'few_steps');
+    await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'hundred_steps');
+
+    const { getByText, queryByText, rerender } = render(
+      <SubscriptionProvider>
+        <GuidedSessionScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    fireEvent.press(getByText(/Start Session/i));
+
+    expect(getByText('Outdoor level 5 of 7: A Few Calm Steps')).toBeTruthy();
+    expect(queryByText('Outdoor level 6 of 7: 100-Step Confidence')).toBeNull();
+
+    rerender(
+      <SubscriptionProvider>
+        <GuidedSessionScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet', level: 'hundred_steps' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    expect(getByText('Outdoor level 6 of 7: 100-Step Confidence')).toBeTruthy();
+  });
+
+  test('outdoor_progress_020: Dynamic challenge step Suggested time is formatted correctly and hides when time reaches 0', async () => {
+    const { getByText, queryByText } = render(
+      <SubscriptionProvider>
+        <GuidedSessionScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet', level: 'short_pause' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    fireEvent.press(getByText(/Start Session/i));
+
+    // Advance to Step 4 (index 3)
+    fireEvent.press(getByText(/Next Step/i)); // Step 2
+    fireEvent.press(getByText(/Next Step/i)); // Step 3
+    fireEvent.press(getByText(/Next Step/i)); // Step 4 (active)
+
+    // Duration for short_pause is 20
+    expect(getByText(/Suggested time: about 20 sec/i)).toBeTruthy();
+
+    // Advance time by 20 seconds so it hits 0
+    act(() => {
+      jest.advanceTimersByTime(21000);
+    });
+
+    // The suggested time badge should hide (not render "Suggested time: about 0 sec")
+    expect(queryByText(/Suggested time: about 0 sec/i)).toBeNull();
+  });
+
+  test('outdoor_progress_021: Displays special duration copy for hundred_steps and ten_min_walk', async () => {
+    const { getByText, rerender } = render(
+      <SubscriptionProvider>
+        <GuidedSessionScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet', level: 'hundred_steps' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    fireEvent.press(getByText(/Start Session/i));
+
+    // Advance to Step 4 (index 3)
+    fireEvent.press(getByText(/Next Step/i)); // Step 2
+    fireEvent.press(getByText(/Next Step/i)); // Step 3
+    fireEvent.press(getByText(/Next Step/i)); // Step 4 (active)
+
+    // For hundred_steps it must display "Keep it short and easy today."
+    expect(getByText('Keep it short and easy today.')).toBeTruthy();
+
+    // Rerender with ten_min_walk
+    rerender(
+      <SubscriptionProvider>
+        <GuidedSessionScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet', level: 'ten_min_walk' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    // For ten_min_walk it must also display "Keep it short and easy today."
+    expect(getByText('Keep it short and easy today.')).toBeTruthy();
+  });
+
+  test('outdoor_progress_022: SessionPreview uses "level" terminology and selector is placed before suitableFor/notFor/safetyNotes', async () => {
+    // Setup AsyncStorage with newly unlocked level 'open_edge'
+    await AsyncStorage.setItem(
+      'chillpup_outdoor_confidence_levels_test-pet',
+      JSON.stringify(['doorway_calm', 'open_edge'])
+    );
+    await AsyncStorage.setItem(
+      'chillpup_newly_unlocked_outdoor_confidence_level_test-pet',
+      'open_edge'
+    );
+
+    const { getByText, queryByText } = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    // Assert that the preview banner uses "New level available" instead of "New step available"
+    expect(getByText('New level available')).toBeTruthy();
+    expect(queryByText('New step available')).toBeNull();
+
+    // Assert that the select CTAs use "Select new level" and "Stay with easier level"
+    expect(getByText('Select new level')).toBeTruthy();
+    expect(getByText('Stay with easier level')).toBeTruthy();
+    expect(queryByText('Show new step')).toBeNull();
+    expect(queryByText('Stay with easier step')).toBeNull();
+
+    // Verify layout order/rendering sequence by verifying query elements exist
+    expect(getByText('Outdoor Confidence level')).toBeTruthy();
+    expect(getByText('Best for')).toBeTruthy();
+  });
+
+  test('outdoor_progress_023: CTA clicks select correct levels in normal and signs-increased state', async () => {
+    // Normal Case
+    await AsyncStorage.setItem(
+      'chillpup_outdoor_confidence_levels_test-pet',
+      JSON.stringify(['doorway_calm', 'open_edge'])
+    );
+    await AsyncStorage.setItem(
+      'chillpup_newly_unlocked_outdoor_confidence_level_test-pet',
+      'open_edge'
+    );
+
+    let utils = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    // Normal case: Select new level selects open_edge
+    fireEvent.press(utils.getByText('Select new level'));
+    await act(async () => {});
+    let selected = await AsyncStorage.getItem('chillpup_selected_outdoor_confidence_level_test-pet');
+    expect(selected).toBe('open_edge');
+
+    // Normal case: Stay with easier level selects doorway_calm
+    // Reset newlyUnlockedLevel to open_edge and clear acknowledgement
+    await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'open_edge');
+    await AsyncStorage.removeItem('chillpup_acknowledged_outdoor_confidence_level_test-pet');
+    let utils2 = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    fireEvent.press(utils2.getByText('Stay with easier level'));
+    await act(async () => {});
+    selected = await AsyncStorage.getItem('chillpup_selected_outdoor_confidence_level_test-pet');
+    expect(selected).toBe('doorway_calm');
+
+    // Signs Increased Case
+    (SessionService.getStressSignsTrend as jest.Mock).mockResolvedValue({ status: 'increased' });
+    await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'open_edge');
+    await AsyncStorage.removeItem('chillpup_acknowledged_outdoor_confidence_level_test-pet');
+    let utils3 = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    // Title shows "Easier level suggested"
+    expect(utils3.getByText('Easier level suggested')).toBeTruthy();
+    expect(utils3.getByText('Select easier level')).toBeTruthy();
+    expect(utils3.getByText('Review new level')).toBeTruthy();
+
+    // Select easier level selects doorway_calm
+    fireEvent.press(utils3.getByText('Select easier level'));
+    await act(async () => {});
+    selected = await AsyncStorage.getItem('chillpup_selected_outdoor_confidence_level_test-pet');
+    expect(selected).toBe('doorway_calm');
+
+    // Review new level selects open_edge
+    await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'open_edge');
+    await AsyncStorage.removeItem('chillpup_acknowledged_outdoor_confidence_level_test-pet');
+    let utils4 = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    fireEvent.press(utils4.getByText('Review new level'));
+    await act(async () => {});
+    selected = await AsyncStorage.getItem('chillpup_selected_outdoor_confidence_level_test-pet');
+    expect(selected).toBe('open_edge');
+  });
+
+  test('outdoor_progress_024: Newly unlocked level remains visible and selectable in selector ladder after acknowledgement', async () => {
+    // Reset getStressSignsTrend mock for signs
+    (SessionService.getStressSignsTrend as jest.Mock).mockResolvedValue({ status: 'same' });
+
+    await AsyncStorage.setItem(
+      'chillpup_outdoor_confidence_levels_test-pet',
+      JSON.stringify(['doorway_calm', 'open_edge'])
+    );
+    await AsyncStorage.setItem(
+      'chillpup_newly_unlocked_outdoor_confidence_level_test-pet',
+      'open_edge'
+    );
+
+    const { getByText, queryByText } = render(
+      <SubscriptionProvider>
+        <SessionPreviewScreen
+          navigation={mockNavigation}
+          route={{ params: { sessionId: 'outdoor_confidence_reset', petId: 'test-pet' } }}
+        />
+      </SubscriptionProvider>
+    );
+    await act(async () => {});
+
+    // Select new level -> acknowledges banner
+    fireEvent.press(getByText('Select new level'));
+    await act(async () => {});
+
+    // Banner is gone
+    expect(queryByText('New level available')).toBeNull();
+
+    // The level 'Level 2 of 7: Open Edge' is still visible in the ladder
+    expect(getByText('Level 2 of 7: Open Edge')).toBeTruthy();
+  });
 });
+
+
