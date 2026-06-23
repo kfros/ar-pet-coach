@@ -48,6 +48,8 @@ const ANXIETY_SIGNS: { id: AnxietySign; label: string }[] = [
     { id: 'bolting_or_escape_attempts', label: 'Escape Attempts' },
     { id: 'collapse_or_breathing_trouble', label: 'Breathing Trouble' },
     { id: 'repeated_vomiting_or_diarrhea', label: 'Vomiting / Diarrhea' },
+    { id: 'unable_to_settle', label: 'Unable to Settle' },
+    { id: 'clawing_or_scratching_exits', label: 'Clawing / Scratching Exits' },
     { id: 'other', label: 'Other' }
 ];
 
@@ -61,6 +63,13 @@ const POSITIVE_SIGNS: { id: PositiveSign; label: string }[] = [
     { id: 'less_pacing', label: 'Less Pacing' },
     { id: 'more_responsive', label: 'More Responsive' },
     { id: 'chose_safe_spot', label: 'Chose Safe Spot' },
+    { id: 'accepted_food_or_chew', label: 'Accepted Food / Chew' },
+    { id: 'rested_between_noises', label: 'Rested Between Noises' },
+    { id: 'settled_near_owner', label: 'Settled Near Owner' },
+    { id: 'returned_to_room', label: 'Returned to Room' },
+    { id: 'explored_again', label: 'Explored Again' },
+    { id: 'recovered_after_hiding', label: 'Recovered After Hiding' },
+    { id: 'slept_after_event', label: 'Slept After Event' },
     { id: 'fell_asleep', label: 'Fell Asleep' }
 ];
 
@@ -912,8 +921,12 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     <Text style={styles.checkinNextText}>{isBefore ? 'Start Session' : 'Finish & Save'}</Text>
                 </Pressable>
 
-                {isBefore && (
+                {isBefore ? (
                     <Pressable style={styles.skipButton} onPress={handleSkipCheckin}>
+                        <Text style={styles.skipText}>Skip Check-in</Text>
+                    </Pressable>
+                ) : (
+                    <Pressable style={styles.skipButton} onPress={() => saveSession()}>
                         <Text style={styles.skipText}>Skip Check-in</Text>
                     </Pressable>
                 )}

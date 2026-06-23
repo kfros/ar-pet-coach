@@ -14,6 +14,8 @@ export type AnxietySign =
     | 'self_harm'
     | 'collapse_or_breathing_trouble'
     | 'repeated_vomiting_or_diarrhea'
+    | 'unable_to_settle'
+    | 'clawing_or_scratching_exits'
     | 'other';
 
 export type PositiveSign =
@@ -26,6 +28,13 @@ export type PositiveSign =
     | 'less_pacing'
     | 'more_responsive'
     | 'chose_safe_spot'
+    | 'accepted_food_or_chew'
+    | 'rested_between_noises'
+    | 'settled_near_owner'
+    | 'returned_to_room'
+    | 'explored_again'
+    | 'recovered_after_hiding'
+    | 'slept_after_event'
     | 'fell_asleep';
 
 export type AnxietyLevel = 'calm' | 'mild' | 'moderate' | 'high';

@@ -40,6 +40,8 @@ export const STRESS_SIGN_WEIGHTS: Record<AnxietySign, number> = {
     self_harm: 4,
     collapse_or_breathing_trouble: 5,
     repeated_vomiting_or_diarrhea: 4,
+    unable_to_settle: 1,
+    clawing_or_scratching_exits: 2,
     other: 1
 };
 
@@ -53,6 +55,13 @@ export const POSITIVE_SIGN_WEIGHTS: Record<PositiveSign, number> = {
     less_pacing: 1,
     more_responsive: 1,
     chose_safe_spot: 1,
+    accepted_food_or_chew: 1,
+    rested_between_noises: 1,
+    settled_near_owner: 1,
+    returned_to_room: 1,
+    explored_again: 1,
+    recovered_after_hiding: 1,
+    slept_after_event: 2,
     fell_asleep: 2
 };
 

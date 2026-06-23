@@ -213,7 +213,7 @@ export default function OnboardingScreen({ navigation }: any) {
                         <Text style={styles.title}>What is the main problem?</Text>
                         <Text style={styles.subtitle}>Select all that apply.</Text>
                         <View style={{ gap: 10 }}>
-                            {['Separation Anxiety', 'Noise Phobia', 'Visitors', 'Thunderstorms', 'Fireworks', 'Car Travel'].map(p => (
+                            {['Separation Anxiety', 'Noise Sensitivity', 'Visitors', 'Thunderstorms', 'Fireworks', 'Car Travel'].map(p => (
                                 <TouchableOpacity
                                     key={p}
                                     style={[styles.problemBtn, formData.problems.includes(p) && styles.problemBtnActive]}

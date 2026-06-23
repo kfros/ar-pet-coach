@@ -85,15 +85,47 @@ export const SESSIONS: Session[] = [
     {
         id: 'fireworks_loud_noises_basic',
         accessLevel: 'free',
-        title: 'Fireworks & Loud Noises',
-        subtitle: 'Immediate support for noisy moments.',
+        title: 'Thunder & Fireworks Safe Space',
+        subtitle: 'Safe-space support for noisy moments.',
         durationMinutes: 5,
         difficulty: 'easy',
         trigger: 'loud_noises',
-        goal: 'Help the owner reduce pressure during loud noises and guide the dog toward a safer, quieter setup without forced exposure.',
+        goal: 'Help the owner prepare and use a safe, predictable support setup before, during, and after thunder or fireworks.',
         category: 'noise_support',
         categoryLabel: 'Noise & Fireworks',
         categoryOrder: 30,
+        checkInProfileId: 'noise_support',
+        backgroundSoundPolicy: {
+            mode: 'calm_music',
+            defaultEnabled: false,
+            showControls: true,
+            helperText: 'Optional calm background music is available. Skip it if your dog dislikes it. For sound masking, use a familiar household sound such as a fan, TV, or radio outside the app.'
+        },
+        suitableFor: [
+            'Dogs who hide, tremble, pant, pace, or seek the owner during thunder or fireworks.',
+            'Owners who need a simple safe-space support plan.',
+            'Dogs who can remain physically safe indoors with owner support.'
+        ],
+        notFor: [
+            'Escape attempts through doors, windows, fences, or crates.',
+            'Self-injury, severe panic, or destructive attempts to get out.',
+            'Collapse, breathing trouble, seizures, repeated vomiting or diarrhea.',
+            'Fear that remains severe for days after the event.',
+            'Medication or dosage guidance.'
+        ],
+        sourcePrinciples: [
+            'Safe spaces should be available, not forced.',
+            'During real events, focus on management and comfort, not training.',
+            'Dogs may choose to hide; hiding safely can be a coping strategy.',
+            'Use background sound only if it does not worry the dog.',
+            'Contact a veterinarian or veterinary behaviorist for severe, unsafe, or escalating fear.'
+        ],
+        safetyNotes: [
+            'Do not drag or force your dog into a safe space.',
+            'Do not train with thunder or firework sounds during a real event.',
+            'Secure doors, windows, balcony access, and exits.',
+            'If your dog tries to escape, injures themselves, or cannot recover, contact a veterinarian or veterinary behaviorist.'
+        ],
         beforeYouStart: [
             'Move to the quietest safe area available.',
             'Close windows and curtains if possible.',
@@ -103,66 +135,72 @@ export const SESSIONS: Session[] = [
         ],
         steps: [
             {
-                id: 'secure_environment',
-                title: 'Secure the environment',
-                instruction: 'Check doors, windows, balcony access, and any escape routes.',
+                id: 'noise_safe_space_choose',
+                title: 'Choose the safest place',
+                instruction: 'Pick a quiet interior room or familiar hiding place away from windows if possible. Keep the area cozy and hazard-free.',
                 durationSeconds: 45,
                 visualCue: 'observe',
                 canSkip: false
             },
             {
-                id: 'reduce_noise',
-                title: 'Reduce the noise',
-                instruction: 'Move to a quieter room and soften outside noise with curtains, closed windows, or gentle background sound.',
+                id: 'noise_safe_space_make_available',
+                title: 'Make it available, not forced',
+                instruction: 'Let your dog enter and leave if it is safe. Do not drag, push, or shut them into a place they do not already trust.',
+                durationSeconds: 45,
+                visualCue: 'pause',
+                canSkip: false
+            },
+            {
+                id: 'noise_safe_space_reduce',
+                title: 'Soften the outside noise',
+                instruction: 'Close windows and curtains. Add gentle background sound only if your dog is comfortable with it.',
                 durationSeconds: 45,
                 visualCue: 'dim',
                 canSkip: false
             },
             {
-                id: 'offer_safe_choice',
-                title: 'Offer a safe choice',
-                instruction: 'Let your dog choose a bed, crate, corner, or nearby spot. Do not pull them out if they are safely hiding.',
+                id: 'noise_safe_space_support',
+                title: 'Stay calmly available',
+                instruction: 'If your dog seeks contact, offer calm presence. If they choose to hide safely, let them hide.',
                 durationSeconds: 60,
-                visualCue: 'pause',
+                visualCue: 'observe',
                 canSkip: false
             },
             {
-                id: 'offer_positive_item',
-                title: 'Offer something positive',
-                instruction: 'If your dog can still eat or play, offer a high-value reward or favorite toy. If they refuse, do not push.',
+                id: 'noise_safe_space_food_choice',
+                title: 'Offer, do not push',
+                instruction: 'Offer a chew, food toy, or food reward if your dog can eat. If they refuse, remove pressure and stay with the safe setup.',
                 durationSeconds: 60,
                 visualCue: 'reward',
                 canSkip: false
             },
             {
-                id: 'stay_predictable',
-                title: 'Stay predictable',
-                instruction: 'Keep your voice low and your movements slow. Your calm behavior is part of the setup.',
+                id: 'noise_safe_space_recover',
+                title: 'Let recovery take time',
+                instruction: 'Keep the safe space available after the noise stops. Log what helped and what signs were strongest.',
                 durationSeconds: 60,
-                visualCue: 'pulse',
+                visualCue: 'pause',
                 canSkip: false
             }
         ],
         whatToWatchFor: [
-            'Hiding',
+            'Hiding in a preferred spot',
             'Trembling or shaking',
-            'Panting',
-            'Pacing',
-            'Clinging to owner',
-            'Scanning the room',
-            'Refusing treats'
+            'Panting or pacing',
+            'Seeking contact with owner',
+            'Refusing food or chews'
         ],
         stopIf: [
             'Your dog panics, tries to escape, injures themselves, or shows aggression.',
-            'Your dog has vomiting, diarrhea, collapse, breathing trouble, or other medical symptoms.',
-            'In severe cases, recommend contacting a veterinarian or qualified behavior professional.'
+            'Your dog has collapse, breathing trouble, seizures, repeated vomiting, or diarrhea.',
+            'In severe cases, stop the session and contact a veterinarian or veterinary behaviorist.'
         ],
         afterSession: [
             'Log the strongest signs you noticed.',
             'Note whether your dog accepted food, play, or rest.',
             'Use the notes to prepare earlier next time.'
         ],
-        tags: ['free', 'loud_noises', 'fireworks', 'immediate_support'],
+        tags: ['free', 'loud_noises', 'fireworks', 'safe_space'],
         recommendedForTriggers: ['fireworks', 'loud_noises', 'traffic_or_car_horns'],
         iconKey: 'sparkles'
     }
