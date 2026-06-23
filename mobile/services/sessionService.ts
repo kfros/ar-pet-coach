@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth, db, firestore } from './firebaseConfig';
 import { 
     Session, 
     SessionHistoryEntry, 
