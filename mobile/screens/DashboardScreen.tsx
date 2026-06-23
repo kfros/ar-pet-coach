@@ -542,9 +542,15 @@ export default function DashboardScreen({ navigation }: any) {
                                 onPress={toggleCategory}
                                 testID={`category-header-${catKey}`}
                             >
-                                <Text style={styles.categoryTitleText}>
-                                    {`${catMeta.title} · ${routineCountText}`}
-                                </Text>
+                                <View style={styles.categoryTitleContainer}>
+                                    <Text 
+                                        style={styles.categoryTitleText}
+                                        numberOfLines={2}
+                                        ellipsizeMode="tail"
+                                    >
+                                        {`${catMeta.title} · ${routineCountText}`}
+                                    </Text>
+                                </View>
                                 <View style={styles.categoryHeaderRight}>
                                     <Text style={styles.categoryToggleActionText}>
                                         {isExpanded ? 'Hide' : 'Show'}
@@ -669,17 +675,25 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         borderWidth: 1,
         borderColor: '#E3ECEF',
+        gap: 8,
         ...SHADOWS.small
+    },
+    categoryTitleContainer: {
+        flex: 1,
+        flexShrink: 1,
+        minWidth: 0
     },
     categoryTitleText: {
         fontSize: 14,
         fontWeight: '700',
-        color: COLORS.text
+        color: COLORS.text,
+        flexShrink: 1
     },
     categoryHeaderRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6
+        gap: 6,
+        flexShrink: 0
     },
     categoryToggleActionText: {
         fontSize: 12,

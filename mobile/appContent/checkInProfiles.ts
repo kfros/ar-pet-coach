@@ -111,8 +111,8 @@ export const CHECKIN_PROFILES: Record<CheckInProfileId, CheckInProfile> = {
     noise_support: {
         id: "noise_support",
         title: "Noise support signs",
-        beforePrompt: "How is your dog right now?",
-        afterPrompt: "How is your dog after the routine?",
+        beforePrompt: "What signs do you notice before the noise support routine?",
+        afterPrompt: "What signs did you notice after the noise support routine?",
         showPositiveSignsAfter: true,
         milestonePromptEnabled: false,
         stressSigns: [
@@ -122,23 +122,22 @@ export const CHECKIN_PROFILES: Record<CheckInProfileId, CheckInProfile> = {
             { id: "pacing_or_restless", label: "Pacing / Restless", kind: "stress", scoreWeight: 1 },
             { id: "owner_seeking", label: "Seeking Owner", kind: "stress", scoreWeight: 1 },
             { id: "scanning_or_alert", label: "Scanning / Alert", kind: "stress", scoreWeight: 1 },
-            { id: "freezing", label: "Freezing", kind: "stress", scoreWeight: 2 },
             { id: "barking_whining_howling", label: "Vocalizing", kind: "stress", scoreWeight: 1 },
             { id: "drooling", label: "Drooling", kind: "stress", scoreWeight: 1 },
             { id: "not_accepting_treats", label: "Refusing Treats", kind: "stress", scoreWeight: 2 },
+            { id: "unable_to_settle", label: "Unable to settle", kind: "stress", scoreWeight: 1 },
+            { id: "clawing_or_scratching_exits", label: "Clawing/scratching at exits", kind: "stress", scoreWeight: 2 },
             { id: "other", label: "Other", kind: "stress", scoreWeight: 1 }
         ],
         positiveSigns: [
-            { id: "relaxed_body", label: "Relaxed Body", kind: "positive", scoreWeight: 1 },
-            { id: "soft_eyes", label: "Soft Eyes", kind: "positive", scoreWeight: 1 },
-            { id: "slower_breathing", label: "Slower Breathing", kind: "positive", scoreWeight: 1 },
-            { id: "settled_nearby", label: "Settled Nearby", kind: "positive", scoreWeight: 1 },
-            { id: "took_treats_calmly", label: "Took Treats Calmly", kind: "positive", scoreWeight: 1 },
-            { id: "resting_or_lying_down", label: "Resting / Lying Down", kind: "positive", scoreWeight: 1 },
-            { id: "less_pacing", label: "Less Pacing", kind: "positive", scoreWeight: 1 },
-            { id: "more_responsive", label: "More Responsive", kind: "positive", scoreWeight: 1 },
-            { id: "chose_safe_spot", label: "Chose Safe Spot", kind: "positive", scoreWeight: 1 },
-            { id: "fell_asleep", label: "Fell Asleep", kind: "positive", scoreWeight: 2 }
+            { id: "chose_safe_spot", label: "Chose safe spot", kind: "positive", scoreWeight: 1 },
+            { id: "accepted_food_or_chew", label: "Accepted food or chew", kind: "positive", scoreWeight: 1 },
+            { id: "rested_between_noises", label: "Rested between noises", kind: "positive", scoreWeight: 1 },
+            { id: "settled_near_owner", label: "Settled near owner", kind: "positive", scoreWeight: 1 },
+            { id: "returned_to_room", label: "Returned to room", kind: "positive", scoreWeight: 1 },
+            { id: "explored_again", label: "Explored again", kind: "positive", scoreWeight: 1 },
+            { id: "recovered_after_hiding", label: "Recovered after hiding", kind: "positive", scoreWeight: 1 },
+            { id: "slept_after_event", label: "Slept after event", kind: "positive", scoreWeight: 2 }
         ],
         severeSigns: GLOBAL_SEVERE_SIGNS
     },
