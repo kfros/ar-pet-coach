@@ -58,7 +58,14 @@ export const BEHAVIORAL_SEVERE_SIGNS: AnxietySign[] = [
 
 export const MEDICAL_SEVERE_SIGNS: AnxietySign[] = [
     'collapse_or_breathing_trouble',
-    'repeated_vomiting_or_diarrhea'
+    'repeated_vomiting_or_diarrhea',
+    'cannot_urinate',
+    'straining_or_only_drops',
+    'blood_in_urine_or_stool',
+    'pain_while_pottying',
+    'repeated_unsuccessful_potty_attempts',
+    'lethargy_or_weakness',
+    'sudden_major_potty_change'
 ];
 
 export const SEVERE_SIGN_LOGIC = {
