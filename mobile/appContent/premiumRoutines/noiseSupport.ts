@@ -132,5 +132,181 @@ export const NOISE_SUPPORT_PREMIUM_SESSIONS: Session[] = [
                 canSkip: false
             }
         ]
+    },
+    {
+        id: "post_fireworks_recovery_home",
+        title: "Post-Fireworks Recovery at Home",
+        subtitle: "Calm support after the noise has stopped.",
+        accessLevel: "premium",
+        category: "noise_support",
+        categoryLabel: "Noise & Fireworks",
+        categoryOrder: 30,
+        estimatedDurationSeconds: 300,
+        suggestedTimeCopy: "About 5 min",
+        durationMinutes: 5,
+        difficulty: "easy",
+        trigger: "loud_noises",
+        checkInProfileId: "noise_support",
+        iconKey: "home",
+        tags: [
+            "premium",
+            "noise",
+            "recovery",
+            "fireworks"
+        ],
+        recommendedForTriggers: [
+            "loud_noises",
+            "fireworks"
+        ],
+        backgroundSoundPolicy: {
+            mode: "none",
+            defaultEnabled: false,
+            showControls: false,
+            helperText: "No in-app sound is needed for this recovery routine."
+        },
+        description: "A gentle indoor recovery routine for dogs that remain unsettled after fireworks, thunder, or another loud noise has ended.",
+        goal: "Help the owner lower pressure at home, keep safe places available, offer calm presence without forcing contact, and watch for signs of recovery or need for professional support.",
+        suitableFor: [
+            "Dogs that are still unsettled indoors after fireworks, thunder, or another loud noise event.",
+            "Dogs that are hiding, trembling, panting, pacing, scanning, clingy, or unable to rest after the noise has stopped.",
+            "Dogs whose stress signs are gradually softening and who are not showing medical emergency signs."
+        ],
+        notFor: [
+            "Active fireworks, thunder, storms, or loud noise that is still happening.",
+            "Escape attempts, self-injury, collapse, breathing difficulty, seizure-like signs, visible injuries, or unsafe behavior.",
+            "Continuous extreme distress that does not start to soften.",
+            "Repeated inability to recover after noise events.",
+            "Older dogs with sudden new confusion, fear, disorientation, or suspected sensory decline."
+        ],
+        sourcePrinciples: [
+            "Use after the noise has stopped or dropped to baseline.",
+            "Allow the dog to stay in a chosen safe place.",
+            "Do not pull the dog out of hiding.",
+            "Reduce stimulation and keep the home predictable.",
+            "Offer calm presence without forced contact.",
+            "Keep water and normal resources available without forcing food or interaction.",
+            "Watch for softening recovery signs.",
+            "Contact a veterinarian or veterinary behaviorist for severe, unsafe, persistent, escalating, or recurrent distress."
+        ],
+        safetyNotes: [
+            "Use this only after the loud event has stopped or dropped to baseline.",
+            "Do not force your dog out of hiding, into contact, into food, into play, or outside.",
+            "Do not punish, scold, or block access to a safe hiding place.",
+            "For severe panic, escape attempts, self-injury, injury, breathing trouble, collapse, seizure-like signs, unsafe behavior, or distress that does not soften, contact a veterinarian or emergency clinic.",
+            "For repeated or escalating noise fear, contact a veterinarian or veterinary behaviorist."
+        ],
+        beforeYouStart: [
+            "Make sure the loud event has stopped or dropped to baseline.",
+            "If noise is still happening, use Thunder & Fireworks Safe Space instead.",
+            "If your dog is injured, struggling to breathe, collapsing, trying to escape, or unable to settle at all, contact a veterinarian or emergency clinic."
+        ],
+        beforeCheckinEnabled: true,
+        afterCheckinEnabled: true,
+        severeNoticeEnabled: true,
+        stopIf: [
+            "hiding",
+            "trembling_or_shaking",
+            "panting",
+            "pacing_or_restless",
+            "scanning_or_alert",
+            "freezing",
+            "barking_whining_howling",
+            "drooling",
+            "bolting_or_escape_attempts",
+            "not_accepting_treats",
+            "aggression",
+            "self_harm",
+            "collapse_or_breathing_trouble",
+            "repeated_vomiting_or_diarrhea"
+        ],
+        whatToWatchFor: [
+            "Coming out of hiding voluntarily",
+            "Breathing returning closer to normal",
+            "Less scanning or startle",
+            "Changing resting position",
+            "Accepting water or food without pressure",
+            "Resting or sleeping",
+            "Choosing calm contact or a relaxed spot"
+        ],
+        afterSession: [
+            "Allow your dog quiet time before normal activity.",
+            "Offer resources calmly and let them choose when to eat.",
+            "If distress stays severe or unsafe, contact appropriate support."
+        ],
+        fallbacks: [
+            {
+                type: "routine",
+                routineId: "fireworks_loud_noises_basic",
+                title: "Thunder & Fireworks Safe Space",
+                body: "Use this if the noise is still happening or may start again soon."
+            },
+            {
+                type: "routine",
+                routineId: "daily_calm_reset",
+                title: "Daily Calm Reset",
+                body: "Use this for a simpler calm reset when your dog is only mildly unsettled."
+            },
+            {
+                type: "routine",
+                routineId: "post_fireworks_walk_rebuild",
+                title: "Post-Fireworks Walk Rebuild",
+                body: "Use this later, only after your dog is reasonably settled indoors but still hesitant to go outside."
+            },
+            {
+                type: "info",
+                title: "Get professional support",
+                body: "For severe, unsafe, persistent, escalating, or repeated noise fear, contact a veterinarian or veterinary behaviorist."
+            }
+        ],
+        steps: [
+            {
+                id: "recovery_noise_over_check",
+                title: "Check that the noise is over",
+                instruction: "Start only after the loud event has stopped or dropped to baseline. If the noise is still happening or may start again soon, use the safe-space routine instead.",
+                durationSeconds: 45,
+                visualCue: "observe",
+                canSkip: false
+            },
+            {
+                id: "recovery_keep_safe_place",
+                title: "Keep the safe place open",
+                instruction: "Let your dog stay where they feel safest, such as a den, crate, bathroom, under furniture, or near you. Do not pull them out or block the place they chose.",
+                durationSeconds: 45,
+                visualCue: "pause",
+                canSkip: false
+            },
+            {
+                id: "recovery_lower_room_pressure",
+                title: "Lower the room pressure",
+                instruction: "Make the room boring and predictable. Keep voices low, avoid sudden cleaning noises or visitors, and give your dog time before asking for normal activity.",
+                durationSeconds: 45,
+                visualCue: "observe",
+                canSkip: false
+            },
+            {
+                id: "recovery_presence_no_demands",
+                title: "Offer presence without demands",
+                instruction: "Stay nearby if your dog seeks you, or give distance if they choose it. Keep contact optional and calm. Avoid calling, touching, or hovering again and again.",
+                durationSeconds: 45,
+                visualCue: "pulse",
+                canSkip: false
+            },
+            {
+                id: "recovery_resources_no_force",
+                title: "Place resources, don’t force them",
+                instruction: "Make water available near the safe area. You can offer food calmly, but do not use it as a test or push your dog to eat. Let them choose when they are ready.",
+                durationSeconds: 45,
+                visualCue: "reward",
+                canSkip: false
+            },
+            {
+                id: "recovery_watch_softening",
+                title: "Watch for softening",
+                instruction: "Look for small recovery signs: easier breathing, less scanning, changing position, resting, drinking, coming out voluntarily, or choosing calm contact. If distress stays severe or unsafe, pause self-help and contact a veterinarian.",
+                durationSeconds: 75,
+                visualCue: "observe",
+                canSkip: false
+            }
+        ]
     }
 ];
