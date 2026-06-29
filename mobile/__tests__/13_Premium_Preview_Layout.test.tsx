@@ -159,4 +159,24 @@ describe('Premium Preview Layout and Badge State', () => {
         expect(getByText('Fallback Routine')).toBeTruthy();
         expect(getByText('Use this instead')).toBeTruthy();
     });
+
+    test('preview_title_allows_multiline_test: title uses numberOfLines={3} and has flexShrink', () => {
+        jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
+            isPremium: true,
+            isLoading: false,
+        } as any);
+
+        const { getByText } = render(
+            <SubscriptionManager.SubscriptionProvider>
+                <SessionPreviewScreen navigation={mockNavigation} route={mockRoute} />
+            </SubscriptionManager.SubscriptionProvider>
+        );
+
+        const titleText = getByText(premiumSession.title);
+        expect(titleText).toBeTruthy();
+        expect(titleText.props.numberOfLines).toBe(3);
+
+        const titleStyle = require('react-native').StyleSheet.flatten(titleText.props.style);
+        expect(titleStyle.flexShrink).toBe(1);
+    });
 });

@@ -42,6 +42,13 @@ export const STRESS_SIGN_WEIGHTS: Record<AnxietySign, number> = {
     repeated_vomiting_or_diarrhea: 4,
     unable_to_settle: 1,
     clawing_or_scratching_exits: 2,
+    cannot_urinate: 5,
+    straining_or_only_drops: 4,
+    blood_in_urine_or_stool: 5,
+    pain_while_pottying: 4,
+    repeated_unsuccessful_potty_attempts: 4,
+    lethargy_or_weakness: 4,
+    sudden_major_potty_change: 4,
     other: 1
 };
 
@@ -73,7 +80,14 @@ export const BEHAVIORAL_SEVERE_SIGNS: AnxietySign[] = [
 
 export const MEDICAL_SEVERE_SIGNS: AnxietySign[] = [
     'collapse_or_breathing_trouble',
-    'repeated_vomiting_or_diarrhea'
+    'repeated_vomiting_or_diarrhea',
+    'cannot_urinate',
+    'straining_or_only_drops',
+    'blood_in_urine_or_stool',
+    'pain_while_pottying',
+    'repeated_unsuccessful_potty_attempts',
+    'lethargy_or_weakness',
+    'sudden_major_potty_change'
 ];
 
 const BEHAVIORAL_NOTE = "For panic, aggression, self-injury, or escape attempts, stop the routine and get professional support.";

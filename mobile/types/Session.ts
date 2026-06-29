@@ -16,6 +16,13 @@ export type AnxietySign =
     | 'repeated_vomiting_or_diarrhea'
     | 'unable_to_settle'
     | 'clawing_or_scratching_exits'
+    | 'cannot_urinate'
+    | 'straining_or_only_drops'
+    | 'blood_in_urine_or_stool'
+    | 'pain_while_pottying'
+    | 'repeated_unsuccessful_potty_attempts'
+    | 'lethargy_or_weakness'
+    | 'sudden_major_potty_change'
     | 'other';
 
 export type PositiveSign =
@@ -80,6 +87,7 @@ export interface SessionStep {
     id: string;
     title: string;
     instruction: string;
+    explanation?: string;
     durationSeconds: number;
     visualCue: VisualCue;
     canSkip: boolean;
@@ -194,7 +202,8 @@ export type CheckInProfileId =
   | 'noise_support'
   | 'visitors'
   | 'being_alone'
-  | 'care_handling';
+  | 'care_handling'
+  | 'weather_potty_confidence';
 
 export type CheckInSignKind =
   | 'stress'
