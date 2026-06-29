@@ -388,5 +388,208 @@ export const WALK_FEAR_PREMIUM_SESSIONS: Session[] = [
                 }
             }
         ]
+    },
+    {
+        id: "night_walk_confidence",
+        title: "Night Walk Confidence",
+        subtitle: "Small, familiar steps for calmer evening walks.",
+        accessLevel: "premium",
+        category: "walk_fear",
+        categoryLabel: "Walk Fear & Outdoor Confidence",
+        categoryOrder: 20,
+        estimatedDurationSeconds: 300,
+        suggestedTimeCopy: "About 5 min",
+        durationMinutes: 5,
+        difficulty: "moderate",
+        trigger: "nighttime",
+        checkInProfileId: "outdoor_confidence",
+        iconKey: "walk",
+        tags: [
+            "premium",
+            "walk_fear",
+            "outdoor",
+            "nighttime",
+            "confidence"
+        ],
+        recommendedForTriggers: [
+            "nighttime",
+            "new_places",
+            "not_sure"
+        ],
+        backgroundSoundPolicy: {
+            mode: "none",
+            defaultEnabled: false,
+            showControls: false,
+            helperText: "No background sound is needed for night-walk confidence practice."
+        },
+        description: "A short routine for dogs that walk normally during the day but become hesitant, watchful, or easily startled during evening or night walks.",
+        goal: "Help the owner choose a safer familiar route, reduce night-walk pressure, invite tiny voluntary movement, and stop before worry builds.",
+        suitableFor: [
+            "Dogs that usually walk during the day but hesitate, scan, freeze briefly, or startle more during evening or night walks.",
+            "Dogs that can still respond to the owner, recover after a pause, and move voluntarily when the route is familiar and easy.",
+            "Mild to moderate low-light worry on familiar routes.",
+            "Short night-walk practice close to home before attempting a normal night walk."
+        ],
+        notFor: [
+            "Sudden new night fear in an older dog.",
+            "Bumping into objects, missing doorways, disorientation, visible eye changes, or suspected vision problems.",
+            "Limping, yelping, stiffness, pain signs, collapse, breathing trouble, vomiting, diarrhea, or other medical symptoms.",
+            "Night-time agitation, pacing, vocalizing, or confusion that also happens indoors.",
+            "Panic with escape attempts near roads.",
+            "Aggression, self-injury, unsafe pulling, or severe distress outdoors.",
+            "Unsafe routes, poor visibility for the owner, traffic hazards, or areas where the owner cannot keep the dog secure."
+        ],
+        sourcePrinciples: [
+            "Use familiar routes and predictable landmarks.",
+            "Start with the easiest, best-lit version of the night walk.",
+            "Keep the first attempts short and close to home.",
+            "Let the dog pause, look, sniff, or turn back without pressure.",
+            "Progress means calmer recovery, not longer distance.",
+            "Do not force movement through dark or high-startle areas.",
+            "Vet-first for sudden night fear, older dogs, disorientation, vision changes, suspected pain, or escalating behavior."
+        ],
+        safetyNotes: [
+            "Practice only in safe, familiar, well-lit areas where you can avoid traffic and escape risk.",
+            "Do not drag, pull, scold, or force your dog through dark sections.",
+            "Stop or turn back if your dog freezes hard, panics, tries to bolt, or cannot recover.",
+            "For sudden new night fear, vision concerns, pain signs, confusion, collapse, breathing trouble, or unsafe behavior, contact a veterinarian.",
+            "For severe, persistent, or escalating fear, contact a veterinarian or veterinary behaviorist."
+        ],
+        beforeYouStart: [
+            "Choose a familiar, well-lit starting point close to home.",
+            "Use secure, properly fitted gear and keep the leash soft.",
+            "Avoid traffic, isolated unsafe areas, and places with sudden loud night activity.",
+            "If this fear is sudden, severe, or paired with confusion, pain, or vision concerns, contact your veterinarian before practicing."
+        ],
+        beforeCheckinEnabled: true,
+        afterCheckinEnabled: true,
+        severeNoticeEnabled: true,
+        stopIf: [
+            "freezing",
+            "trembling_or_shaking",
+            "panting",
+            "pacing_or_restless",
+            "scanning_or_alert",
+            "bolting_or_escape_attempts",
+            "not_accepting_treats",
+            "aggression",
+            "self_harm",
+            "collapse_or_breathing_trouble",
+            "repeated_vomiting_or_diarrhea"
+        ],
+        whatToWatchFor: [
+            "Willingness to stand near the familiar night starting point.",
+            "Looking around without panic.",
+            "Sniffing or exploring a familiar spot.",
+            "Checking in with the owner after a startle.",
+            "Taking food calmly if offered.",
+            "Turning back calmly when the session ends.",
+            "Recovering faster after small night sounds or shadows."
+        ],
+        afterSession: [
+            "Log where your dog first stayed comfortable.",
+            "Progress means a calmer edge, not a longer walk.",
+            "Repeat the same easy step before making it harder."
+        ],
+        fallbacks: [
+            {
+                type: "routine",
+                routineId: "outdoor_confidence_reset",
+                title: "Outdoor Confidence Reset",
+                body: "Use this if your dog is also hesitant outdoors during the day or needs easier threshold practice."
+            },
+            {
+                type: "routine",
+                routineId: "daily_calm_reset",
+                title: "Daily Calm Reset",
+                body: "Use this indoors first if your dog is too tense to start outside."
+            },
+            {
+                type: "info",
+                title: "Check health and safety first",
+                body: "For sudden night fear, confusion, vision concerns, pain signs, collapse, breathing trouble, unsafe behavior, or severe distress, stop and contact a veterinarian."
+            }
+        ],
+        steps: [
+            {
+                id: "night_choose_safe_route",
+                title: "Choose the safest familiar route",
+                instruction: "Pick the easiest night version of a familiar route: close to home, better lit, quiet, and away from traffic or sudden activity. This is not a full walk.",
+                durationSeconds: 45,
+                visualCue: "observe",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "night_check_body_and_context",
+                title: "Check body and context",
+                instruction: "Before moving forward, notice whether your dog can breathe easily, look at you, and move freely. If this night fear is sudden, severe, or paired with confusion, pain, or vision concerns, stop and contact your veterinarian.",
+                durationSeconds: 45,
+                visualCue: "pulse",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "night_start_at_bright_edge",
+                title: "Start at the bright edge",
+                instruction: "Stand at the easiest bright edge: doorway, building exit, porch, driveway, or first familiar lit spot. Let your dog look, sniff, or pause without pressure.",
+                durationSeconds: 45,
+                visualCue: "observe",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "night_invite_one_segment",
+                title: "Invite one tiny segment",
+                instruction: "Invite a few calm steps along the familiar route only if your dog is still able to recover. Keep the leash soft. If they hesitate, shorten the segment instead of adding pressure.",
+                durationSeconds: 45,
+                visualCue: "reward",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "night_pause_after_startle",
+                title: "Pause after a startle",
+                instruction: "If your dog hears a night sound or notices a shadow, pause. Let them look, sniff, or check in with you. Continue only if their body softens again.",
+                durationSeconds: 60,
+                visualCue: "pause",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "night_end_before_scanning_builds",
+                title: "End before scanning builds",
+                instruction: "Turn back while the walk is still easy. Next time, repeat the same familiar night segment before making it darker, longer, or busier.",
+                durationSeconds: 60,
+                visualCue: "reward",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            }
+        ]
     }
 ];
+
