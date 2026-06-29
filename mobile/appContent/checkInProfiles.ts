@@ -242,6 +242,53 @@ export const CHECKIN_PROFILES: Record<CheckInProfileId, CheckInProfile> = {
             { id: "fell_asleep", label: "Fell Asleep", kind: "positive", scoreWeight: 2 }
         ],
         severeSigns: GLOBAL_SEVERE_SIGNS
+    },
+    weather_potty_confidence: {
+        id: "weather_potty_confidence",
+        title: "Weather potty signs",
+        beforePrompt: "What signs do you notice before this potty attempt?",
+        afterPrompt: "What signs did you still notice after the attempt?",
+        showPositiveSignsAfter: true,
+        milestonePromptEnabled: false,
+        stressSigns: [
+            { id: "freezing_at_threshold", label: "Freezing at the edge", kind: "stress", scoreWeight: 2 },
+            { id: "pulling_back_home", label: "Pulling back / turning home", kind: "stress", scoreWeight: 2 },
+            { id: "scanning_outside", label: "Scanning outside", kind: "stress", scoreWeight: 1 },
+            { id: "trembling_or_shaking", label: "Trembling / Shaking", kind: "stress", scoreWeight: 2 },
+            { id: "panting", label: "Panting", kind: "stress", scoreWeight: 1 },
+            { id: "not_accepting_treats", label: "Refusing treats", kind: "stress", scoreWeight: 2, helperText: "If your dog refuses food they usually like, make the step easier." },
+            { id: "trying_to_hide", label: "Trying to hide", kind: "stress", scoreWeight: 2 },
+            { id: "vocalizing", label: "Whining / Barking", kind: "stress", scoreWeight: 1 },
+            { id: "tucked_tail_or_low_body", label: "Tucked tail / low body", kind: "stress", scoreWeight: 1 },
+            { id: "unable_to_recover", label: "Could not settle after returning", kind: "stress", scoreWeight: 2 },
+            { id: "other", label: "Other", kind: "stress", scoreWeight: 1 }
+        ],
+        positiveSigns: [
+            { id: "looked_back_at_owner", label: "Looked back at me", kind: "positive", scoreWeight: 1 },
+            { id: "took_treats_calmly", label: "Took treats calmly", kind: "positive", scoreWeight: 1 },
+            { id: "looser_body", label: "Body looked a little softer", kind: "positive", scoreWeight: 1 },
+            { id: "sniffed_or_explored", label: "Sniffed or explored briefly", kind: "positive", scoreWeight: 1 },
+            { id: "voluntary_step", label: "Moved voluntarily", kind: "positive", scoreWeight: 1 },
+            { id: "paused_without_panic", label: "Paused without panic", kind: "positive", scoreWeight: 1 },
+            { id: "returned_calmly", label: "Returned calmly", kind: "positive", scoreWeight: 1 },
+            { id: "recovered_after_retreat", label: "Recovered after retreat", kind: "positive", scoreWeight: 1 },
+            { id: "noticed_trigger_and_recovered", label: "Noticed something and recovered", kind: "positive", scoreWeight: 1 },
+            { id: "checked_in_after_step", label: "Checked in after the step", kind: "positive", scoreWeight: 1 }
+        ],
+        severeSigns: [
+            { id: "aggression", label: "Aggression", kind: "severe", scoreWeight: 3, safetyLevel: "behavioral_stop" },
+            { id: "self_harm", label: "Self-Harm", kind: "severe", scoreWeight: 4, safetyLevel: "behavioral_stop" },
+            { id: "bolting_or_escape_attempts", label: "Escape Attempts", kind: "severe", scoreWeight: 3, safetyLevel: "behavioral_stop" },
+            { id: "cannot_urinate", label: "Cannot urinate", kind: "severe", scoreWeight: 5, safetyLevel: "medical_stop" },
+            { id: "straining_or_only_drops", label: "Straining / only drops", kind: "severe", scoreWeight: 4, safetyLevel: "medical_stop" },
+            { id: "blood_in_urine_or_stool", label: "Blood in urine or stool", kind: "severe", scoreWeight: 5, safetyLevel: "medical_stop" },
+            { id: "pain_while_pottying", label: "Pain while pottying", kind: "severe", scoreWeight: 4, safetyLevel: "medical_stop" },
+            { id: "repeated_unsuccessful_potty_attempts", label: "Repeated unsuccessful potty attempts", kind: "severe", scoreWeight: 4, safetyLevel: "medical_stop" },
+            { id: "repeated_vomiting_or_diarrhea", label: "Vomiting / diarrhea", kind: "severe", scoreWeight: 4, safetyLevel: "medical_stop" },
+            { id: "lethargy_or_weakness", label: "Lethargy / weakness", kind: "severe", scoreWeight: 4, safetyLevel: "medical_stop" },
+            { id: "collapse_or_breathing_trouble", label: "Collapse / breathing trouble", kind: "severe", scoreWeight: 5, safetyLevel: "medical_stop" },
+            { id: "sudden_major_potty_change", label: "Sudden major potty change", kind: "severe", scoreWeight: 4, safetyLevel: "medical_stop" }
+        ]
     }
 };
 

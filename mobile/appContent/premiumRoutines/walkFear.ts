@@ -590,6 +590,229 @@ export const WALK_FEAR_PREMIUM_SESSIONS: Session[] = [
                 }
             }
         ]
+    },
+    {
+        id: "rain_weather_potty_confidence",
+        title: "Rain / Weather Potty Confidence",
+        subtitle: "Tiny sheltered potty attempts in bad weather.",
+        accessLevel: "premium",
+        category: "walk_fear",
+        categoryLabel: "Walk Fear & Outdoor Confidence",
+        categoryOrder: 20,
+        estimatedDurationSeconds: 300,
+        suggestedTimeCopy: "About 5 min",
+        durationMinutes: 5,
+        difficulty: "easy",
+        trigger: "weather",
+        checkInProfileId: "weather_potty_confidence",
+        iconKey: "walk",
+        tags: [
+            "premium",
+            "walk_fear",
+            "weather",
+            "rain",
+            "potty",
+            "outdoor"
+        ],
+        recommendedForTriggers: [
+            "weather",
+            "rain",
+            "outdoor",
+            "not_sure"
+        ],
+        backgroundSoundPolicy: {
+            mode: "none",
+            defaultEnabled: false,
+            showControls: false,
+            helperText: "No background sound is needed for weather potty support."
+        },
+        description: "A short, low-pressure routine for mild bad-weather potty reluctance. Plan one tiny, sheltered outdoor attempt, reward success, and stop immediately if medical warning signs are present.",
+        goal: "Help the owner choose the easiest sheltered potty spot, keep the attempt short, avoid pressure or punishment, and recognize when signs point to veterinary care instead of training.",
+        suitableFor: [
+            "Dogs with a known pattern of disliking rain, wind, puddles, or wet ground.",
+            "Dogs that toilet normally in good weather but delay or avoid pottying in bad weather.",
+            "Dogs that are otherwise bright, eating, drinking, moving, and behaving normally.",
+            "Dogs with no pain signs, vomiting, diarrhea, blood, repeated straining, collapse, or unusual changes in drinking or urination.",
+            "Dogs that recover quickly after coming back indoors."
+        ],
+        notFor: [
+            "Dogs that cannot urinate.",
+            "Dogs repeatedly trying to urinate with little or no output.",
+            "Dogs straining, crying, or showing pain while trying to urinate or defecate.",
+            "Dogs with blood in urine or stool.",
+            "Dogs with vomiting, diarrhea, lethargy, collapse, weakness, painful abdomen, or hunched posture.",
+            "Male dogs repeatedly straining or unable to urinate.",
+            "Dogs with sudden severe potty changes or repeated accidents in a previously housetrained adult dog.",
+            "Older dogs with sudden new house-soiling or outdoor refusal without an obvious weather pattern.",
+            "Dogs with confusion, disorientation, fever-like signs, appetite loss, or major changes in drinking/urination."
+        ],
+        sourcePrinciples: [
+            "Start with a medical safety gate before any training-like step.",
+            "Use only for mild weather-related reluctance with no red flags.",
+            "Use the most sheltered potty spot close to the door.",
+            "Go outside with the dog.",
+            "Keep attempts very short and potty-focused.",
+            "Reward success and return indoors promptly.",
+            "Do not punish accidents.",
+            "Do not withhold water or food.",
+            "Do not drag, pull, flood, or leave the dog outside in hopes they will toilet.",
+            "Red flags override the routine and require veterinary care."
+        ],
+        safetyNotes: [
+            "Do not drag or pull your dog into the rain or onto wet ground.",
+            "Do not leave your dog outside alone or prolong attempts in bad weather.",
+            "Never punish or scold your dog for accidents; accidents are not misbehavior done on purpose or to control you.",
+            "Do not withhold water or food, and never use crate confinement as punishment.",
+            "For any urinary distress, inability to urinate, straining, blood, vomiting, diarrhea, pain, or sudden potty changes, contact a veterinarian immediately."
+        ],
+        beforeYouStart: [
+            "Choose a close, sheltered potty spot near the doorway.",
+            "Go outside with your dog instead of sending them alone.",
+            "Use secure, properly fitted gear and keep the leash soft.",
+            "Before practicing, check for any medical red flags like straining, blood, or inability to urinate."
+        ],
+        beforeCheckinEnabled: true,
+        afterCheckinEnabled: true,
+        severeNoticeEnabled: true,
+        stopIf: [
+            "freezing",
+            "trembling_or_shaking",
+            "panting",
+            "scanning_or_alert",
+            "bolting_or_escape_attempts",
+            "not_accepting_treats",
+            "aggression",
+            "self_harm",
+            "cannot_urinate",
+            "straining_or_only_drops",
+            "blood_in_urine_or_stool",
+            "pain_while_pottying",
+            "repeated_unsuccessful_potty_attempts",
+            "repeated_vomiting_or_diarrhea",
+            "lethargy_or_weakness",
+            "collapse_or_breathing_trouble",
+            "sudden_major_potty_change"
+        ],
+        whatToWatchFor: [
+            "Steps onto damp ground more readily.",
+            "Reaches the sheltered potty spot without panic.",
+            "Stays outside briefly without rushing in distress.",
+            "Urinates or defecates normally once outside.",
+            "Accepts a calm reward after potty.",
+            "Returns indoors calmly.",
+            "Shows fewer weather-related accidents over time."
+        ],
+        afterSession: [
+            "Log where your dog first stayed comfortable.",
+            "Progress means a calmer edge, not a longer walk.",
+            "Repeat the same easy step before making it harder."
+        ],
+        fallbacks: [
+            {
+                type: "routine",
+                routineId: "outdoor_confidence_reset",
+                title: "Outdoor Confidence Reset",
+                body: "Use this if your dog also hesitates outdoors in normal weather and needs broader threshold practice."
+            },
+            {
+                type: "routine",
+                routineId: "daily_calm_reset",
+                title: "Daily Calm Reset",
+                body: "Use this indoors if your dog is too stressed to start a short potty attempt."
+            },
+            {
+                type: "info",
+                title: "Call your vet first",
+                body: "For no urine, repeated straining, blood, pain, vomiting, diarrhea, lethargy, collapse, sudden potty changes, or repeated accidents in a previously housetrained adult dog, contact a veterinarian before trying training."
+            }
+        ],
+        steps: [
+            {
+                id: "weather_potty_red_flag_check",
+                title: "Check red flags first",
+                explanation: "Potty trouble can be medical, so safety comes before weather practice.",
+                instruction: "Before trying a bad-weather potty step, check for warning signs: no urine, repeated straining, blood, pain, vomiting, diarrhea, lethargy, collapse, or sudden major potty changes. If any are present, stop and contact a veterinarian.",
+                durationSeconds: 60,
+                visualCue: "observe",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "weather_potty_choose_shelter",
+                title: "Choose the easiest sheltered spot",
+                explanation: "A close, covered, familiar place lowers the weather pressure.",
+                instruction: "Pick the easiest potty spot near the door: under an overhang, beside a wall, on less-wet ground, or another familiar sheltered area. This is only for one potty attempt, not a walk.",
+                durationSeconds: 45,
+                visualCue: "observe",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "weather_potty_go_together",
+                title: "Go out together",
+                explanation: "Your calm presence can make the short attempt feel safer.",
+                instruction: "Go outside with your dog instead of sending them alone. Keep your movement calm, the leash soft, and the goal simple: reach the sheltered potty spot.",
+                durationSeconds: 45,
+                visualCue: "pulse",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "weather_potty_keep_it_short",
+                title: "Keep the attempt tiny",
+                explanation: "Short tries reduce stress and avoid turning potty into a standoff.",
+                instruction: "Give your dog a brief chance to potty in the sheltered spot. If stress rises or they keep trying to rush back inside, end the attempt calmly and try again later.",
+                durationSeconds: 45,
+                visualCue: "pause",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "weather_potty_reward_or_reset",
+                title: "Reward success, reset failure",
+                explanation: "Success gets reinforced; a missed attempt stays neutral.",
+                instruction: "If your dog potties, reward calmly and return indoors. If they do not potty, return indoors without punishment, pressure, or drama. Keep water and normal routines available.",
+                durationSeconds: 45,
+                visualCue: "reward",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            },
+            {
+                id: "weather_potty_plan_next_easy_chance",
+                title: "Plan the next easy chance",
+                explanation: "Frequent easy chances work better than one stressful battle.",
+                instruction: "Choose the next easiest opportunity: lighter rain, more shelter, a shorter path, or another calm try later. If warning signs appear at any point, stop using the routine and contact your veterinarian.",
+                durationSeconds: 60,
+                visualCue: "observe",
+                canSkip: false,
+                backgroundSoundPolicy: {
+                    mode: "none",
+                    defaultEnabled: false,
+                    showControls: false
+                }
+            }
+        ]
     }
 ];
+
 
