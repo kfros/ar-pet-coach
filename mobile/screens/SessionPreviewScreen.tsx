@@ -196,7 +196,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                                     {ROUTINE_CATEGORIES[session.category as RoutineCategory]?.title || session.category}
                                 </Text>
                             )}
-                            <Text style={styles.title} numberOfLines={2}>{session.title}</Text>
+                            <Text style={styles.title} numberOfLines={3}>{session.title}</Text>
                         </View>
                         {session.accessLevel === 'premium' && (
                             <View style={[
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     headerTitle: { ...FONTS.h3, marginLeft: 10 },
     scrollContent: { padding: 20, paddingBottom: 100 },
     heroCard: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 24, marginBottom: 24, ...SHADOWS.small },
-    title: { ...FONTS.h1, color: COLORS.text, marginBottom: 8 },
+    title: { ...FONTS.h1, color: COLORS.text, marginBottom: 8, flexShrink: 1 },
     subtitle: { ...FONTS.body, color: COLORS.textSecondary, marginBottom: 20 },
     metaRow: { flexDirection: 'row', gap: 20 },
     metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
