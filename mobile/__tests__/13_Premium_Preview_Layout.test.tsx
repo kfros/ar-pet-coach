@@ -160,7 +160,13 @@ describe('Premium Preview Layout and Badge State', () => {
         expect(getByText('Use this instead')).toBeTruthy();
     });
 
-    test('preview_title_allows_multiline_test: title uses numberOfLines={3} and has flexShrink', () => {
+    test('preview_title_allows_multiline_test: long title is not constrained in the top row and is fully visible', () => {
+        const longSession = {
+            ...premiumSession,
+            title: 'Rain / Weather Potty Confidence',
+        };
+        (SessionService.getSessionById as jest.Mock).mockReturnValue(longSession);
+
         jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
             isPremium: true,
             isLoading: false,
@@ -172,11 +178,14 @@ describe('Premium Preview Layout and Badge State', () => {
             </SubscriptionManager.SubscriptionProvider>
         );
 
-        const titleText = getByText(premiumSession.title);
+        const titleText = getByText('Rain / Weather Potty Confidence');
         expect(titleText).toBeTruthy();
-        expect(titleText.props.numberOfLines).toBe(3);
+        expect(titleText.props.numberOfLines).toBeUndefined();
 
         const titleStyle = require('react-native').StyleSheet.flatten(titleText.props.style);
         expect(titleStyle.flexShrink).toBe(1);
+
+        // Premium badge still renders
+        expect(getByText('INCLUDED')).toBeTruthy();
     });
 });

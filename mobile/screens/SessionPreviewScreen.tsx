@@ -189,15 +189,12 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
                 <View style={styles.heroCard}>
-                    <View style={styles.heroHeader}>
-                        <View style={styles.titleContainer}>
-                            {session.category && (
-                                <Text style={styles.categoryLabel}>
-                                    {ROUTINE_CATEGORIES[session.category as RoutineCategory]?.title || session.category}
-                                </Text>
-                            )}
-                            <Text style={styles.title} numberOfLines={3}>{session.title}</Text>
-                        </View>
+                    <View style={styles.heroTopRow}>
+                        {session.category && (
+                            <Text style={styles.categoryLabel}>
+                                {ROUTINE_CATEGORIES[session.category as RoutineCategory]?.title || session.category}
+                            </Text>
+                        )}
                         {session.accessLevel === 'premium' && (
                             <View style={[
                                 styles.previewBadge,
@@ -217,6 +214,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                             </View>
                         )}
                     </View>
+                    <Text style={styles.title}>{session.title}</Text>
                     <Text style={styles.subtitle}>{session.subtitle}</Text>
 
                     <View style={styles.metaRow}>
@@ -493,8 +491,13 @@ const styles = StyleSheet.create({
     startButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-    heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-    titleContainer: { flex: 1, marginRight: 12 },
+    heroTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 12,
+        marginBottom: 16,
+    },
     previewBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -503,6 +506,7 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 12,
         borderWidth: 1,
+        flexShrink: 0,
     },
     previewBadgeLocked: {
         backgroundColor: COLORS.primary,
@@ -550,6 +554,9 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         marginBottom: 4,
+        flex: 1,
+        flexShrink: 1,
+        marginRight: 12,
     },
     outdoorWarningBanner: {
         flexDirection: 'row',
