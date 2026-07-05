@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../services/firebaseConfig';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import Purchases from 'react-native-purchases';
+import RevenueCatService from '../services/revenueCatService';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../components/SubscriptionManager';
 import { signOut } from '../services/authService';
@@ -12,7 +12,7 @@ import PetProfileRepository from '../services/petProfileRepository';
 
 export default function SettingsScreen({ navigation }: any) {
     const user = auth().currentUser;
-    const { isPremium, customerInfo } = useSubscription();
+    const { isPremium, customerInfo, restorePurchases, refreshEntitlement } = useSubscription();
     const [pets, setPets] = useState<any[]>([]);
     const [authMode, setAuthMode] = useState<string>('unauthenticated');
 
@@ -26,7 +26,13 @@ export default function SettingsScreen({ navigation }: any) {
         } else {
             setPets([]);
         }
-    }, []);
+
+        try {
+            await refreshEntitlement();
+        } catch (e) {
+            console.error('Failed to refresh entitlement on focus:', e);
+        }
+    }, [refreshEntitlement]);
 
     useFocusEffect(
         useCallback(() => {
@@ -40,8 +46,8 @@ export default function SettingsScreen({ navigation }: any) {
 
     const handleRestorePurchases = async () => {
         try {
-            const info = await Purchases.restorePurchases();
-            if (info.entitlements.active['ar-pet-coach-premium']) {
+            const info = await restorePurchases();
+            if (info?.entitlements.active['ar-pet-coach-premium']) {
                 Alert.alert("Success", "Your purchases have been restored!");
                 navigation.navigate('PremiumStatus');
             } else {
@@ -95,7 +101,7 @@ export default function SettingsScreen({ navigation }: any) {
                             }
                             // Only call logOut for RevenueCat if the user was identified
                             // (RevenueCat handles this internally but good to be explicit)
-                            await Purchases.logOut();
+                            await RevenueCatService.logOut();
 
                             await PetProfileRepository.setAuthMode('unauthenticated');
                         } catch (error: any) {

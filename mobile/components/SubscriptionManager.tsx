@@ -7,7 +7,7 @@ interface SubscriptionContextType {
     isPremium: boolean;
     customerInfo: CustomerInfo | null;
     purchasePackage: (pack: PurchasesPackage) => Promise<void>;
-    restorePurchases: () => Promise<void>;
+    restorePurchases: () => Promise<CustomerInfo | null>;
     isLoading: boolean;
     checkPaywallTrigger: () => Promise<boolean>;
     trackCalmingSession: () => Promise<number>;
@@ -18,7 +18,7 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
     isPremium: false,
     customerInfo: null,
     purchasePackage: async () => { },
-    restorePurchases: async () => { },
+    restorePurchases: async () => null,
     isLoading: true,
     checkPaywallTrigger: async () => false,
     trackCalmingSession: async () => 0,
@@ -69,6 +69,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const info = await RevenueCatService.restorePurchases();
         updateCustomerState(info);
         setIsLoading(false);
+        return info;
     };
 
     const refreshEntitlement = async () => {
