@@ -169,7 +169,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Pressable onPress={() => navigation.goBack()} style={styles.backButton} testID="preview-back-button">
                     <Ionicons name="chevron-back" size={28} color={COLORS.text} />
                 </Pressable>
                 <Text style={styles.headerTitle}>Session Preview</Text>
