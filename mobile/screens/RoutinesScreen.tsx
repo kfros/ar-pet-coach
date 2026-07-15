@@ -20,7 +20,8 @@ import { ROUTINE_CATEGORIES } from '../appContent/routineCategories';
 import { RoutineCategory, Session } from '../types/Session';
 import {
     getRoutineCataloguePresentation,
-    CATEGORY_CATALOGUE_PRESENTATION
+    CATEGORY_CATALOGUE_PRESENTATION,
+    getNoiseRoutinePhasePresentation
 } from '../appContent/routineCataloguePresentation';
 
 export default function RoutinesScreen({ navigation }: any) {
@@ -96,6 +97,36 @@ export default function RoutinesScreen({ navigation }: any) {
         }, [])
     );
 
+    // CP-ROUTINES-002-STABLE-SORT:
+    // Sort routines in noise_support category by phaseOrder stably, preserving original relative order for unmapped ones.
+    const getSortedRoutinesForCategory = (catKey: string, routines: Session[]): Session[] => {
+        if (catKey !== 'noise_support') {
+            return routines;
+        }
+
+        const copied = [...routines];
+        copied.sort((a, b) => {
+            const phaseA = getNoiseRoutinePhasePresentation(a);
+            const phaseB = getNoiseRoutinePhasePresentation(b);
+
+            if (phaseA && phaseB) {
+                return phaseA.phaseOrder - phaseB.phaseOrder;
+            }
+            if (phaseA) {
+                return -1;
+            }
+            if (phaseB) {
+                return 1;
+            }
+
+            const idxA = routines.indexOf(a);
+            const idxB = routines.indexOf(b);
+            return idxA - idxB;
+        });
+
+        return copied;
+    };
+
     const handleStartSession = (session: Session) => {
         if (!petId) {
             navigation.navigate('PetProfileStepper');
@@ -122,17 +153,29 @@ export default function RoutinesScreen({ navigation }: any) {
         const problemSummary = presentation.problemSummary;
 
         const isPremiumRoutine = item.accessLevel === 'premium';
-        // CP-ROUTINES-001-LOADING-COPY:
-        // Checking state when subscription is loading and routine is premium
         const isChecking = isPremiumRoutine && subLoading;
         const isLocked = isPremiumRoutine && !isPremium && !subLoading;
 
         const displayTime = item.suggestedTimeCopy || `${item.durationMinutes} min`;
 
-        // Accessibility configurations
-        let cardAccessibilityLabel = `${problemTitle}. ${isLocked ? 'Unlock routine' : 'View routine'}`;
-        if (isChecking) {
-            cardAccessibilityLabel = `Checking access for ${problemTitle}`;
+        // CP-ROUTINES-002-ACCESSIBILITY-EXACTNESS:
+        // Formulating exact accessibility labels incorporating phase labels.
+        const phaseMeta = getNoiseRoutinePhasePresentation(item);
+        let cardAccessibilityLabel = '';
+
+        if (phaseMeta) {
+            const phaseWord = phaseMeta.label.charAt(0).toUpperCase() + phaseMeta.label.slice(1).toLowerCase();
+            let actionWord = isLocked ? 'Unlock routine' : 'View routine';
+            if (isChecking) {
+                actionWord = 'Checking access';
+            }
+            cardAccessibilityLabel = `${phaseWord}. ${problemTitle}. ${actionWord}.`;
+        } else {
+            let actionWord = isLocked ? 'Unlock routine' : 'View routine';
+            if (isChecking) {
+                actionWord = 'Checking access';
+            }
+            cardAccessibilityLabel = `${problemTitle}. ${actionWord}`;
         }
 
         return (
@@ -145,6 +188,16 @@ export default function RoutinesScreen({ navigation }: any) {
                 accessibilityLabel={cardAccessibilityLabel}
                 accessibilityState={{ disabled: isChecking }}
             >
+                {/* CP-ROUTINES-002-EXACT-MAPPING: Render informational phase block */}
+                {phaseMeta && (
+                    <View style={styles.phaseBlock} testID={`routine-phase-${item.id}`}>
+                        <View style={styles.phaseLabelContainer}>
+                            <Text style={styles.phaseLabelText}>{phaseMeta.label}</Text>
+                        </View>
+                        <Text style={styles.phaseTimingText}>{phaseMeta.timingInstruction}</Text>
+                    </View>
+                )}
+
                 <View style={styles.cardHeader}>
                     <Text style={styles.sessionCardTitle}>{problemTitle}</Text>
                     {isChecking ? null : (
@@ -347,28 +400,43 @@ export default function RoutinesScreen({ navigation }: any) {
                     {showAllRoutines ? 'All routines' : selectedCatTitle}
                 </Text>
 
+                {/* CP-ROUTINES-002-PHASE-ORDER-COPY: Selected Category Timing Helper */}
+                {!showAllRoutines && activeCategory === 'noise_support' && (
+                    <Text style={styles.timingHelperText}>
+                        Choose the timing that matches your situation.
+                    </Text>
+                )}
+
                 {showAllRoutines ? (
                     activeCategories.map((catKey) => {
                         const routines = allSessions.filter(s => getNormalizedCategory(s) === catKey);
                         if (routines.length === 0) return null;
+
+                        const sortedRoutines = getSortedRoutinesForCategory(catKey, routines);
 
                         return (
                             <View key={catKey} testID={`routine-section-${catKey}`} style={styles.sectionGroup}>
                                 <Text style={styles.sectionHeaderTitle}>
                                     {ROUTINE_CATEGORIES[catKey as RoutineCategory].title}
                                 </Text>
+                                {/* CP-ROUTINES-002-PHASE-ORDER-COPY: Show All Noise Category Timing Helper */}
+                                {catKey === 'noise_support' && (
+                                    <Text style={styles.timingHelperTextSection}>
+                                        Choose the timing that matches your situation.
+                                    </Text>
+                                )}
                                 <View style={styles.sectionRoutinesList}>
-                                    {routines.map(s => renderSessionCard(s))}
+                                    {sortedRoutines.map(s => renderSessionCard(s))}
                                 </View>
                             </View>
                         );
                     })
                 ) : (
                     <View style={styles.sectionRoutinesList}>
-                        {allSessions
-                            .filter(s => getNormalizedCategory(s) === activeCategory)
-                            .map(s => renderSessionCard(s))
-                        }
+                        {getSortedRoutinesForCategory(
+                            activeCategory,
+                            allSessions.filter(s => getNormalizedCategory(s) === activeCategory)
+                        ).map(s => renderSessionCard(s))}
                     </View>
                 )}
             </View>
@@ -468,6 +536,20 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         marginBottom: 16,
     },
+    timingHelperText: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        marginTop: -10,
+        marginBottom: 16,
+        fontStyle: 'italic',
+    },
+    timingHelperTextSection: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        marginTop: -6,
+        marginBottom: 16,
+        fontStyle: 'italic',
+    },
     sectionGroup: {
         marginBottom: 24,
     },
@@ -491,6 +573,38 @@ const styles = StyleSheet.create({
         borderColor: '#E3ECEF',
         ...SHADOWS.small,
         width: '100%',
+    },
+    phaseBlock: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0F9F6', // Neutral light teal
+        borderWidth: 1,
+        borderColor: '#CCEDE5',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 10,
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    phaseLabelContainer: {
+        backgroundColor: '#E6F4F1',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    phaseLabelText: {
+        fontSize: 9,
+        fontWeight: '900',
+        color: '#0F766E', // Solid teal
+        letterSpacing: 0.5,
+    },
+    phaseTimingText: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+        flex: 1,
+        minWidth: 140,
+        lineHeight: 15,
     },
     cardHeader: {
         flexDirection: 'row',

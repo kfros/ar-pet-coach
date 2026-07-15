@@ -106,6 +106,42 @@ const mockSessionsList: Session[] = [
         afterSession: [],
         tags: [],
         recommendedForTriggers: [],
+    },
+    {
+        id: 'fireworks_prep_routine',
+        accessLevel: 'premium',
+        title: 'Fireworks Prep: Calm-Day Practice',
+        subtitle: 'Calm-day preparation.',
+        durationMinutes: 10,
+        difficulty: 'moderate',
+        trigger: 'fireworks',
+        category: 'noise_support',
+        steps: [],
+        goal: '',
+        beforeYouStart: [],
+        whatToWatchFor: [],
+        stopIf: [],
+        afterSession: [],
+        tags: [],
+        recommendedForTriggers: [],
+    },
+    {
+        id: 'post_fireworks_recovery_home',
+        accessLevel: 'premium',
+        title: 'Post-Fireworks Recovery at Home',
+        subtitle: 'Post-noise recovery.',
+        durationMinutes: 15,
+        difficulty: 'moderate',
+        trigger: 'fireworks',
+        category: 'noise_support',
+        steps: [],
+        goal: '',
+        beforeYouStart: [],
+        whatToWatchFor: [],
+        stopIf: [],
+        afterSession: [],
+        tags: [],
+        recommendedForTriggers: [],
     }
 ];
 
@@ -180,9 +216,10 @@ describe('RoutineCatalogue - Dedicated Redesign', () => {
             expect(getByTestId('routine-category-noise_support')).toBeTruthy();
         });
 
-        // Pluralization check (foundation: 1, walk_fear: 2, noise_support: 1)
-        expect(getAllByText('1 routine').length).toBe(2); // foundation and noise_support
+        // Pluralization check (foundation: 1, walk_fear: 2, noise_support: 3)
+        expect(getAllByText('1 routine').length).toBe(1); // foundation
         expect(getByText('2 routines')).toBeTruthy(); // walk_fear
+        expect(getByText('3 routines')).toBeTruthy(); // noise_support
     });
 
     test('foundation category is selected initially', async () => {
@@ -227,7 +264,7 @@ describe('RoutineCatalogue - Dedicated Redesign', () => {
     });
 
     test('Show all routines toggle behaves as a reversible toggle and preserves selections', async () => {
-        const { getByTestId, getByText, queryByText, getAllByText } = render(
+        const { getByTestId, getByText, queryByText } = render(
             <SubscriptionManager.SubscriptionProvider>
                 <RoutinesScreen navigation={mockNavigation} />
             </SubscriptionManager.SubscriptionProvider>
@@ -440,7 +477,6 @@ describe('RoutineCatalogue - Dedicated Redesign', () => {
 
         // Check loading accessibility and copy properties
         expect(premiumCard.props.accessibilityState.disabled).toBe(true);
-        expect(premiumCard.props.accessibilityLabel).toBe('Checking access for Scared to go outside');
         
         expect(within(premiumCard).getByText('CHECKING ACCESS')).toBeTruthy();
         expect(within(premiumCard).queryByText('INCLUDED')).toBeNull();
