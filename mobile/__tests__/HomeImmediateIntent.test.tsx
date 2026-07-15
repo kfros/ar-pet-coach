@@ -7,6 +7,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import SessionService from '../services/sessionService';
 import PetProfileRepository from '../services/petProfileRepository';
 import { SubscriptionProvider } from '../components/SubscriptionManager';
+import * as SubscriptionManager from '../components/SubscriptionManager';
 
 // Mock PetProfileRepository
 jest.mock('../services/petProfileRepository', () => {
@@ -147,6 +148,7 @@ describe('DashboardScreen - Rebuilt Home', () => {
   };
 
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
     require('../services/petProfileRepository').__setMockProfile({
       id: 'test-pet-id',
@@ -498,6 +500,93 @@ describe('DashboardScreen - Rebuilt Home', () => {
       expect(queryByText('Suggested from your profile')).toBeNull();
       expect(queryByText('Latest check-in')).toBeNull();
       expect(queryByText('Recent practice')).toBeNull();
+    });
+  });
+
+  test('noise recommendation renders free routine for Premium and non-Premium subscription states', async () => {
+    // Reset mock profile to include loud_noises trigger
+    require('../services/petProfileRepository').__setMockProfile({
+      id: 'test-pet-id',
+      petName: 'Buddy',
+      anxietyScore: 5,
+      anxietyTriggers: ['loud_noises']
+    });
+
+    jest.spyOn(SessionService, 'getHomeSnapshot').mockImplementation(() => Promise.resolve({
+      latestPractice: null,
+      latestCheckIn: null
+    }));
+
+    // Test for both subscription states
+    const states = [false, true];
+    for (const isPremiumState of states) {
+      mockNavigation.navigate.mockClear();
+      jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
+        isPremium: isPremiumState,
+        isLoading: false,
+      } as any);
+
+      const { getByText, queryByText, getByTestId } = render(
+        <SubscriptionProvider>
+          <NavigationContainer>
+            <DashboardScreen navigation={mockNavigation} />
+          </NavigationContainer>
+        </SubscriptionProvider>
+      );
+
+      await waitFor(() => {
+        expect(getByText('Thunder & Fireworks Safe Space')).toBeTruthy();
+        expect(getByText('Profile match: loud noises or fireworks')).toBeTruthy();
+        expect(getByText('View routine')).toBeTruthy();
+
+        // Ensure locked and prep texts/CTAs are absent
+        expect(queryByText('Unlock routine')).toBeNull();
+        expect(queryByText('Start Now')).toBeNull();
+        expect(queryByText('Fireworks Prep: Calm-Day Practice')).toBeNull();
+
+        // Tap the card and verify navigation
+        const card = getByTestId('suggested-routine-card');
+        fireEvent.press(card);
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', {
+          sessionId: 'fireworks_loud_noises_basic',
+          petId: 'test-pet-id'
+        });
+        expect(mockNavigation.navigate).not.toHaveBeenCalledWith('Paywall', expect.any(Object));
+      });
+    }
+  });
+
+  test('missing safe-routine definition renders the neutral Browse routines fallback', async () => {
+    // Reset mock profile to include loud_noises trigger
+    require('../services/petProfileRepository').__setMockProfile({
+      id: 'test-pet-id',
+      petName: 'Buddy',
+      anxietyScore: 5,
+      anxietyTriggers: ['loud_noises']
+    });
+
+    jest.spyOn(SessionService, 'getHomeSnapshot').mockImplementation(() => Promise.resolve({
+      latestPractice: null,
+      latestCheckIn: null
+    }));
+
+    // Force sessions to not contain fireworks_loud_noises_basic
+    jest.spyOn(SessionService, 'getSessions').mockReturnValue([
+      { id: 'daily_calm_reset', accessLevel: 'free', title: 'Daily Calm Reset', steps: [] } as any
+    ]);
+
+    const { getByTestId, queryByTestId, queryByText } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <DashboardScreen navigation={mockNavigation} />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('suggestion-fallback-card')).toBeTruthy();
+      expect(queryByTestId('suggested-routine-card')).toBeNull();
+      expect(queryByText('Thunder & Fireworks Safe Space')).toBeNull();
     });
   });
 });
