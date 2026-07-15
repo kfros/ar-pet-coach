@@ -156,7 +156,7 @@ describe('Suite 07: Pause And Feedback', () => {
       }
     });
 
-    const { findByText } = render(
+    const { getByTestId } = render(
       <SubscriptionProvider>
         <NavigationContainer>
           <DashboardScreen navigation={mockNavigation} />
@@ -164,6 +164,8 @@ describe('Suite 07: Pause And Feedback', () => {
       </SubscriptionProvider>
     );
 
-    expect(await findByText(/Strong signs were noted/i)).toBeTruthy();
+    await waitFor(() => {
+      expect(getByTestId('historical-severe-warning')).toBeTruthy();
+    });
   });
 });

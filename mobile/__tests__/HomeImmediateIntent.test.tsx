@@ -390,7 +390,7 @@ describe('DashboardScreen - Rebuilt Home', () => {
     });
   });
 
-  test('historical severe-sign check-in displays safety warning box', async () => {
+  test('historical severe-sign check-in displays safety warning box and suppresses recommendations', async () => {
     jest.spyOn(SessionService, 'getHomeSnapshot').mockImplementation(() => Promise.resolve({
       latestPractice: null,
       latestCheckIn: {
@@ -401,11 +401,12 @@ describe('DashboardScreen - Rebuilt Home', () => {
         score: 8,
         levelLabel: 'Elevated Signs',
         hasSevereSigns: true,
-        severeSignsNote: 'vomiting'
+        severeSignsNote: 'vomiting',
+        severeCategory: 'behavioral'
       }
     }));
 
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText, queryByTestId, queryByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
           <DashboardScreen navigation={mockNavigation} />
@@ -415,7 +416,17 @@ describe('DashboardScreen - Rebuilt Home', () => {
 
     await waitFor(() => {
       expect(getByTestId('historical-severe-warning')).toBeTruthy();
-      expect(getByText(/Strong signs were noted in your latest saved check-in. Stop the routine if strong signs appear./)).toBeTruthy();
+      expect(getByText(/Strong signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment. For panic, aggression, self-injury, or escape attempts, stop routines and get professional support./)).toBeTruthy();
+
+      // Recommendation slot must show historical severe boundary card and suppress suggestions
+      expect(getByTestId('historical-severe-boundary-card')).toBeTruthy();
+      expect(getByText('Before another routine')).toBeTruthy();
+      expect(queryByTestId('suggested-routine-card')).toBeNull();
+      expect(queryByTestId('suggestion-fallback-card')).toBeNull();
+
+      // Quick action cards must remain fully accessible
+      expect(getByTestId('home-action-routines')).toBeTruthy();
+      expect(getByTestId('home-action-sounds')).toBeTruthy();
     });
   });
 

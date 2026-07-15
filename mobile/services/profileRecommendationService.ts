@@ -10,6 +10,10 @@ export function getProfileRecommendation(
     anxietyTriggers: readonly any[] | null | undefined,
     isSevere: boolean
 ): RecommendationResult {
+    if (isSevere) {
+        return { session: null, reason: '' };
+    }
+
     // Defensive array validation and normalization
     const triggers = Array.isArray(anxietyTriggers)
         ? anxietyTriggers.filter(
@@ -18,7 +22,6 @@ export function getProfileRecommendation(
         : [];
 
     // 1. Highest priority: loud noises or fireworks
-    // Noise/fireworks still selects the safe-space routine even when isSevere is true (CP-SAFE-002 behavior not added here).
     if (triggers.includes('loud_noises') || triggers.includes('fireworks')) {
         const found = sessions.find(s => s.id === 'fireworks_loud_noises_basic');
         return {
