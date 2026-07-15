@@ -262,11 +262,36 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
 
             {/* Suggestion Card */}
-            <Text style={styles.sectionTitle}>Suggested from your profile</Text>
-            <Text style={styles.suggestionExplanation}>
-                Based on the triggers saved in {profile?.petName || 'your dog'}'s profile — not a live assessment.
+            <Text style={styles.sectionTitle}>
+                {homeSnapshot?.latestCheckIn?.hasSevereSigns ? "Before another routine" : "Suggested from your profile"}
             </Text>
-            {renderSuggestionCard()}
+            <Text style={styles.suggestionExplanation}>
+                {homeSnapshot?.latestCheckIn?.hasSevereSigns
+                    ? (homeSnapshot.latestCheckIn.severeCategory === 'medical'
+                        ? "Medical signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment."
+                        : "Strong signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment.")
+                    : `Based on the triggers saved in ${profile?.petName || 'your dog'}'s profile — not a live assessment.`
+                }
+            </Text>
+            {(() => {
+                if (homeSnapshot?.latestCheckIn?.hasSevereSigns) {
+                    const isMedical = homeSnapshot.latestCheckIn.severeCategory === 'medical';
+                    return (
+                        <View style={styles.suggestionCard} testID="historical-severe-boundary-card">
+                            <View style={styles.suggestionHeader}>
+                                <Ionicons name="alert-circle-outline" size={16} color="#B85C38" style={{ marginRight: 6 }} />
+                                <Text style={styles.suggestionReason} numberOfLines={2}>
+                                    {isMedical
+                                        ? "For medical symptoms or severe distress, contact a veterinarian."
+                                        : "For panic, aggression, self-injury, or escape attempts, stop routines and get professional support."
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+                    );
+                }
+                return renderSuggestionCard();
+            })()}
 
             {/* Latest check-in */}
             <Text style={styles.sectionTitle}>Latest check-in</Text>
@@ -294,7 +319,10 @@ export default function DashboardScreen({ navigation }: any) {
                         <View style={styles.severeSignsBox} testID="historical-severe-warning">
                             <Ionicons name="alert-circle-outline" size={16} color="#B85C38" />
                             <Text style={styles.severeSignsText}>
-                                Strong signs were noted in your latest saved check-in. Stop the routine if strong signs appear. For medical red flags, pain, collapse, breathing trouble, or severe distress, contact appropriate professional support.
+                                {homeSnapshot.latestCheckIn.severeCategory === 'medical'
+                                    ? "Medical signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment. For medical symptoms or severe distress, contact a veterinarian."
+                                    : "Strong signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment. For panic, aggression, self-injury, or escape attempts, stop routines and get professional support."
+                                }
                             </Text>
                         </View>
                     )}

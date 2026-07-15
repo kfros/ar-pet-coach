@@ -440,6 +440,7 @@ class SessionService {
                     levelLabel: getLevelLabelFromScore(scoreResult.score),
                     hasSevereSigns: !!scoreResult.hasSevereSigns,
                     severeSignsNote: scoreResult.severeSignsNote || '',
+                    severeCategory: scoreResult.severeCategory ?? null,
                 };
             }
         }

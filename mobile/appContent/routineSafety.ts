@@ -1,4 +1,4 @@
-import { AnxietySign } from '../types/Session';
+import { AnxietySign, CheckInProfile } from '../types/Session';
 
 export const FORBIDDEN_TERMS = [
     "cure",
@@ -89,3 +89,30 @@ export const IN_SESSION_SAFETY_PROMPT = {
     body: "If signs increased, use a shorter step, add more distance, or stop for today.",
     primaryCTA: "Finish"
 };
+
+export function getSelectedSevereCategory(
+    selectedIds: string[] | null | undefined,
+    profile: CheckInProfile | null | undefined
+): 'medical' | 'behavioral' | null {
+    if (!selectedIds || !Array.isArray(selectedIds) || !profile || !profile.severeSigns) {
+        return null;
+    }
+
+    let hasMedical = false;
+    let hasBehavioral = false;
+
+    for (const id of selectedIds) {
+        const sign = profile.severeSigns.find(s => s.id === id);
+        if (sign) {
+            if (sign.safetyLevel === 'medical_stop') {
+                hasMedical = true;
+            } else if (sign.safetyLevel === 'behavioral_stop') {
+                hasBehavioral = true;
+            }
+        }
+    }
+
+    if (hasMedical) return 'medical';
+    if (hasBehavioral) return 'behavioral';
+    return null;
+}

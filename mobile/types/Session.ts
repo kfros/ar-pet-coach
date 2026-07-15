@@ -248,6 +248,7 @@ export interface HomeSnapshot {
     levelLabel: string;
     hasSevereSigns: boolean;
     severeSignsNote: string;
+    severeCategory?: 'behavioral' | 'medical' | null;
   } | null;
 }
 

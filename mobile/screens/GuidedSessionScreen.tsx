@@ -13,7 +13,8 @@ import {
     MEDICAL_SEVERE_SIGNS,
     BEHAVIORAL_SEVERE_SIGNS,
     SEVERE_SIGN_LOGIC,
-    IN_SESSION_SAFETY_PROMPT
+    IN_SESSION_SAFETY_PROMPT,
+    getSelectedSevereCategory
 } from '../appContent/routineSafety';
 import { calculateCheckinScore } from '../services/progressScoring';
 import {
@@ -255,6 +256,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [showNextStepPrompt, setShowNextStepPrompt] = useState(false);
     const [showSafetyNotice, setShowSafetyNotice] = useState<{ title: string, body: string, type: 'medical' | 'behavioral' } | null>(null);
     const [showFinalSafetyPrompt, setShowFinalSafetyPrompt] = useState(false);
+    const [showAfterSafetyNotice, setShowAfterSafetyNotice] = useState<{ title: string, body: string } | null>(null);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -439,7 +441,30 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         await AsyncStorage.setItem(REPEAT_STORAGE_KEY, newValue.toString());
     };
 
+    const checkBeforeSafety = (signs = beforeSigns) => {
+        const category = getSelectedSevereCategory(signs, profile);
+        if (category === 'medical') {
+            setShowSafetyNotice({
+                title: "Medical signs noted",
+                body: "For medical symptoms or severe distress, contact a veterinarian.",
+                type: 'medical'
+            });
+            return true;
+        } else if (category === 'behavioral') {
+            setShowSafetyNotice({
+                title: "Strong signs noted",
+                body: "For panic, aggression, self-injury, or escape attempts, stop the routine and get professional support.",
+                type: 'behavioral'
+            });
+            return true;
+        }
+        return false;
+    };
+
     const handleSkipCheckin = () => {
+        if (checkBeforeSafety()) {
+            return;
+        }
         setPhase('active');
     };
 
@@ -452,24 +477,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             const newSigns = [...current, sign];
             setter(newSigns);
 
-            // GFM-005: Severe sign logic
-            if (isBefore && session?.severeNoticeEnabled) {
-                const hasMedical = newSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s as any));
-                const hasBehavioral = newSigns.some(s => BEHAVIORAL_SEVERE_SIGNS.includes(s as any));
-
-                if (hasMedical) {
-                    setShowSafetyNotice({
-                        title: SEVERE_SIGN_LOGIC.medical.title,
-                        body: SEVERE_SIGN_LOGIC.medical.body,
-                        type: 'medical'
-                    });
-                } else if (hasBehavioral) {
-                    setShowSafetyNotice({
-                        title: SEVERE_SIGN_LOGIC.behavioral.title,
-                        body: SEVERE_SIGN_LOGIC.behavioral.body,
-                        type: 'behavioral'
-                    });
-                }
+            if (isBefore) {
+                checkBeforeSafety(newSigns);
             }
         }
     };
@@ -595,6 +604,22 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
             const prevScore = beforeLevel ? calculateCheckinScore(beforeCheckin, profile) : null;
             const worsened = prevScore !== null && (scoreResult.score - prevScore.score) >= 2;
             const hasAfterSevere = afterSigns.some(s => MEDICAL_SEVERE_SIGNS.includes(s as any) || BEHAVIORAL_SEVERE_SIGNS.includes(s as any));
+
+            const afterCategory = getSelectedSevereCategory(afterSigns, profile);
+            if (afterCategory) {
+                if (afterCategory === 'medical') {
+                    setShowAfterSafetyNotice({
+                        title: "Medical signs noted",
+                        body: "For medical symptoms or severe distress, contact a veterinarian."
+                    });
+                } else {
+                    setShowAfterSafetyNotice({
+                        title: "Strong signs noted",
+                        body: "For panic, aggression, self-injury, or escape attempts, stop routines and get professional support."
+                    });
+                }
+                return;
+            }
 
             if (sessionId === 'outdoor_confidence_reset' && !stoppedEarly) {
                 if (milestonesToSave === null || milestonesToSave === undefined) {
@@ -905,7 +930,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                     style={styles.checkinNextButton}
                     onPress={() => {
                         if (isBefore) {
-                            if (showSafetyNotice?.type === 'medical' && SEVERE_SIGN_LOGIC.medical.blockStart) {
+                            if (checkBeforeSafety()) {
                                 return;
                             }
                             setPhase('active');
@@ -1195,33 +1220,52 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                         <Text style={styles.modalBody}>{showSafetyNotice?.body}</Text>
 
                         <View style={{ width: '100%', gap: 12 }}>
-                            {showSafetyNotice?.type === 'behavioral' && (
-                                <Pressable
-                                    style={styles.modalBtn}
-                                    onPress={() => {
-                                        setShowSafetyNotice(null);
-                                        navigation.navigate('SessionPreview', { sessionId: 'daily_calm_reset', petId });
-                                    }}
-                                >
-                                    <Text style={styles.modalBtnText}>{SEVERE_SIGN_LOGIC.behavioral.primaryCTA}</Text>
-                                </Pressable>
-                            )}
                             <Pressable
-                                style={[styles.modalBtn, showSafetyNotice?.type === 'medical' ? { backgroundColor: '#EF4444' } : { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border }]}
+                                style={styles.modalBtn}
                                 onPress={() => {
                                     setShowSafetyNotice(null);
-                                    if (showSafetyNotice?.type === 'medical' && SEVERE_SIGN_LOGIC.medical.blockStart) {
-                                        navigation.goBack();
-                                    } else {
-                                        navigation.goBack();
-                                    }
                                 }}
                             >
-                                <Text style={[styles.modalBtnText, showSafetyNotice?.type !== 'medical' && { color: COLORS.textSecondary }]}>
-                                    {showSafetyNotice?.type === 'medical' ? SEVERE_SIGN_LOGIC.medical.primaryCTA : SEVERE_SIGN_LOGIC.behavioral.secondaryCTA}
+                                <Text style={styles.modalBtnText}>Review check-in</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.modalBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border }]}
+                                onPress={() => {
+                                    setShowSafetyNotice(null);
+                                    navigation.navigate('Dashboard');
+                                }}
+                            >
+                                <Text style={[styles.modalBtnText, { color: COLORS.textSecondary }]}>
+                                    End routine
                                 </Text>
                             </Pressable>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={!!showAfterSafetyNotice} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={[styles.modalIcon, showAfterSafetyNotice?.title.includes('Medical') ? { backgroundColor: '#FEE2E2' } : { backgroundColor: '#FEF3C7' }]}>
+                            <Ionicons
+                                name={showAfterSafetyNotice?.title.includes('Medical') ? "medical-outline" : "alert-circle-outline"}
+                                size={40}
+                                color={showAfterSafetyNotice?.title.includes('Medical') ? "#EF4444" : "#D97706"}
+                            />
+                        </View>
+                        <Text style={styles.modalTitle}>{showAfterSafetyNotice?.title}</Text>
+                        <Text style={styles.modalBody}>{showAfterSafetyNotice?.body}</Text>
+
+                        <Pressable
+                            style={styles.modalBtn}
+                            onPress={() => {
+                                setShowAfterSafetyNotice(null);
+                                navigation.navigate('Dashboard');
+                            }}
+                        >
+                            <Text style={styles.modalBtnText}>Done</Text>
+                        </Pressable>
                     </View>
                 </View>
             </Modal>

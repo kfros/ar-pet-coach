@@ -24,9 +24,10 @@ describe('ProfileRecommendationSafety - getProfileRecommendation pure selector t
         expect(result.reason).toBe('Profile match: loud noises or fireworks');
     });
 
-    test('noise/fireworks still selects safe-space routine when isSevere is true', () => {
+    test('noise/fireworks returns null when isSevere is true', () => {
         const result = getProfileRecommendation(mockSessions, ['loud_noises'], true);
-        expect(result.session?.id).toBe('fireworks_loud_noises_basic');
+        expect(result.session).toBeNull();
+        expect(result.reason).toBe('');
     });
 
     test('loud_noises wins over new_places and other outdoor triggers', () => {
@@ -73,9 +74,9 @@ describe('ProfileRecommendationSafety - getProfileRecommendation pure selector t
     });
 
     test('preserves existing non-noise priority and severe-sign behavior', () => {
-        // Severe sign blocks outdoor
+        // Severe sign blocks outdoor and returns null suggestion
         const resultSevereOutdoor = getProfileRecommendation(mockSessions, ['new_places'], true);
-        expect(resultSevereOutdoor.session?.id).toBe('daily_calm_reset'); // falls through to default
+        expect(resultSevereOutdoor.session).toBeNull();
 
         // Non-severe outdoor trigger resolves correctly
         const resultOutdoor = getProfileRecommendation(mockSessions, ['new_places'], false);
