@@ -5,7 +5,8 @@ import {
     SessionHistoryEntry, 
     StressSignsTrendStatus, 
     StressSignsTrendPoint, 
-    StressSignsTrendSummary 
+    StressSignsTrendSummary,
+    HomeSnapshot
 } from '../types/Session';
 import { SESSIONS } from '../appContent/sessions';
 import { PREMIUM_SESSIONS } from '../appContent/premiumRoutines';
@@ -389,6 +390,63 @@ class SessionService {
             minRequiredCheckins,
             hasEnoughData: true,
             legend
+        };
+    }
+
+    async getHomeSnapshot(petId: string): Promise<HomeSnapshot> {
+        const history = await this.getLocalHistory();
+        
+        // Filter history by the exact current petId
+        const petHistory = history.filter(h => h.petId === petId);
+
+        // Sort defensively by completedAt descending (most recent first)
+        const sortedHistory = [...petHistory].sort((a, b) => {
+            const timeA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+            const timeB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+            return timeB - timeA;
+        });
+
+        // 1. Resolve latestPractice (most recent entry regardless of check-ins)
+        let latestPractice = null;
+        if (sortedHistory.length > 0) {
+            const practiceEntry = sortedHistory[0];
+            const session = this.getSessionById(practiceEntry.sessionId);
+            latestPractice = {
+                sessionId: practiceEntry.sessionId,
+                sessionTitle: session?.title || 'Unknown Routine',
+                completedAt: practiceEntry.completedAt || '',
+                completed: !!practiceEntry.completed,
+                stoppedEarly: !!practiceEntry.stoppedEarly,
+            };
+        }
+
+        // 2. Resolve latestCheckIn (most recent entry containing afterCheckin or beforeCheckin)
+        let latestCheckIn = null;
+        const entryWithCheckin = sortedHistory.find(h => h.afterCheckin || h.beforeCheckin);
+        if (entryWithCheckin) {
+            const session = this.getSessionById(entryWithCheckin.sessionId);
+            const profile = session ? getCheckInProfile(session.checkInProfileId) : undefined;
+            
+            // Prefer afterCheckin over beforeCheckin within the same selected entry
+            const checkin = entryWithCheckin.afterCheckin || entryWithCheckin.beforeCheckin;
+            if (checkin) {
+                const scoreResult = calculateCheckinScore(checkin, profile);
+                latestCheckIn = {
+                    sessionId: entryWithCheckin.sessionId,
+                    sessionTitle: session?.title || 'Unknown Routine',
+                    completedAt: entryWithCheckin.completedAt || '',
+                    phase: entryWithCheckin.afterCheckin ? ('after' as const) : ('before' as const),
+                    score: scoreResult.score,
+                    levelLabel: getLevelLabelFromScore(scoreResult.score),
+                    hasSevereSigns: !!scoreResult.hasSevereSigns,
+                    severeSignsNote: scoreResult.severeSignsNote || '',
+                };
+            }
+        }
+
+        return {
+            latestPractice,
+            latestCheckIn,
         };
     }
 }

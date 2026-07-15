@@ -32,6 +32,7 @@ jest.mock('../services/petProfileRepository', () => ({
 jest.mock('../services/sessionService', () => ({
   getSessions: jest.fn(() => []),
   getRecentProgress: jest.fn(() => Promise.resolve(null)),
+  getHomeSnapshot: jest.fn(),
 }));
 
 // Mock SubscriptionManager entirely so SubscriptionProvider never fires async RevenueCat calls
@@ -144,6 +145,6 @@ describe('Suite 06: Regression And MVP Compliance', () => {
 
   test('progress_001: Recent Progress card renders on Dashboard', async () => {
     const utils = render(wrap(<DashboardScreen navigation={mockNavigation} />));
-    expect(await utils.findByText(/No sessions yet|Recent Progress/i)).toBeTruthy();
+    expect(await utils.findByText('Recent practice')).toBeTruthy();
   });
 });

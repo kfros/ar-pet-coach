@@ -49,6 +49,7 @@ jest.mock('../services/sessionService', () => ({
   getSessions: jest.fn(() => [mockSession]),
   saveSessionHistory: jest.fn(() => Promise.resolve()),
   getRecentProgress: jest.fn(),
+  getHomeSnapshot: jest.fn(),
 }));
 
 jest.mock('../services/petProfileRepository', () => ({
@@ -115,14 +116,18 @@ describe('Suite 07: Pause And Feedback', () => {
   }, 15000);
 
   test('test_current_signs_uses_latest_after_checkin: HOME-001', async () => {
-    (SessionService.getRecentProgress as jest.Mock).mockResolvedValue({
-        outcome: 'improved',
-        latestScore: 2,
-        latestLevelLabel: 'calm',
-        title: 'Recent Progress',
-        body: 'Last: Daily Calm Reset',
-        details: ['Signs looked lower after the session.'],
-        hasSevereSigns: false
+    (SessionService.getHomeSnapshot as jest.Mock).mockResolvedValue({
+      latestPractice: { sessionId: 'daily_calm_reset', sessionTitle: 'Daily Calm Reset', completedAt: '2026-07-15T10:00:00Z', completed: true, stoppedEarly: false },
+      latestCheckIn: {
+        sessionId: 'daily_calm_reset',
+        sessionTitle: 'Daily Calm Reset',
+        completedAt: '2026-07-15T10:00:00Z',
+        phase: 'after',
+        score: 2,
+        levelLabel: 'Very Calm',
+        hasSevereSigns: false,
+        severeSignsNote: ''
+      }
     });
 
     const { findByText } = render(
@@ -133,18 +138,22 @@ describe('Suite 07: Pause And Feedback', () => {
       </SubscriptionProvider>
     );
 
-    expect(await findByText(/Calm signs/i)).toBeTruthy();
+    expect(await findByText(/Very Calm/i)).toBeTruthy();
   });
 
   test('test_recent_progress_worsened_uses_warning_tone: HOME-002', async () => {
-    (SessionService.getRecentProgress as jest.Mock).mockResolvedValue({
-        outcome: 'worsened',
-        latestScore: 7,
-        latestLevelLabel: 'moderate',
-        title: 'Recent Progress',
-        body: 'Last: Daily Calm Reset',
-        details: ['Signs looked higher after the session.'],
-        hasSevereSigns: true
+    (SessionService.getHomeSnapshot as jest.Mock).mockResolvedValue({
+      latestPractice: { sessionId: 'daily_calm_reset', sessionTitle: 'Daily Calm Reset', completedAt: '2026-07-15T10:00:00Z', completed: true, stoppedEarly: false },
+      latestCheckIn: {
+        sessionId: 'daily_calm_reset',
+        sessionTitle: 'Daily Calm Reset',
+        completedAt: '2026-07-15T10:00:00Z',
+        phase: 'after',
+        score: 7,
+        levelLabel: 'Moderate Signs',
+        hasSevereSigns: true,
+        severeSignsNote: 'vomiting'
+      }
     });
 
     const { findByText } = render(
@@ -155,7 +164,6 @@ describe('Suite 07: Pause And Feedback', () => {
       </SubscriptionProvider>
     );
 
-    expect(await findByText(/Signs looked higher after the session/i)).toBeTruthy();
     expect(await findByText(/Strong signs were noted/i)).toBeTruthy();
   });
 });
