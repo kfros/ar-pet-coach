@@ -4,7 +4,6 @@ import {
     Text,
     StyleSheet,
     ScrollView,
-    FlatList,
     Pressable,
     RefreshControl,
     Dimensions,
@@ -15,90 +14,59 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
-import {
-    getAnxietyColor,
-    getAnxietyLabel,
-} from '../helpers/anxietyGradient';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { getAnxietyColor } from '../helpers/anxietyGradient';
 
 import PetProfileRepository from '../services/petProfileRepository';
 import SessionService from '../services/sessionService';
-import { ROUTINE_CATEGORIES } from '../appContent/routineCategories';
-import { RoutineCategory, StressSignsTrendSummary } from '../types/Session';
+import { HomeSnapshot } from '../types/Session';
 
 export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [profile, setProfile] = useState<any>(null);
     const [petId, setPetId] = useState<string | null>(null);
-    const [petData, setPetData] = useState<any>(null);
-    const [progressData, setProgressData] = useState<any>(null);
-    const [trendSummary, setTrendSummary] = useState<StressSignsTrendSummary | null>(null);
+    const [profile, setProfile] = useState<any>(null);
+    const [homeSnapshot, setHomeSnapshot] = useState<HomeSnapshot | null>(null);
     const [recommendedSession, setRecommendedSession] = useState<any>(null);
     const [recommendationReason, setRecommendationReason] = useState<string>('');
-    const [showTrendDetails, setShowTrendDetails] = useState(false);
-    const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-    const [hasInitializedCategories, setHasInitializedCategories] = useState(false);
-    const lastPetIdRef = React.useRef<string | null>(null);
 
     const { isPremium, isLoading: subLoading } = useSubscription();
     const insets = useSafeAreaInsets();
 
-    const signsScore = trendSummary && trendSummary.latestScore !== null 
-        ? trendSummary.latestScore 
-        : (progressData ? progressData.latestScore : (petData?.anxietyScore ?? 0));
-
-    const signsLabel = trendSummary && trendSummary.latestScore !== null
-        ? trendSummary.points[trendSummary.points.length - 1].levelLabel
-        : (progressData ? progressData.latestLevelLabel + ' signs' : (petData ? getAnxietyLabel(signsScore) : 'No check-in yet'));
-
-    // HOME-001: Visual tone logic for Current Signs
-    let signsColor = getAnxietyColor(signsScore);
-    let signsDesc = 'Based on your last check-in';
-
-    if ((!trendSummary || trendSummary.latestScore === null) && !progressData) {
-        signsColor = '#5F7680'; // Neutral blue-gray
-        signsDesc = 'Complete a Calm Check-In to track signs over time.';
-    } else if (signsScore < 4) {
-        signsColor = '#11866F'; // Positive soft
-        signsDesc = 'Based on your last check-in.';
-    } else if (signsScore >= 7) {
-        signsColor = '#B7791F'; // Warning soft
-        if (signsScore >= 9) {
-            signsDesc = 'Keep the session easy and stop if signs increase.';
-        } else {
-            signsDesc = 'Based on your last check-in — consider a calming routine.';
+    const formatDateTime = (dateStr: string) => {
+        if (!dateStr) return 'Saved recently';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return 'Saved recently';
+            return d.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            }) + ' at ' + d.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch {
+            return 'Saved recently';
         }
-    } else { // mild
-        signsColor = '#B7791F'; // Warning soft
-        signsDesc = 'Based on your last check-in — consider a calming routine.';
-    }
+    };
 
     const fetchData = async () => {
         try {
             const pet = await PetProfileRepository.getPetProfile();
-
             if (pet) {
-                setPetData(pet);
                 setPetId(pet.id || 'guest_pet');
                 setProfile({ petName: pet.petName });
 
-                const progress = await SessionService.getRecentProgress(pet.id || 'guest_pet');
-                setProgressData(progress);
+                const snapshot = await SessionService.getHomeSnapshot(pet.id || 'guest_pet');
+                setHomeSnapshot(snapshot || null);
 
-                const trend = typeof SessionService.getStressSignsTrend === 'function'
-                    ? await SessionService.getStressSignsTrend(pet.id || 'guest_pet')
-                    : null;
-                setTrendSummary(trend);
-
-                // Better recommendation logic
+                // Recommendation selection logic
                 const allSessions = SessionService.getSessions();
                 let recommended = allSessions.find(s => s.id === 'daily_calm_reset');
                 let reason = 'Start here: short and easy';
 
                 const triggers = pet.anxietyTriggers || [];
-                const isSevere = trend?.status === 'severe';
+                const isSevere = !!snapshot?.latestCheckIn?.hasSevereSigns;
 
                 if (!isSevere && (triggers.includes('new_places') || triggers.includes('traffic_car_horns') || triggers.includes('nighttime') || triggers.includes('not_sure'))) {
                     recommended = allSessions.find(s => s.id === 'outdoor_confidence_reset');
@@ -119,27 +87,13 @@ export default function DashboardScreen({ navigation }: any) {
                     reason = 'Low-pressure prep for handling & vet visits';
                 }
 
-                setRecommendedSession(recommended);
+                setRecommendedSession(recommended || null);
                 setRecommendationReason(reason);
-
-                const currentPetId = pet.id || 'guest_pet';
-                const isNewPet = lastPetIdRef.current !== currentPetId;
-                lastPetIdRef.current = currentPetId;
-
-                // Initialize expandedCategories once if not yet initialized or if pet changed
-                if (!hasInitializedCategories || isNewPet) {
-                    const initialExpanded: Record<string, boolean> = {
-                        foundation: true,
-                    };
-                    if (recommended && recommended.category) {
-                        initialExpanded[recommended.category] = true;
-                    }
-                    setExpandedCategories(initialExpanded);
-                    setHasInitializedCategories(true);
-                }
             } else {
-                setPetData(null);
                 setPetId(null);
+                setProfile(null);
+                setHomeSnapshot(null);
+                setRecommendedSession(null);
             }
         } catch (error) {
             console.error("Error fetching dashboard data:", error);
@@ -149,8 +103,16 @@ export default function DashboardScreen({ navigation }: any) {
         }
     };
 
-    useFocusEffect(useCallback(() => { fetchData(); }, []));
-    const onRefresh = () => { setRefreshing(true); fetchData(); };
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [])
+    );
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchData();
+    };
 
     const handleStartSession = (session: any) => {
         if (!petId) {
@@ -166,76 +128,12 @@ export default function DashboardScreen({ navigation }: any) {
         navigation.navigate('SessionPreview', { sessionId: session.id, petId });
     };
 
-    const renderSessionCard = (item: any, isHorizontal = false) => {
-        const isLocked = item.accessLevel === 'premium' && !isPremium && !subLoading;
-        const iconName = (item.iconKey || (item.id.includes('fireworks') ? 'sparkles' : 'sunny')) + "-outline";
-
-        // PREMIUM_BADGE_STATE_FIX
-        const badgeBg = isLocked ? COLORS.primary : '#E6F7F2';
-        const badgeText = isLocked ? '#FFFFFF' : '#0F766E';
-        const badgeBorder = isLocked ? COLORS.primary : '#B8E7DC';
-        const badgeLabel = isLocked ? 'PREMIUM' : 'INCLUDED';
-        const badgeIcon = isLocked ? 'lock-closed' : 'checkmark-circle';
-
-        const displayTime = item.suggestedTimeCopy || `${item.durationMinutes} min`;
-
-        return (
-            <Pressable
-                key={item.id}
-                style={[
-                    styles.sessionCardItem,
-                    isHorizontal ? { width: SCREEN_WIDTH * 0.7, marginRight: 16 } : { width: '100%', marginBottom: 12 }
-                ]}
-                onPress={() => handleStartSession(item)}
-            >
-                <View style={styles.sessionCardTop}>
-                    <View style={styles.sessionIconBg}>
-                        <Ionicons
-                            name={iconName as any}
-                            size={24}
-                            color={COLORS.primary}
-                        />
-                    </View>
-                    <View style={[
-                        styles.badge,
-                        item.accessLevel === 'premium'
-                            ? { backgroundColor: badgeBg, borderWidth: 1, borderColor: badgeBorder }
-                            : styles.freeBadge
-                    ]}>
-                        {item.accessLevel === 'premium' ? (
-                            <>
-                                <Ionicons
-                                    name={badgeIcon as any}
-                                    size={12}
-                                    color={badgeText}
-                                    style={{ marginRight: 4 }}
-                                />
-                                <Text style={[styles.badgeText, { color: badgeText }]}>
-                                    {badgeLabel}
-                                </Text>
-                            </>
-                        ) : (
-                            <Text style={[styles.badgeText, { color: COLORS.primary }]}>
-                                FREE
-                            </Text>
-                        )}
-                    </View>
-                </View>
-                <Text style={styles.cardCategoryLabel}>
-                    {(item.categoryLabel || 'Foundation').toUpperCase()} • {displayTime}
-                </Text>
-                <Text style={styles.sessionCardTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.sessionCardSubtitle} numberOfLines={2}>{item.subtitle}</Text>
-                <View style={styles.sessionCardFooter}>
-                    <Text style={styles.sessionDuration}>{displayTime}</Text>
-                    <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
-                </View>
-            </Pressable>
-        );
-    };
-
     if (loading) {
-        return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+        return (
+            <View style={styles.center}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+        );
     }
 
     if (!petId) {
@@ -245,7 +143,8 @@ export default function DashboardScreen({ navigation }: any) {
                     <Text style={styles.headerTitle}>Welcome</Text>
                     <Pressable
                         onPress={() => navigation.navigate('Settings')}
-                        style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.6 }]}
+                        style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.6 }]}
+                        testID="settings-button"
                     >
                         <Ionicons name="person-outline" size={24} color={COLORS.primary} />
                     </Pressable>
@@ -268,21 +167,79 @@ export default function DashboardScreen({ navigation }: any) {
         );
     }
 
-    const allSessions = SessionService.getSessions();
-    const freeSessions = allSessions.filter(s => s.accessLevel === 'free');
-    const premiumSessions = allSessions.filter(s => s.accessLevel === 'premium');
+    const renderSuggestionCard = () => {
+        if (!recommendedSession) {
+            return (
+                <Pressable
+                    style={styles.suggestionFallbackCard}
+                    onPress={() => navigation.navigate('Routines')}
+                    testID="suggestion-fallback-card"
+                    accessibilityLabel="Browse routines"
+                >
+                    <View style={styles.suggestionFallbackRow}>
+                        <Ionicons name="list-outline" size={24} color={COLORS.primary} />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.suggestionFallbackTitle}>Browse routines</Text>
+                            <Text style={styles.suggestionFallbackDesc}>Find a calming routine for your pup.</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                    </View>
+                </Pressable>
+            );
+        }
+
+        const isLocked = recommendedSession.accessLevel === 'premium' && !isPremium && !subLoading;
+        const ctaLabel = isLocked ? "Unlock routine" : "View routine";
+        const cardAccessibilityLabel = isLocked 
+            ? `Unlock routine: ${recommendedSession.title}. ${recommendationReason}` 
+            : `View routine: ${recommendedSession.title}. ${recommendationReason}`;
+
+        return (
+            <Pressable
+                style={styles.suggestionCard}
+                onPress={() => handleStartSession(recommendedSession)}
+                accessibilityLabel={cardAccessibilityLabel}
+                testID="suggested-routine-card"
+            >
+                <View style={styles.suggestionHeader}>
+                    <Ionicons name="sparkles-outline" size={16} color={COLORS.primary} />
+                    <Text style={styles.suggestionReason} numberOfLines={1}>{recommendationReason}</Text>
+                </View>
+                
+                <Text style={styles.suggestionRoutineTitle}>{recommendedSession.title}</Text>
+                <Text style={styles.suggestionRoutineSubtitle}>{recommendedSession.subtitle}</Text>
+                
+                <View style={styles.suggestionFooter}>
+                    <View style={styles.suggestionMeta}>
+                        <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
+                        <Text style={styles.suggestionDuration}>
+                            {recommendedSession.suggestedTimeCopy || `${recommendedSession.durationMinutes} min`}
+                        </Text>
+                    </View>
+                    <View style={styles.suggestionCta}>
+                        <Text style={styles.suggestionCtaText}>{ctaLabel}</Text>
+                        <Ionicons 
+                            name={isLocked ? "lock-closed" : "chevron-forward"} 
+                            size={16} 
+                            color={COLORS.primary} 
+                        />
+                    </View>
+                </View>
+            </Pressable>
+        );
+    };
 
     return (
         <ScrollView
             style={styles.container}
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[styles.content, { paddingBottom: 60 }]}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
             {/* Header */}
             <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
                 <View>
-                    <Text style={styles.greeting}>Hi {profile?.petName ? `${profile.petName}'s owner` : 'there'} 👋</Text>
-                    <Text style={styles.headerTitle}>ChillPup</Text>
+                    <Text style={styles.brandTitle}>ChillPup</Text>
+                    <Text style={styles.greeting}>Hi, {profile?.petName ? `${profile.petName}'s owner` : 'there'} 👋</Text>
                 </View>
                 <Pressable
                     onPress={() => navigation.navigate('Settings')}
@@ -293,444 +250,386 @@ export default function DashboardScreen({ navigation }: any) {
                 </Pressable>
             </View>
 
-            {/* Current Signs Alert */}
-            <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: signsColor }]}>
-                <View style={styles.rowBetween}>
-                    <View style={styles.row}>
-                        <Ionicons name="pulse" size={18} color={signsColor} />
-                        <Text style={[styles.cardTitle, { marginLeft: 8 }]}>Current Signs</Text>
-                    </View>
-                    <Text style={[styles.score, { color: signsColor }]}>{signsScore}/10</Text>
-                </View>
-                <View style={styles.gradientBarBg}>
-                    <View style={styles.gradientBar}>
-                        <View style={[styles.gradientSegment, { flex: 3, backgroundColor: '#10B981', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }]} />
-                        <View style={[styles.gradientSegment, { flex: 3, backgroundColor: '#F59E0B' }]} />
-                        <View style={[styles.gradientSegment, { flex: 2, backgroundColor: '#F97316' }]} />
-                        <View style={[styles.gradientSegment, { flex: 2, backgroundColor: '#EF4444', borderTopRightRadius: 4, borderBottomRightRadius: 4 }]} />
-                    </View>
-                    <View style={[styles.gradientIndicator, { left: `${Math.min(95, (signsScore / 10) * 100)}%` }]}>
-                        <View style={[styles.indicatorDot, { backgroundColor: signsColor }]} />
-                    </View>
-                </View>
-                <View style={styles.anxietyLabelRow}>
-                    <Text style={[styles.anxietyLabelText, { color: signsColor }]}>{signsLabel}</Text>
-                    <Text style={styles.anxietyDesc}>{signsDesc}</Text>
-                </View>
+            {/* Prompt */}
+            <Text style={styles.promptText}>What would you like to do?</Text>
+
+            {/* Immediate Actions */}
+            <View style={styles.actionsRow}>
+                <Pressable
+                    style={styles.actionCard}
+                    onPress={() => navigation.navigate('Routines')}
+                    testID="home-action-routines"
+                    accessibilityLabel="Browse routines"
+                >
+                    <Ionicons name="list-outline" size={24} color={COLORS.primary} style={styles.actionIcon} />
+                    <Text style={styles.actionTitle}>Browse routines</Text>
+                    <Text style={styles.actionHelper}>Choose a short, owner-guided routine.</Text>
+                </Pressable>
+                <Pressable
+                    style={styles.actionCard}
+                    onPress={() => navigation.navigate('Sounds')}
+                    testID="home-action-sounds"
+                    accessibilityLabel="Calming sounds"
+                >
+                    <Ionicons name="musical-notes-outline" size={24} color={COLORS.primary} style={styles.actionIcon} />
+                    <Text style={styles.actionTitle}>Calming sounds</Text>
+                    <Text style={styles.actionHelper}>Open the Sounds section.</Text>
+                </Pressable>
             </View>
 
-            {/* Stress Signs Trend Card */}
-            {(() => {
-                const trendThemeMap: Record<string, { bg: string, text: string, border: string, icon: string }> = {
-                    not_enough_data: { bg: '#F8FAFC', text: '#475569', border: '#64748B', icon: 'remove-circle-outline' },
-                    easing: { bg: '#F0FDFA', text: '#0F766E', border: '#0D9488', icon: 'trending-up' },
-                    same: { bg: '#F8FAFC', text: '#475569', border: '#64748B', icon: 'remove-circle-outline' },
-                    mixed: { bg: '#FEF3C7', text: '#B45309', border: '#D97706', icon: 'shuffle-outline' },
-                    increased: { bg: '#FFEDD5', text: '#C2410C', border: '#F97316', icon: 'trending-down' },
-                    severe: { bg: '#FEF2F2', text: '#B91C1C', border: '#EF4444', icon: 'warning-outline' }
-                };
+            {/* Suggestion Card */}
+            <Text style={styles.sectionTitle}>Suggested from your profile</Text>
+            <Text style={styles.suggestionExplanation}>
+                Based on the triggers saved in {profile?.petName || 'your dog'}'s profile — not a live assessment.
+            </Text>
+            {renderSuggestionCard()}
 
-                const currentTrendStatus = trendSummary?.status || 'not_enough_data';
-                const theme = trendThemeMap[currentTrendStatus] || trendThemeMap.not_enough_data;
-
-                const chartHeight = 80;
-                const chartPadding = 12;
-                const chartWidth = SCREEN_WIDTH - 72;
-
-                const shortHelper = trendSummary 
-                    ? (trendSummary.helper || (trendSummary.status === 'severe' ? 'Stop the routine if strong signs appear.' : 'Recent check-ins look fairly steady.')) 
-                    : 'No sessions yet. Complete at least 2 check-ins to see a trend.';
-
-                const renderTrendChart = () => {
-                    if (!trendSummary || !trendSummary.hasEnoughData || trendSummary.points.length === 0) return null;
-                    const points = trendSummary.points;
-                    const totalPoints = points.length;
-                    const segmentWidth = totalPoints > 1 ? chartWidth / (totalPoints - 1) : chartWidth;
+            {/* Latest check-in */}
+            <Text style={styles.sectionTitle}>Latest check-in</Text>
+            {homeSnapshot?.latestCheckIn ? (
+                <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: getAnxietyColor(homeSnapshot.latestCheckIn.score) }]} testID="latest-checkin-card">
+                    <View style={styles.rowBetween}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                            <Text style={[styles.checkInLevel, { color: getAnxietyColor(homeSnapshot.latestCheckIn.score) }]}>
+                                {homeSnapshot.latestCheckIn.levelLabel}
+                            </Text>
+                            <Text style={styles.checkInDate}>
+                                {formatDateTime(homeSnapshot.latestCheckIn.completedAt)}
+                            </Text>
+                        </View>
+                        <Text style={[styles.checkInScore, { color: getAnxietyColor(homeSnapshot.latestCheckIn.score) }]}>
+                            {homeSnapshot.latestCheckIn.score}/10
+                        </Text>
+                    </View>
                     
-                    const coords = points.map((p, index) => {
-                        const x = index * segmentWidth;
-                        const y = chartPadding + (1 - p.stressSignsScore / 10) * (chartHeight - chartPadding * 2);
-                        return { x, y };
-                    });
+                    <Text style={styles.checkInNote}>
+                        Owner-reported signs from your latest saved check-in.
+                    </Text>
 
-                    return (
-                        <View style={{ marginTop: 16 }}>
-                            <View style={{ height: chartHeight, width: chartWidth, position: 'relative', justifyContent: 'center' }}>
-                                {/* Horizontal grid line helpers */}
-                                <View style={{ position: 'absolute', left: 0, top: chartPadding, right: 0, height: 1, backgroundColor: '#E2E8F0', borderStyle: 'dashed' }} />
-                                <View style={{ position: 'absolute', left: 0, bottom: chartPadding, right: 0, height: 1, backgroundColor: '#E2E8F0', borderStyle: 'dashed' }} />
-
-                                {/* Render lines */}
-                                {coords.slice(0, -1).map((c1, index) => {
-                                    const c2 = coords[index + 1];
-                                    const angle = Math.atan2(c2.y - c1.y, c2.x - c1.x);
-                                    const distance = Math.sqrt((c2.x - c1.x)**2 + (c2.y - c1.y)**2);
-                                    const midX = (c1.x + c2.x) / 2;
-                                    const midY = (c1.y + c2.y) / 2;
-
-                                    return (
-                                        <View
-                                            key={`line-${index}`}
-                                            style={{
-                                                position: 'absolute',
-                                                left: midX - distance / 2,
-                                                top: midY - 1,
-                                                width: distance,
-                                                height: 2,
-                                                backgroundColor: theme.border,
-                                                transform: [{ rotate: `${angle}rad` }],
-                                            }}
-                                        />
-                                    );
-                                })}
-
-                                {/* Render dots */}
-                                {coords.map((c, index) => {
-                                    const p = points[index];
-                                    const dotColor = p.hasSevereSigns ? '#EF4444' : theme.border;
-                                    return (
-                                        <View
-                                            key={`dot-${index}`}
-                                            style={{
-                                                position: 'absolute',
-                                                left: c.x - 5,
-                                                top: c.y - 5,
-                                                width: 10,
-                                                height: 10,
-                                                borderRadius: 5,
-                                                backgroundColor: dotColor,
-                                                borderWidth: 2,
-                                                borderColor: '#fff',
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </View>
-                            {/* X-axis labels */}
-                            <View style={{ flexDirection: 'row', width: chartWidth, justifyContent: 'space-between', paddingHorizontal: 4, marginTop: 4 }}>
-                                {points.map((p, index) => (
-                                    <Text key={`label-${index}`} style={{ fontSize: 9, color: COLORS.textSecondary, fontWeight: '600' }}>
-                                        S{p.sequenceNumber}
-                                    </Text>
-                                ))}
-                            </View>
-                            {showTrendDetails && <Text style={styles.trendLegendText}>{trendSummary.legend}</Text>}
-                        </View>
-                    );
-                };
-
-                return (
-                    <View style={[styles.progressSummaryCard, { backgroundColor: theme.bg, borderLeftColor: theme.border }]}>
-                        <View style={styles.trendHeaderRow}>
-                            <View style={styles.row}>
-                                <Ionicons name={theme.icon as any} size={20} color={theme.text} />
-                                <Text style={[styles.progressSummaryTitle, { color: theme.text }]}>
-                                    Stress Signs Trend
-                                </Text>
-                            </View>
-                            <Pressable 
-                                style={styles.detailsToggleBtn} 
-                                onPress={() => setShowTrendDetails(!showTrendDetails)}
-                                testID="trend-details-toggle"
-                            >
-                                <Text style={styles.detailsToggleText}>
-                                    {showTrendDetails ? 'Hide details' : 'Details'}
-                                </Text>
-                                <Ionicons 
-                                    name={showTrendDetails ? 'chevron-up' : 'chevron-down'} 
-                                    size={14} 
-                                    color={theme.text} 
-                                />
-                            </Pressable>
-                        </View>
-                        
-                        <View style={{ marginTop: 8 }}>
-                            <Text style={[styles.trendStatusTitle, { color: theme.text }]}>
-                                {trendSummary ? trendSummary.statusTitle : 'Not enough data yet'}
-                            </Text>
-                            <Text style={styles.trendHelperText}>
-                                {shortHelper}
+                    {homeSnapshot.latestCheckIn.hasSevereSigns && (
+                        <View style={styles.severeSignsBox} testID="historical-severe-warning">
+                            <Ionicons name="alert-circle-outline" size={16} color="#B85C38" />
+                            <Text style={styles.severeSignsText}>
+                                Strong signs were noted in your latest saved check-in. Stop the routine if strong signs appear. For medical red flags, pain, collapse, breathing trouble, or severe distress, contact appropriate professional support.
                             </Text>
                         </View>
+                    )}
+                </View>
+            ) : (
+                <View style={styles.emptyCard} testID="latest-checkin-empty">
+                    <Ionicons name="pulse-outline" size={24} color={COLORS.textSecondary} style={{ marginBottom: 8 }} />
+                    <Text style={styles.emptyCardTitle}>No check-ins yet</Text>
+                    <Text style={styles.emptyCardBody}>Saved check-ins will appear here after a routine.</Text>
+                </View>
+            )}
 
-                        {(showTrendDetails || (progressData && progressData.details && progressData.details.length > 0)) && (
-                            <View 
-                                style={[
-                                    styles.expandedTrendDetails, 
-                                    !showTrendDetails && { height: 0, opacity: 0, overflow: 'hidden', marginTop: 0, padding: 0 }
-                                ]}
-                                testID="expanded-trend-details"
-                            >
-                                {showTrendDetails && trendSummary?.body && (
-                                    <Text style={styles.progressSummaryBodyText}>
-                                        {trendSummary.body}
-                                    </Text>
-                                )}
-                                {progressData && progressData.details && progressData.details.length > 0 && (
-                                    <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 8 }}>
-                                        {progressData.details.map((detail: string, index: number) => (
-                                            <Text key={index} style={styles.progressDetailText}>{detail}</Text>
-                                        ))}
-                                    </View>
-                                )}
-                            </View>
-                        )}
-
-                        {trendSummary?.hasEnoughData && renderTrendChart()}
-
-                        {progressData && progressData.hasSevereSigns && (
-                            <View style={styles.severeSignsBox}>
-                                <Ionicons name="alert-circle-outline" size={16} color="#B85C38" />
-                                <Text style={styles.severeSignsText}>
-                                    Strong signs were noted: {progressData.severeSignsNote || 'Stop the session if these signs appear.'}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                );
-            })()}
-
-            {/* Recommended Session */}
-            <Text style={styles.sectionTitle}>Recommended for your dog</Text>
-            <Pressable
-                style={styles.heroCard}
-                onPress={() => handleStartSession(recommendedSession)}
-            >
-                <View style={styles.heroContent}>
-                    <View style={styles.recommendationBadge}>
-                        <Ionicons name="sparkles" size={14} color={COLORS.primary} />
-                        <Text style={styles.recommendationBadgeText}>{recommendationReason}</Text>
-                    </View>
-                    <Text style={styles.heroTitle}>{recommendedSession?.title}</Text>
-                    <Text style={styles.heroSubtitle} numberOfLines={2}>{recommendedSession?.subtitle}</Text>
-                    <View style={styles.heroFooter}>
-                        <View style={styles.heroAction}>
-                            <Ionicons name="play" size={16} color="#fff" />
-                            <Text style={styles.heroActionText}>Start Now</Text>
+            {/* Recent practice */}
+            <Text style={styles.sectionTitle}>Recent practice</Text>
+            {homeSnapshot?.latestPractice ? (
+                <View style={styles.card} testID="recent-practice-card">
+                    <Text style={styles.practiceTitle}>
+                        {homeSnapshot.latestPractice.sessionTitle}
+                    </Text>
+                    <Text style={styles.practiceMeta}>
+                        {formatDateTime(homeSnapshot.latestPractice.completedAt)}
+                    </Text>
+                    
+                    <View style={styles.practiceStatusRow}>
+                        <View style={styles.statusBadge}>
+                            <Text style={styles.statusText}>
+                                {homeSnapshot.latestPractice.stoppedEarly 
+                                    ? "Stopped early" 
+                                    : (homeSnapshot.latestPractice.completed ? "Completed" : "Saved")}
+                            </Text>
                         </View>
-                        <Text style={styles.heroDuration}>{recommendedSession?.suggestedTimeCopy || `${recommendedSession?.durationMinutes} min`}</Text>
                     </View>
                 </View>
+            ) : (
+                <View style={styles.emptyCard} testID="recent-practice-empty">
+                    <Ionicons name="calendar-outline" size={24} color={COLORS.textSecondary} style={{ marginBottom: 8 }} />
+                    <Text style={styles.emptyCardTitle}>No practice saved yet</Text>
+                    <Text style={styles.emptyCardBody}>Completed routines will appear here.</Text>
+                </View>
+            )}
+
+            {/* View progress action */}
+            <Pressable
+                style={styles.viewProgressButton}
+                onPress={() => navigation.navigate('Progress')}
+                testID="view-progress-button"
+                accessibilityLabel="View progress"
+            >
+                <Text style={styles.viewProgressButtonText}>View progress</Text>
+                <Ionicons name="arrow-forward" size={16} color={COLORS.primary} />
             </Pressable>
-
-            {/* Grouped routines by category */}
-            {(() => {
-                const categories = Object.keys(ROUTINE_CATEGORIES) as RoutineCategory[];
-                const sortedCategories = categories.sort((a, b) => ROUTINE_CATEGORIES[a].order - ROUTINE_CATEGORIES[b].order);
-
-                return sortedCategories.map((catKey) => {
-                    const catMeta = ROUTINE_CATEGORIES[catKey];
-                    const routines = allSessions.filter(s => (s.category || 'foundation') === catKey);
-
-                    if (routines.length === 0) return null;
-
-                    const isExpanded = !!expandedCategories[catKey];
-                    const toggleCategory = () => {
-                        setExpandedCategories(prev => ({
-                            ...prev,
-                            [catKey]: !prev[catKey]
-                        }));
-                    };
-
-                    const routineCountText = routines.length === 1 
-                        ? '1 routine' 
-                        : `${routines.length} routines`;
-
-                    return (
-                        <View key={catKey} style={styles.categorySection}>
-                            <Pressable 
-                                style={styles.collapsibleCategoryHeader} 
-                                onPress={toggleCategory}
-                                testID={`category-header-${catKey}`}
-                            >
-                                <View style={styles.categoryTitleContainer}>
-                                    <Text 
-                                        style={styles.categoryTitleText}
-                                        numberOfLines={2}
-                                        ellipsizeMode="tail"
-                                    >
-                                        {`${catMeta.title} · ${routineCountText}`}
-                                    </Text>
-                                </View>
-                                <View style={styles.categoryHeaderRight}>
-                                    <Text style={styles.categoryToggleActionText}>
-                                        {isExpanded ? 'Hide' : 'Show'}
-                                    </Text>
-                                    <Ionicons 
-                                        name={isExpanded ? 'chevron-up' : 'chevron-down'} 
-                                        size={16} 
-                                        color={COLORS.primary} 
-                                    />
-                                </View>
-                            </Pressable>
-
-                            {isExpanded && (
-                                <View style={{ marginTop: 8 }}>
-                                    <Text style={styles.categorySubtitle}>{catMeta.subtitle}</Text>
-                                    {routines.length > 1 ? (
-                                        <FlatList
-                                            data={routines}
-                                            renderItem={({ item }) => renderSessionCard(item, true)}
-                                            horizontal
-                                            showsHorizontalScrollIndicator={false}
-                                            keyExtractor={item => item.id}
-                                            style={styles.horizontalList}
-                                        />
-                                    ) : (
-                                        renderSessionCard(routines[0], false)
-                                    )}
-                                </View>
-                            )}
-                        </View>
-                    );
-                });
-            })()}
         </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F6FAF8' },
-    content: { padding: 20, paddingBottom: 40 },
+    content: { padding: 20 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    greeting: { ...FONTS.small, color: COLORS.textSecondary, fontWeight: '600' },
-    headerTitle: { ...FONTS.h1, color: COLORS.text },
-    settingsButton: { padding: 4, justifyContent: 'center', alignItems: 'center' },
-    card: { backgroundColor: '#fff', borderRadius: SIZES.radius, padding: 16, marginBottom: 16, ...SHADOWS.small },
-    rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    row: { flexDirection: 'row', alignItems: 'center' },
-    cardTitle: { ...FONTS.body, fontWeight: '600', color: COLORS.text },
-    score: { ...FONTS.h3 },
-    gradientBarBg: { height: 14, marginBottom: 12, position: 'relative', justifyContent: 'center' },
-    gradientBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden' },
-    gradientSegment: { height: '100%' },
-    gradientIndicator: { position: 'absolute', top: -1, marginLeft: -6 },
-    indicatorDot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#fff', ...SHADOWS.small },
-    anxietyLabelRow: { gap: 2 },
-    anxietyLabelText: { ...FONTS.caption, fontWeight: '700' },
-    anxietyDesc: { ...FONTS.small, color: COLORS.textSecondary },
-
-    sectionTitle: { ...FONTS.h3, color: COLORS.text, marginBottom: 12 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12, marginTop: 8 },
-    sectionSubtitleText: { ...FONTS.small, color: COLORS.textSecondary, marginBottom: 4 },
-
-    heroCard: { backgroundColor: COLORS.primary, borderRadius: 24, padding: 24, marginBottom: 16, ...SHADOWS.medium },
-    heroContent: { gap: 8 },
-    recommendationBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
-    recommendationBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700' },
-    heroTitle: { ...FONTS.h2, color: '#fff' },
-    heroSubtitle: { ...FONTS.body, color: 'rgba(255,255,255,0.8)', lineHeight: 22 },
-    heroFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-    heroAction: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-    heroActionText: { fontSize: 14, color: COLORS.primary, fontWeight: '700' },
-    heroDuration: { fontSize: 12, color: '#fff', fontWeight: '600' },
-
-    horizontalList: { marginHorizontal: -20, paddingHorizontal: 20, marginBottom: 16 },
-    sessionCardItem: { backgroundColor: '#fff', borderRadius: 20, padding: 16, ...SHADOWS.small, borderWidth: 1, borderColor: '#E3ECEF' },
-    sessionCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-    sessionIconBg: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#DDF4EF', justifyContent: 'center', alignItems: 'center' },
-    badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
-    freeBadge: { backgroundColor: '#DDF4EF' },
-    premiumBadge: { backgroundColor: COLORS.primary },
-    badgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-    sessionCardTitle: { ...FONTS.body, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-    sessionCardSubtitle: { ...FONTS.small, color: COLORS.textSecondary, lineHeight: 18, marginBottom: 12 },
-    sessionCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 10 },
-    sessionDuration: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
-
-    progressSummaryCard: { borderRadius: SIZES.radius, padding: 16, marginBottom: 16, borderLeftWidth: 4 },
-    progressSummaryTitle: { ...FONTS.body, fontWeight: '700', marginLeft: 8 },
-    progressSummaryBody: { ...FONTS.body, fontWeight: '600', color: COLORS.text, marginTop: 4 },
-    progressDetailText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4, paddingLeft: 4 },
-    progressSummaryText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4 },
-    severeSignsBox: { flexDirection: 'row', gap: 8, backgroundColor: '#FFEDE6', padding: 12, borderRadius: 12, marginTop: 16 },
-    severeSignsText: { flex: 1, fontSize: 11, color: '#B85C38', lineHeight: 16, fontWeight: '500' },
-
-    primaryButton: { backgroundColor: COLORS.primary, padding: 18, borderRadius: SIZES.radius, width: '100%', alignItems: 'center', ...SHADOWS.small },
-    primaryButtonPressed: { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },
-    primaryButtonText: { color: '#fff', ...FONTS.body, fontWeight: 'bold' },
-    noPetAvatar: { width: 150, height: 150, backgroundColor: COLORS.lavender, borderRadius: 75, justifyContent: 'center', alignItems: 'center', marginBottom: 30, ...SHADOWS.small },
-    noPetTitle: { ...FONTS.h1, color: COLORS.primary, textAlign: 'center', marginBottom: 16 },
-    noPetDesc: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 24 },
-    logoutButton: { padding: 8, justifyContent: 'center', alignItems: 'center' },
-
-    // Grouped category sections
-    categorySection: { marginBottom: 16 },
-    categoryHeader: { marginBottom: 12, marginTop: 8 },
-    categoryTitle: { ...FONTS.h3, color: COLORS.text, fontWeight: '700' },
-    categorySubtitle: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 2 },
-    cardCategoryLabel: { ...FONTS.caption, color: COLORS.primary, fontWeight: '600', marginBottom: 4 },
-    trendStatusTitle: { ...FONTS.body, fontWeight: '700', marginTop: 4 },
-    trendHelperText: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 4 },
-    trendLegendText: { fontSize: 10, color: COLORS.textSecondary, fontStyle: 'italic', alignSelf: 'flex-end', marginTop: 8 },
-
-    // Collapsible Category Header & Spacing additions
-    collapsibleCategoryHeader: {
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    brandTitle: { ...FONTS.body, fontWeight: '700', color: COLORS.text, opacity: 0.8 },
+    greeting: { ...FONTS.h2, color: COLORS.text, fontWeight: '700', marginTop: 2 },
+    settingsButton: { padding: 8, justifyContent: 'center', alignItems: 'center', minWidth: 44, minHeight: 44, marginRight: -8 },
+    promptText: { ...FONTS.body, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 16 },
+    
+    actionsRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 20,
+    },
+    actionCard: {
+        flex: 1,
+        minWidth: 140,
         backgroundColor: '#fff',
-        borderRadius: 14,
+        borderRadius: 16,
+        padding: 16,
+        ...SHADOWS.small,
         borderWidth: 1,
         borderColor: '#E3ECEF',
-        gap: 8,
-        ...SHADOWS.small
+        minHeight: 120,
+        justifyContent: 'center',
     },
-    categoryTitleContainer: {
-        flex: 1,
-        flexShrink: 1,
-        minWidth: 0
+    actionIcon: {
+        marginBottom: 8,
     },
-    categoryTitleText: {
-        fontSize: 14,
+    actionTitle: {
+        fontSize: 15,
         fontWeight: '700',
         color: COLORS.text,
-        flexShrink: 1
+        marginBottom: 4,
     },
-    categoryHeaderRight: {
+    actionHelper: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        lineHeight: 16,
+    },
+
+    sectionTitle: { ...FONTS.h3, color: COLORS.text, marginTop: 20, marginBottom: 8 },
+    
+    suggestionExplanation: { ...FONTS.caption, color: COLORS.textSecondary, marginBottom: 10, lineHeight: 18 },
+    
+    suggestionCard: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 16,
+        ...SHADOWS.medium,
+    },
+    suggestionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        flexShrink: 0
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        alignSelf: 'flex-start',
+        marginBottom: 12,
     },
-    categoryToggleActionText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: COLORS.primary
+    suggestionReason: {
+        fontSize: 11,
+        color: '#fff',
+        fontWeight: '700',
     },
-    trendHeaderRow: {
+    suggestionRoutineTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#fff',
+        marginBottom: 6,
+    },
+    suggestionRoutineSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.85)',
+        lineHeight: 18,
+        marginBottom: 16,
+    },
+    suggestionFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        width: '100%',
-        marginBottom: 8
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.15)',
+        paddingTop: 12,
     },
-    detailsToggleBtn: {
+    suggestionMeta: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0,0,0,0.05)'
     },
-    detailsToggleText: {
+    suggestionDuration: {
         fontSize: 12,
+        color: '#fff',
         fontWeight: '600',
-        color: COLORS.textSecondary
     },
-    expandedTrendDetails: {
-        marginTop: 8,
-        padding: 8,
-        backgroundColor: 'rgba(0,0,0,0.02)',
-        borderRadius: 10
+    suggestionCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#fff',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
     },
-    progressSummaryBodyText: {
-        ...FONTS.small,
+    suggestionCtaText: {
+        fontSize: 13,
+        color: COLORS.primary,
+        fontWeight: '700',
+    },
+
+    suggestionFallbackCard: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        ...SHADOWS.small,
+        borderWidth: 1,
+        borderColor: '#E3ECEF',
+    },
+    suggestionFallbackRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    suggestionFallbackTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 2,
+    },
+    suggestionFallbackDesc: {
+        fontSize: 12,
         color: COLORS.textSecondary,
-        lineHeight: 18
-    }
+    },
+
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: SIZES.radius,
+        padding: 16,
+        marginBottom: 16,
+        ...SHADOWS.small,
+        borderWidth: 1,
+        borderColor: '#E3ECEF',
+    },
+    rowBetween: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    checkInLevel: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    checkInDate: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+    },
+    checkInScore: {
+        fontSize: 20,
+        fontWeight: '800',
+    },
+    checkInNote: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        lineHeight: 16,
+    },
+
+    severeSignsBox: {
+        flexDirection: 'row',
+        gap: 8,
+        backgroundColor: '#FFEDE6',
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#FFDDD0',
+    },
+    severeSignsText: {
+        flex: 1,
+        fontSize: 11,
+        color: '#B85C38',
+        lineHeight: 16,
+        fontWeight: '500',
+    },
+
+    emptyCard: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: SIZES.radius,
+        padding: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderStyle: 'dashed',
+        marginBottom: 16,
+    },
+    emptyCardTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    emptyCardBody: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+    },
+
+    practiceTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    practiceMeta: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+        marginBottom: 12,
+    },
+    practiceStatusRow: {
+        flexDirection: 'row',
+    },
+    statusBadge: {
+        backgroundColor: '#E5E7EB',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    statusText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+    },
+
+    viewProgressButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#fff',
+        padding: 16,
+        borderRadius: SIZES.radius,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        marginTop: 8,
+        minHeight: 44,
+    },
+    viewProgressButtonText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.primary,
+    },
+
+    noPetAvatar: { width: 150, height: 150, backgroundColor: COLORS.lavender, borderRadius: 75, justifyContent: 'center', alignItems: 'center', marginBottom: 30, ...SHADOWS.small },
+    noPetTitle: { ...FONTS.h1, color: COLORS.primary, textAlign: 'center', marginBottom: 16 },
+    noPetDesc: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 24 },
+    primaryButton: { backgroundColor: COLORS.primary, padding: 18, borderRadius: SIZES.radius, width: '100%', alignItems: 'center', ...SHADOWS.small },
+    primaryButtonPressed: { backgroundColor: COLORS.primaryDark, transform: [{ scale: 0.98 }] },
+    primaryButtonText: { color: '#fff', ...FONTS.body, fontWeight: 'bold' },
+    headerTitle: { ...FONTS.h2, color: COLORS.text, fontWeight: '700' },
 });

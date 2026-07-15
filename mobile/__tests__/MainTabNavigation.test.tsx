@@ -54,7 +54,7 @@ describe('MainTabNavigator Focused Tests', () => {
     // Wait for DashboardScreen data to fetch
     await waitFor(() => {
       expect(getByText('ChillPup')).toBeTruthy();
-      expect(getByText(/Buddy/)).toBeTruthy();
+      expect(getByText("Hi, Buddy's owner 👋")).toBeTruthy();
     });
 
     const homeTab = getByTestId('main-tab-home');
@@ -65,7 +65,7 @@ describe('MainTabNavigator Focused Tests', () => {
   });
 
   test('Tapping Routines, Sounds, and Progress selects the correct tab and renders temporary shells', async () => {
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText, findByTestId } = render(
       <SubscriptionProvider>
         <NavigationContainer>
           <MainTabNavigator />
@@ -79,24 +79,44 @@ describe('MainTabNavigator Focused Tests', () => {
 
     const routinesTab = getByTestId('main-tab-routines');
     fireEvent.press(routinesTab);
-    const routinesScreen = getByTestId('routines-tab-screen');
+    const routinesScreen = await findByTestId('routines-tab-screen');
     expect(routinesScreen).toBeTruthy();
-    expect(within(routinesScreen).getByText('Routines')).toBeTruthy();
+    expect(within(routinesScreen).getByText('Browse Routines')).toBeTruthy();
     expect(routinesTab.props.accessibilityState.selected).toBe(true);
 
     const soundsTab = getByTestId('main-tab-sounds');
     fireEvent.press(soundsTab);
-    const soundsScreen = getByTestId('sounds-tab-screen');
+    const soundsScreen = await findByTestId('sounds-tab-screen');
     expect(soundsScreen).toBeTruthy();
     expect(within(soundsScreen).getByText('Sounds')).toBeTruthy();
     expect(soundsTab.props.accessibilityState.selected).toBe(true);
 
     const progressTab = getByTestId('main-tab-progress');
     fireEvent.press(progressTab);
-    const progressScreen = getByTestId('progress-tab-screen');
+    const progressScreen = await findByTestId('progress-tab-screen');
     expect(progressScreen).toBeTruthy();
     expect(within(progressScreen).getByText('Progress')).toBeTruthy();
     expect(progressTab.props.accessibilityState.selected).toBe(true);
+  });
+
+  test('Verify that Sounds and Progress remain temporary screens', async () => {
+    const { getByTestId, findByTestId } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <MainTabNavigator />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+
+    const soundsTab = getByTestId('main-tab-sounds');
+    fireEvent.press(soundsTab);
+    const soundsScreen = await findByTestId('sounds-tab-screen');
+    expect(within(soundsScreen).getByText('This section is being prepared.')).toBeTruthy();
+
+    const progressTab = getByTestId('main-tab-progress');
+    fireEvent.press(progressTab);
+    const progressScreen = await findByTestId('progress-tab-screen');
+    expect(within(progressScreen).getByText('This section is being prepared.')).toBeTruthy();
   });
 });
 

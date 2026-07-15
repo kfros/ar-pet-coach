@@ -231,3 +231,23 @@ export interface CheckInProfile {
   milestonePromptEnabled?: boolean;
 }
 
+export interface HomeSnapshot {
+  latestPractice: {
+    sessionId: string;
+    sessionTitle: string;
+    completedAt: string;
+    completed: boolean;
+    stoppedEarly: boolean;
+  } | null;
+  latestCheckIn: {
+    sessionId: string;
+    sessionTitle: string;
+    completedAt: string;
+    phase: 'before' | 'after';
+    score: number;
+    levelLabel: string;
+    hasSevereSigns: boolean;
+    severeSignsNote: string;
+  } | null;
+}
+

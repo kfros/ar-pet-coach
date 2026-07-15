@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import SessionPreviewScreen from '../screens/SessionPreviewScreen';
-import DashboardScreen from '../screens/DashboardScreen';
+import RoutinesScreen from '../screens/RoutinesScreen';
 import * as SubscriptionManager from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
 import { COLORS } from '../constants/Theme';
@@ -25,6 +25,7 @@ jest.mock('../services/sessionService', () => ({
     getSessions: jest.fn(),
     getSessionById: jest.fn(),
     getRecentProgress: jest.fn(() => Promise.resolve(null)),
+    getHomeSnapshot: jest.fn(),
 }));
 
 // Mock PetProfileRepository
@@ -67,7 +68,7 @@ describe('Premium Preview Layout and Badge State', () => {
 
         const { findByText, queryByText } = render(
             <SubscriptionManager.SubscriptionProvider>
-                <DashboardScreen navigation={mockNavigation} />
+                <RoutinesScreen navigation={mockNavigation} />
             </SubscriptionManager.SubscriptionProvider>
         );
 
@@ -86,7 +87,7 @@ describe('Premium Preview Layout and Badge State', () => {
 
         const { findByText, queryByText } = render(
             <SubscriptionManager.SubscriptionProvider>
-                <DashboardScreen navigation={mockNavigation} />
+                <RoutinesScreen navigation={mockNavigation} />
             </SubscriptionManager.SubscriptionProvider>
         );
 

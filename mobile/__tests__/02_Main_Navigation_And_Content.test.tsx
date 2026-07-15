@@ -38,7 +38,7 @@ describe('Suite 02: Main Navigation And Content', () => {
       </SubscriptionProvider>
     );
     
-    expect(await findByText(/Buddy/)).toBeTruthy();
+    expect(await findByText(/Buddy's owner/)).toBeTruthy();
     expect(await findByText('ChillPup')).toBeTruthy();
   });
 
@@ -51,7 +51,7 @@ describe('Suite 02: Main Navigation And Content', () => {
       </SubscriptionProvider>
     );
     
-    expect(await findByText(/Recommended/)).toBeTruthy();
+    expect(await findByText(/Suggested from your profile/)).toBeTruthy();
     const fireworksElements = await findAllByText(/Fireworks/i);
     expect(fireworksElements.length).toBeGreaterThan(0);
   });

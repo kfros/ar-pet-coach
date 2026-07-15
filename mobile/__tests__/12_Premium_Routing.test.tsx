@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import DashboardScreen from '../screens/DashboardScreen';
+import RoutinesScreen from '../screens/RoutinesScreen';
 import * as SubscriptionManager from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
 import PetProfileRepository from '../services/petProfileRepository';
@@ -19,6 +19,7 @@ jest.mock('../services/sessionService', () => ({
     getSessions: jest.fn(),
     getSessionById: jest.fn(),
     getRecentProgress: jest.fn(() => Promise.resolve(null)),
+    getHomeSnapshot: jest.fn(),
 }));
 
 // Mock PetProfileRepository
@@ -52,7 +53,7 @@ describe('Premium Routing Logic', () => {
         (SessionService.getSessionById as jest.Mock).mockReturnValue(premiumSession);
     });
 
-    test('non-premium user tapping premium routine in Dashboard navigates to Paywall', async () => {
+    test('non-premium user tapping premium routine in RoutinesScreen navigates to Paywall', async () => {
         jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
             isPremium: false,
             isLoading: false,
@@ -60,7 +61,7 @@ describe('Premium Routing Logic', () => {
 
         const { findByText } = render(
             <SubscriptionManager.SubscriptionProvider>
-                <DashboardScreen navigation={mockNavigation} />
+                <RoutinesScreen navigation={mockNavigation} />
             </SubscriptionManager.SubscriptionProvider>
         );
 
@@ -73,7 +74,7 @@ describe('Premium Routing Logic', () => {
         }));
     });
 
-    test('premium user tapping premium routine in Dashboard navigates to SessionPreview', async () => {
+    test('premium user tapping premium routine in RoutinesScreen navigates to SessionPreview', async () => {
         jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
             isPremium: true,
             isLoading: false,
@@ -81,7 +82,7 @@ describe('Premium Routing Logic', () => {
 
         const { findByText } = render(
             <SubscriptionManager.SubscriptionProvider>
-                <DashboardScreen navigation={mockNavigation} />
+                <RoutinesScreen navigation={mockNavigation} />
             </SubscriptionManager.SubscriptionProvider>
         );
 
