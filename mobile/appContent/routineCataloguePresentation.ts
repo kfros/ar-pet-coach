@@ -11,6 +11,15 @@ export interface CategoryCatalogueItem {
     icon: string;
 }
 
+export type NoiseRoutinePhase = 'during' | 'before' | 'after';
+
+export interface NoiseRoutinePhasePresentation {
+    phase: NoiseRoutinePhase;
+    label: 'DURING' | 'BEFORE' | 'AFTER';
+    timingInstruction: string;
+    phaseOrder: number;
+}
+
 export const CATEGORY_CATALOGUE_PRESENTATION: Record<string, CategoryCatalogueItem> = {
     foundation: {
         title: "Not sure where to start?",
@@ -91,6 +100,27 @@ export const ROUTINE_CATALOGUE_PRESENTATION: Record<string, RoutineCatalogueItem
     }
 };
 
+export const NOISE_ROUTINE_PHASE_PRESENTATION: Record<string, NoiseRoutinePhasePresentation> = {
+    fireworks_loud_noises_basic: {
+        phase: 'during',
+        label: 'DURING',
+        timingInstruction: "Use while thunder or fireworks are happening or may start again soon.",
+        phaseOrder: 10
+    },
+    fireworks_prep_routine: {
+        phase: 'before',
+        label: 'BEFORE',
+        timingInstruction: "Use only on a calm, quiet day before a noisy event.",
+        phaseOrder: 20
+    },
+    post_fireworks_recovery_home: {
+        phase: 'after',
+        label: 'AFTER',
+        timingInstruction: "Use after the noise has stopped or returned to its usual level.",
+        phaseOrder: 30
+    }
+};
+
 export function getRoutineCataloguePresentation(session: Session): RoutineCatalogueItem {
     const matched = ROUTINE_CATALOGUE_PRESENTATION[session.id];
     if (matched) {
@@ -100,4 +130,8 @@ export function getRoutineCataloguePresentation(session: Session): RoutineCatalo
         problemTitle: session.title,
         problemSummary: session.subtitle
     };
+}
+
+export function getNoiseRoutinePhasePresentation(session: Session): NoiseRoutinePhasePresentation | null {
+    return NOISE_ROUTINE_PHASE_PRESENTATION[session.id] || null;
 }
