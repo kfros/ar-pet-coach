@@ -10,6 +10,7 @@ import PaywallScreen from '../screens/PaywallScreen';
 import * as SubscriptionManager from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
 import PetProfileRepository from '../services/petProfileRepository';
+import { Session } from '../types/Session';
 
 // Mock navigation
 const mockNavigation = {
@@ -18,15 +19,17 @@ const mockNavigation = {
 };
 
 // Mock SessionService
-jest.mock('../services/sessionService', () => ({
-    getSessions: jest.fn(),
-    getStressSignsTrend: jest.fn(),
-    getRecentProgress: jest.fn(),
-    getHomeSnapshot: jest.fn(),
-    getSessionById: jest.fn((id) => {
-        return [...mockSessions].find(s => s.id === id);
-    }),
-}));
+jest.mock('../services/sessionService', () => {
+    let mockSessions: Session[] = [];
+    return {
+        getSessions: jest.fn(() => mockSessions),
+        getSessionById: jest.fn((id) => mockSessions.find(s => s.id === id)),
+        getHomeSnapshot: jest.fn(),
+        __setMockSessions: (sessions: Session[]) => {
+            mockSessions = sessions;
+        }
+    };
+});
 
 // Mock PetProfileRepository
 jest.mock('../services/petProfileRepository', () => ({
@@ -36,50 +39,73 @@ jest.mock('../services/petProfileRepository', () => ({
     hasPetProfile: jest.fn(() => Promise.resolve(true)),
 }));
 
-
 const mockSessions = [
     {
         id: 'daily_calm_reset',
         title: 'Daily Calm Reset',
         subtitle: 'Short daily calibration',
-        accessLevel: 'free',
+        accessLevel: 'free' as const,
         category: 'foundation',
         categoryLabel: 'Start Here',
         categoryOrder: 10,
         durationMinutes: 3,
         steps: [],
         stopIf: [],
+        difficulty: 'easy' as const,
+        goal: '',
+        beforeYouStart: [],
+        whatToWatchFor: [],
+        afterSession: [],
+        tags: [],
+        recommendedForTriggers: [],
+        trigger: ''
     },
     {
         id: 'outdoor_confidence_reset',
         title: 'Outdoor Confidence Reset',
         subtitle: 'Routine Two Sub',
-        accessLevel: 'premium',
+        accessLevel: 'premium' as const,
         category: 'walk_fear',
         categoryLabel: 'Walk Fear & Outdoor Confidence',
         categoryOrder: 20,
         durationMinutes: 5,
         steps: [],
         stopIf: [],
+        difficulty: 'moderate' as const,
+        goal: '',
+        beforeYouStart: [],
+        whatToWatchFor: [],
+        afterSession: [],
+        tags: [],
+        recommendedForTriggers: [],
+        trigger: ''
     },
     {
         id: 'noise_basic',
         title: 'Noise Basic',
         subtitle: 'Routine Three Sub',
-        accessLevel: 'free',
+        accessLevel: 'free' as const,
         category: 'noise_support',
         categoryLabel: 'Noise & Fireworks',
         categoryOrder: 30,
         durationMinutes: 8,
         steps: [],
         stopIf: [],
+        difficulty: 'easy' as const,
+        goal: '',
+        beforeYouStart: [],
+        whatToWatchFor: [],
+        afterSession: [],
+        tags: [],
+        recommendedForTriggers: [],
+        trigger: ''
     }
 ];
 
 describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        (SessionService.getSessions as jest.Mock).mockReturnValue(mockSessions);
+        require('../services/sessionService').__setMockSessions(mockSessions);
         (PetProfileRepository.getPetProfile as jest.Mock).mockResolvedValue({
             id: 'pet_123',
             petName: 'Buddy',
@@ -87,9 +113,15 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
         });
 
         jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
-            isPremium: false, // Start as non-premium by default
+            isPremium: false,
             isLoading: false,
-        } as any);
+            customerInfo: null,
+            purchasePackage: jest.fn(),
+            restorePurchases: jest.fn(),
+            trackCalmingSession: jest.fn(),
+            checkPaywallTrigger: jest.fn(),
+            refreshEntitlement: jest.fn(),
+        });
     });
 
     test('renders RoutinesScreen and shows categories and routines correctly', async () => {
@@ -99,43 +131,42 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
             </SubscriptionManager.SubscriptionProvider>
         );
 
-        // foundation category header should show count and routine title because it is expanded by default
-        const foundationHeader = await waitFor(() => screen.getByTestId('category-header-foundation'));
-        expect(foundationHeader).toBeTruthy();
-        expect(screen.queryByText('Start Here · 1 routine')).toBeTruthy();
-        expect(await screen.findByText('Daily Calm Reset')).toBeTruthy();
+        // foundation category header should show count and routine title because it is selected by default
+        const foundationCard = await waitFor(() => screen.getByTestId('routine-category-foundation'));
+        expect(foundationCard).toBeTruthy();
+        expect(foundationCard.props.accessibilityState.selected).toBe(true);
 
-        // walk_fear category header is visible, but collapsed by default (so routine name is not rendered)
-        expect(screen.queryByText('Walk Fear & Outdoor Confidence · 1 routine')).toBeTruthy();
-        expect(screen.queryByText('Outdoor Confidence Reset')).toBeNull();
+        // Problem Title and copy rendered
+        expect(screen.queryByText('Need a simple place to start')).toBeTruthy();
+        
+        // walk_fear category grid card is visible, but not selected by default (so walk_fear routine title is not rendered)
+        const walkFearCard = screen.getByTestId('routine-category-walk_fear');
+        expect(walkFearCard).toBeTruthy();
+        expect(walkFearCard.props.accessibilityState.selected).toBe(false);
+        expect(screen.queryByText('Scared to go outside')).toBeNull();
     });
 
-    test('collapses and expands categories when headers are pressed', async () => {
+    test('filters routine list when category cards are pressed', async () => {
         const screen = render(
             <SubscriptionManager.SubscriptionProvider>
                 <RoutinesScreen navigation={mockNavigation} />
             </SubscriptionManager.SubscriptionProvider>
         );
 
-        // Verify Daily Calm Reset is visible initially
-        expect(await screen.findByText('Daily Calm Reset')).toBeTruthy();
+        // Verify Daily Calm Reset (Need a simple place to start) is visible initially
+        expect(await screen.findByText('Need a simple place to start')).toBeTruthy();
 
-        // Collapse foundation
-        const foundationHeader = screen.getByTestId('category-header-foundation');
-        fireEvent.press(foundationHeader);
+        // Tap walk_fear category
+        const walkFearCard = screen.getByTestId('routine-category-walk_fear');
+        fireEvent.press(walkFearCard);
 
         // Daily Calm Reset should disappear
         await waitFor(() => {
-            expect(screen.queryByText('Daily Calm Reset')).toBeNull();
+            expect(screen.queryByText('Need a simple place to start')).toBeNull();
         });
 
-        // Expand Noise & Fireworks
-        expect(screen.queryByText('Noise Basic')).toBeNull();
-        const noiseHeader = screen.getByTestId('category-header-noise_support');
-        fireEvent.press(noiseHeader);
-
-        // Noise Basic should now be visible
-        expect(await screen.findByText('Noise Basic')).toBeTruthy();
+        // Scared to go outside should now be visible
+        expect(await screen.findByText('Scared to go outside')).toBeTruthy();
     });
 
     test('free routine opens SessionPreview, premium routine opens Paywall for non-premium user', async () => {
@@ -145,16 +176,16 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
             </SubscriptionManager.SubscriptionProvider>
         );
 
-        // Press free routine (Daily Calm Reset)
-        await screen.findByText('Daily Calm Reset');
-        fireEvent.press(screen.getByText('Daily Calm Reset'));
+        // Press free routine (Need a simple place to start)
+        await screen.findByText('Need a simple place to start');
+        fireEvent.press(screen.getByText('Need a simple place to start'));
         expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', expect.objectContaining({ sessionId: 'daily_calm_reset' }));
 
-        // Expand and press premium routine (Outdoor Confidence Reset)
-        const walkHeader = screen.getByTestId('category-header-walk_fear');
-        fireEvent.press(walkHeader);
-        await screen.findByText('Outdoor Confidence Reset');
-        fireEvent.press(screen.getByText('Outdoor Confidence Reset'));
+        // Expand and press premium routine (Scared to go outside)
+        const walkCard = screen.getByTestId('routine-category-walk_fear');
+        fireEvent.press(walkCard);
+        await screen.findByText('Scared to go outside');
+        fireEvent.press(screen.getByText('Scared to go outside'));
         expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', expect.objectContaining({ sessionId: 'outdoor_confidence_reset' }));
     });
 
@@ -162,7 +193,13 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
         jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
             isPremium: true,
             isLoading: false,
-        } as any);
+            customerInfo: null,
+            purchasePackage: jest.fn(),
+            restorePurchases: jest.fn(),
+            trackCalmingSession: jest.fn(),
+            checkPaywallTrigger: jest.fn(),
+            refreshEntitlement: jest.fn(),
+        });
 
         const screen = render(
             <SubscriptionManager.SubscriptionProvider>
@@ -170,10 +207,10 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
             </SubscriptionManager.SubscriptionProvider>
         );
 
-        const walkHeader = await screen.findByTestId('category-header-walk_fear');
-        fireEvent.press(walkHeader);
-        await screen.findByText('Outdoor Confidence Reset');
-        fireEvent.press(screen.getByText('Outdoor Confidence Reset'));
+        const walkCard = await screen.findByTestId('routine-category-walk_fear');
+        fireEvent.press(walkCard);
+        await screen.findByText('Scared to go outside');
+        fireEvent.press(screen.getByText('Scared to go outside'));
         expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', expect.objectContaining({ sessionId: 'outdoor_confidence_reset' }));
     });
 
@@ -203,10 +240,9 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
         fireEvent.press(getByTestId('main-tab-routines'));
 
         // Press a routine to go to SessionPreview
-        await findByText('Daily Calm Reset');
+        await findByText('Routines');
         fireEvent.press(getByTestId('main-tab-routines')); // Ensure focus is on routines tab
         
-        const routineCard = getByTestId('main-tab-routines'); // Just simulating tab state
         expect(getByTestId('routines-tab-screen')).toBeTruthy();
 
         // Render RoutinesScreen directly inside a nested setup to click the card:
@@ -217,8 +253,8 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
                 </NavigationContainer>
             </SubscriptionManager.SubscriptionProvider>
         );
-        await routinesScreenOnly.findByText('Daily Calm Reset');
-        fireEvent.press(routinesScreenOnly.getByText('Daily Calm Reset'));
+        await routinesScreenOnly.findByText('Need a simple place to start');
+        fireEvent.press(routinesScreenOnly.getByText('Need a simple place to start'));
         expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', expect.anything());
     });
 });

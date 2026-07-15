@@ -1,13 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
-    FlatList,
     Pressable,
-    Dimensions,
     ActivityIndicator,
+    useWindowDimensions,
+    DimensionValue,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,19 +17,63 @@ import { useSubscription } from '../components/SubscriptionManager';
 import PetProfileRepository from '../services/petProfileRepository';
 import SessionService from '../services/sessionService';
 import { ROUTINE_CATEGORIES } from '../appContent/routineCategories';
-import { RoutineCategory } from '../types/Session';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { RoutineCategory, Session } from '../types/Session';
+import {
+    getRoutineCataloguePresentation,
+    CATEGORY_CATALOGUE_PRESENTATION
+} from '../appContent/routineCataloguePresentation';
 
 export default function RoutinesScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [petId, setPetId] = useState<string | null>(null);
-    const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-        foundation: true,
+
+    const allSessions = SessionService.getSessions();
+    const sortedCategories = (Object.keys(ROUTINE_CATEGORIES) as RoutineCategory[]).sort(
+        (a, b) => ROUTINE_CATEGORIES[a].order - ROUTINE_CATEGORIES[b].order
+    );
+
+    // CP-ROUTINES-001-UNKNOWN-CATEGORY:
+    // Normalize missing or unrecognized categories to foundation for catalogue presentation.
+    const getNormalizedCategory = (session: Session): RoutineCategory => {
+        const hasCategory = session.category && (session.category in ROUTINE_CATEGORIES);
+        return hasCategory ? (session.category as RoutineCategory) : 'foundation';
+    };
+
+    // Filter to categories that actually have routines to display
+    const activeCategories = sortedCategories.filter(cat =>
+        allSessions.some(s => getNormalizedCategory(s) === cat)
+    );
+
+    // CP-ROUTINES-001-SELECTION-CONTRACT:
+    // Initialize to foundation if it exists and has routines; otherwise the first non-empty category.
+    const [selectedCategory, setSelectedCategory] = useState<RoutineCategory>(() => {
+        const hasFoundation = allSessions.some(s => getNormalizedCategory(s) === 'foundation');
+        if (hasFoundation && activeCategories.includes('foundation')) {
+            return 'foundation';
+        }
+        return activeCategories[0] || 'foundation';
     });
+
+    // CP-ROUTINES-001-SHOW-ALL-TOGGLE: separate state for showAllRoutines
+    const [showAllRoutines, setShowAllRoutines] = useState(false);
+
+    // CP-ROUTINES-001-SELECTION-FALLBACK:
+    // Sync invalid selected category with non-empty categories if data changes
+    useEffect(() => {
+        if (!activeCategories.includes(selectedCategory) && activeCategories.length > 0) {
+            const fallback = activeCategories.includes('foundation') ? 'foundation' : activeCategories[0];
+            setSelectedCategory(fallback);
+        }
+    }, [activeCategories, selectedCategory]);
+
+    // Resolved active category to render (applying fallback if selectedCategory is invalid)
+    const activeCategory = activeCategories.includes(selectedCategory)
+        ? selectedCategory
+        : (activeCategories.includes('foundation') ? 'foundation' : activeCategories[0]);
 
     const { isPremium, isLoading: subLoading } = useSubscription();
     const insets = useSafeAreaInsets();
+    const { fontScale, width: screenWidth } = useWindowDimensions();
 
     const fetchPetData = async () => {
         try {
@@ -52,13 +96,19 @@ export default function RoutinesScreen({ navigation }: any) {
         }, [])
     );
 
-    const handleStartSession = (session: any) => {
+    const handleStartSession = (session: Session) => {
         if (!petId) {
             navigation.navigate('PetProfileStepper');
             return;
         }
 
-        if (session.accessLevel === 'premium' && !isPremium && !subLoading) {
+        // CP-ROUTINES-001-LOADING-COPY:
+        // Ignore presses and do not navigate while checking access
+        if (session.accessLevel === 'premium' && subLoading) {
+            return;
+        }
+
+        if (session.accessLevel === 'premium' && !isPremium) {
             navigation.navigate('Paywall', { sessionId: session.id, petId });
             return;
         }
@@ -66,68 +116,85 @@ export default function RoutinesScreen({ navigation }: any) {
         navigation.navigate('SessionPreview', { sessionId: session.id, petId });
     };
 
-    const renderSessionCard = (item: any, isHorizontal = false) => {
-        const isLocked = item.accessLevel === 'premium' && !isPremium && !subLoading;
-        const iconName = (item.iconKey || (item.id.includes('fireworks') ? 'sparkles' : 'sunny')) + "-outline";
+    const renderSessionCard = (item: Session) => {
+        const presentation = getRoutineCataloguePresentation(item);
+        const problemTitle = presentation.problemTitle;
+        const problemSummary = presentation.problemSummary;
 
-        const badgeBg = isLocked ? COLORS.primary : '#E6F7F2';
-        const badgeText = isLocked ? '#FFFFFF' : '#0F766E';
-        const badgeBorder = isLocked ? COLORS.primary : '#B8E7DC';
-        const badgeLabel = isLocked ? 'PREMIUM' : 'INCLUDED';
-        const badgeIcon = isLocked ? 'lock-closed' : 'checkmark-circle';
+        const isPremiumRoutine = item.accessLevel === 'premium';
+        // CP-ROUTINES-001-LOADING-COPY:
+        // Checking state when subscription is loading and routine is premium
+        const isChecking = isPremiumRoutine && subLoading;
+        const isLocked = isPremiumRoutine && !isPremium && !subLoading;
 
         const displayTime = item.suggestedTimeCopy || `${item.durationMinutes} min`;
+
+        // Accessibility configurations
+        let cardAccessibilityLabel = `${problemTitle}. ${isLocked ? 'Unlock routine' : 'View routine'}`;
+        if (isChecking) {
+            cardAccessibilityLabel = `Checking access for ${problemTitle}`;
+        }
 
         return (
             <Pressable
                 key={item.id}
-                style={[
-                    styles.sessionCardItem,
-                    isHorizontal ? { width: SCREEN_WIDTH * 0.7, marginRight: 16 } : { width: '100%', marginBottom: 12 }
-                ]}
+                testID={`routine-card-${item.id}`}
+                style={styles.sessionCardItem}
                 onPress={() => handleStartSession(item)}
+                accessibilityRole="button"
+                accessibilityLabel={cardAccessibilityLabel}
+                accessibilityState={{ disabled: isChecking }}
             >
-                <View style={styles.sessionCardTop}>
-                    <View style={styles.sessionIconBg}>
-                        <Ionicons
-                            name={iconName as any}
-                            size={24}
-                            color={COLORS.primary}
+                <View style={styles.cardHeader}>
+                    <Text style={styles.sessionCardTitle}>{problemTitle}</Text>
+                    {isChecking ? null : (
+                        <Ionicons 
+                            name={isLocked ? "lock-closed" : "chevron-forward"} 
+                            size={20} 
+                            color={isLocked ? COLORS.primary : COLORS.textSecondary} 
+                            style={styles.cardArrow}
                         />
-                    </View>
-                    <View style={[
-                        styles.badge,
-                        item.accessLevel === 'premium'
-                            ? { backgroundColor: badgeBg, borderWidth: 1, borderColor: badgeBorder }
-                            : styles.freeBadge
-                    ]}>
-                        {item.accessLevel === 'premium' ? (
-                            <>
+                    )}
+                </View>
+
+                <Text style={styles.sessionCardSubtitle}>{problemSummary}</Text>
+
+                <View style={styles.cardFooter}>
+                    <Text style={styles.sessionDuration}>{displayTime}</Text>
+                    
+                    {isPremiumRoutine ? (
+                        isChecking ? (
+                            <View style={[
+                                styles.badge,
+                                { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#D1D5DB' }
+                            ]}>
+                                <Text style={[styles.badgeText, { color: '#4B5563' }]}>
+                                    CHECKING ACCESS
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={[
+                                styles.badge,
+                                { backgroundColor: isLocked ? COLORS.primary : '#E6F7F2', borderWidth: 1, borderColor: isLocked ? COLORS.primary : '#B8E7DC' }
+                            ]}>
                                 <Ionicons
-                                    name={badgeIcon as any}
+                                    name={isLocked ? "lock-closed" : "checkmark-circle"}
                                     size={12}
-                                    color={badgeText}
+                                    color={isLocked ? '#FFFFFF' : '#0F766E'}
                                     style={{ marginRight: 4 }}
                                 />
-                                <Text style={[styles.badgeText, { color: badgeText }]}>
-                                    {badgeLabel}
+                                <Text style={[styles.badgeText, { color: isLocked ? '#FFFFFF' : '#0F766E' }]}>
+                                    {isLocked ? 'PREMIUM' : 'INCLUDED'}
                                 </Text>
-                            </>
-                        ) : (
+                            </View>
+                        )
+                    ) : (
+                        <View style={[styles.badge, styles.freeBadge]}>
                             <Text style={[styles.badgeText, { color: COLORS.primary }]}>
                                 FREE
                             </Text>
-                        )}
-                    </View>
-                </View>
-                <Text style={styles.cardCategoryLabel}>
-                    {(item.categoryLabel || 'Foundation').toUpperCase()} • {displayTime}
-                </Text>
-                <Text style={styles.sessionCardTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.sessionCardSubtitle} numberOfLines={2}>{item.subtitle}</Text>
-                <View style={styles.sessionCardFooter}>
-                    <Text style={styles.sessionDuration}>{displayTime}</Text>
-                    <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
+                        </View>
+                    )}
                 </View>
             </Pressable>
         );
@@ -157,6 +224,8 @@ export default function RoutinesScreen({ navigation }: any) {
                     <Pressable
                         style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
                         onPress={() => navigation.navigate('PetProfileStepper')}
+                        accessibilityRole="button"
+                        accessibilityLabel="Add First Pet"
                     >
                         <Text style={styles.primaryButtonText}>Add First Pet</Text>
                     </Pressable>
@@ -165,9 +234,23 @@ export default function RoutinesScreen({ navigation }: any) {
         );
     }
 
-    const allSessions = SessionService.getSessions();
-    const categories = Object.keys(ROUTINE_CATEGORIES) as RoutineCategory[];
-    const sortedCategories = categories.sort((a, b) => ROUTINE_CATEGORIES[a].order - ROUTINE_CATEGORIES[b].order);
+    // CP-ROUTINES-001-EMPTY-AND-MISSING-DATA:
+    // Render neutral empty state if no routines are available
+    if (allSessions.length === 0) {
+        return (
+            <View style={styles.center} testID="routines-empty-state">
+                <Text style={styles.emptyText}>No routines available right now.</Text>
+            </View>
+        );
+    }
+
+    const isLargeText = fontScale > 1.2;
+    const isNarrow = screenWidth < 350;
+    const cardWidthStyle: { width: DimensionValue } = isLargeText || isNarrow ? { width: '100%' } : { width: '48%' };
+
+    // Get selected category metadata for accessibility and headings
+    const selectedCatMeta = CATEGORY_CATALOGUE_PRESENTATION[activeCategory];
+    const selectedCatTitle = selectedCatMeta?.title || 'Routines';
 
     return (
         <ScrollView
@@ -175,135 +258,292 @@ export default function RoutinesScreen({ navigation }: any) {
             contentContainerStyle={[styles.content, { paddingTop: insets.top + 10 }]}
             testID="routines-tab-screen"
         >
+            {/* Header: Compact and safe-area aware */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Browse Routines</Text>
+                <Text style={styles.headerTitle}>Routines</Text>
+                <Text style={styles.headerHelper}>Choose what your dog needs help with.</Text>
             </View>
 
-            {sortedCategories.map((catKey) => {
-                const catMeta = ROUTINE_CATEGORIES[catKey];
-                const routines = allSessions.filter(s => (s.category || 'foundation') === catKey);
+            {/* Category Grid Chooser */}
+            <View style={styles.categoryGrid}>
+                {activeCategories.map((catKey) => {
+                    const catMeta = CATEGORY_CATALOGUE_PRESENTATION[catKey];
+                    if (!catMeta) return null;
 
-                if (routines.length === 0) return null;
+                    const routines = allSessions.filter(s => getNormalizedCategory(s) === catKey);
+                    const routineCount = routines.length;
+                    const routineCountText = routineCount === 1 ? '1 routine' : `${routineCount} routines`;
 
-                const isExpanded = !!expandedCategories[catKey];
-                const toggleCategory = () => {
-                    setExpandedCategories(prev => ({
-                        ...prev,
-                        [catKey]: !prev[catKey]
-                    }));
-                };
+                    // CP-ROUTINES-001-SHOW-ALL-TOGGLE:
+                    // Category card shows selected = false while showAllRoutines is true
+                    const isSelected = !showAllRoutines && activeCategory === catKey;
 
-                const routineCountText = routines.length === 1 
-                    ? '1 routine' 
-                    : `${routines.length} routines`;
+                    const catAccessibilityLabel = `${catMeta.title}, ${routineCountText}`;
 
-                return (
-                    <View key={catKey} style={styles.categorySection}>
-                        <Pressable 
-                            style={styles.collapsibleCategoryHeader} 
-                            onPress={toggleCategory}
-                            testID={`category-header-${catKey}`}
+                    return (
+                        <Pressable
+                            key={catKey}
+                            testID={`routine-category-${catKey}`}
+                            style={[
+                                styles.categoryCard,
+                                cardWidthStyle,
+                                isSelected && styles.categoryCardSelected
+                            ]}
+                            onPress={() => {
+                                // Selecting a category immediately resets showAllRoutines to false
+                                setSelectedCategory(catKey);
+                                setShowAllRoutines(false);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
+                            accessibilityLabel={catAccessibilityLabel}
                         >
-                            <View style={styles.categoryTitleContainer}>
-                                <Text 
-                                    style={styles.categoryTitleText}
-                                    numberOfLines={2}
-                                    ellipsizeMode="tail"
-                                >
-                                    {`${catMeta.title} · ${routineCountText}`}
-                                </Text>
-                            </View>
-                            <View style={styles.categoryHeaderRight}>
-                                <Text style={styles.categoryToggleActionText}>
-                                    {isExpanded ? 'Hide' : 'Show'}
-                                </Text>
+                            <View style={styles.categoryCardHeader}>
                                 <Ionicons 
-                                    name={isExpanded ? 'chevron-up' : 'chevron-down'} 
-                                    size={16} 
-                                    color={COLORS.primary} 
+                                    name={catMeta.icon as any} 
+                                    size={24} 
+                                    color={isSelected ? COLORS.primary : COLORS.textSecondary} 
                                 />
-                            </View>
-                        </Pressable>
-
-                        {isExpanded && (
-                            <View style={{ marginTop: 8 }}>
-                                <Text style={styles.categorySubtitle}>{catMeta.subtitle}</Text>
-                                {routines.length > 1 ? (
-                                    <FlatList
-                                        data={routines}
-                                        renderItem={({ item }) => renderSessionCard(item, true)}
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        keyExtractor={item => item.id}
-                                        style={styles.horizontalList}
+                                {isSelected && (
+                                    <Ionicons 
+                                        name="checkmark-circle" 
+                                        size={18} 
+                                        color={COLORS.primary} 
+                                        style={styles.checkmarkIcon}
                                     />
-                                ) : (
-                                    renderSessionCard(routines[0], false)
                                 )}
                             </View>
-                        )}
+                            <Text style={styles.categoryCardTitle}>{catMeta.title}</Text>
+                            <Text style={styles.categoryCardHelper}>{catMeta.helper}</Text>
+                            <Text style={styles.categoryCardCount}>{routineCountText}</Text>
+                        </Pressable>
+                    );
+                })}
+            </View>
+
+            {/* CP-ROUTINES-001-SHOW-ALL-TOGGLE: Reversible toggle button */}
+            <Pressable
+                testID="routine-category-all"
+                style={[
+                    styles.showAllButton,
+                    showAllRoutines && styles.showAllButtonSelected
+                ]}
+                onPress={() => setShowAllRoutines(prev => !prev)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: showAllRoutines }}
+                accessibilityLabel={showAllRoutines ? `Back to ${selectedCatTitle}` : "Show all routines"}
+            >
+                <Text style={[
+                    styles.showAllButtonText,
+                    showAllRoutines && styles.showAllButtonTextSelected
+                ]}>
+                    {showAllRoutines ? "Back to selected category" : "Show all routines"}
+                </Text>
+            </Pressable>
+
+            {/* Routine List Section */}
+            <View style={styles.listSection}>
+                <Text style={styles.listHeading}>
+                    {showAllRoutines ? 'All routines' : selectedCatTitle}
+                </Text>
+
+                {showAllRoutines ? (
+                    activeCategories.map((catKey) => {
+                        const routines = allSessions.filter(s => getNormalizedCategory(s) === catKey);
+                        if (routines.length === 0) return null;
+
+                        return (
+                            <View key={catKey} testID={`routine-section-${catKey}`} style={styles.sectionGroup}>
+                                <Text style={styles.sectionHeaderTitle}>
+                                    {ROUTINE_CATEGORIES[catKey as RoutineCategory].title}
+                                </Text>
+                                <View style={styles.sectionRoutinesList}>
+                                    {routines.map(s => renderSessionCard(s))}
+                                </View>
+                            </View>
+                        );
+                    })
+                ) : (
+                    <View style={styles.sectionRoutinesList}>
+                        {allSessions
+                            .filter(s => getNormalizedCategory(s) === activeCategory)
+                            .map(s => renderSessionCard(s))
+                        }
                     </View>
-                );
-            })}
+                )}
+            </View>
         </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F6FAF8' },
-    content: { padding: 20, paddingBottom: 40 },
+    content: { padding: 16, paddingBottom: 40 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { marginBottom: 16 },
-    headerTitle: { ...FONTS.h1, color: COLORS.text },
-    categorySection: { marginBottom: 16 },
-    categorySubtitle: { ...FONTS.small, color: COLORS.textSecondary, marginTop: 2 },
-    cardCategoryLabel: { ...FONTS.caption, color: COLORS.primary, fontWeight: '600', marginBottom: 4 },
-    collapsibleCategoryHeader: {
+    header: { marginBottom: 20 },
+    headerTitle: { ...FONTS.h1, color: COLORS.text, marginBottom: 4 },
+    headerHelper: { ...FONTS.body, color: COLORS.textSecondary },
+    emptyText: { ...FONTS.body, color: COLORS.textSecondary },
+
+    categoryGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        width: '100%',
+        gap: 12,
+        marginBottom: 16,
+    },
+    categoryCard: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E3ECEF',
+        ...SHADOWS.small,
+        justifyContent: 'flex-start',
+        minHeight: 140,
+    },
+    categoryCardSelected: {
+        borderColor: COLORS.primary,
+        borderWidth: 2,
+    },
+    categoryCardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: '#E3ECEF',
-        gap: 8,
-        ...SHADOWS.small
+        marginBottom: 8,
     },
-    categoryTitleContainer: {
-        flex: 1,
-        flexShrink: 1,
-        minWidth: 0
+    checkmarkIcon: {
+        marginLeft: 'auto',
     },
-    categoryTitleText: {
+    categoryCardTitle: {
         fontSize: 14,
         fontWeight: '700',
         color: COLORS.text,
-        flexShrink: 1
+        marginBottom: 4,
     },
-    categoryHeaderRight: {
+    categoryCardHelper: {
+        fontSize: 11,
+        color: COLORS.textSecondary,
+        lineHeight: 16,
+        marginBottom: 8,
+        flexGrow: 1,
+    },
+    categoryCardCount: {
+        fontSize: 11,
+        color: COLORS.primary,
+        fontWeight: '600',
+    },
+
+    showAllButton: {
+        width: '100%',
+        height: 48,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 28,
+        backgroundColor: 'transparent',
+    },
+    showAllButtonSelected: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    showAllButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.primary,
+    },
+    showAllButtonTextSelected: {
+        color: '#fff',
+    },
+
+    listSection: {
+        marginTop: 8,
+    },
+    listHeading: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 16,
+    },
+    sectionGroup: {
+        marginBottom: 24,
+    },
+    sectionHeaderTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 12,
+    },
+    sectionRoutinesList: {
+        gap: 12,
+    },
+
+    sessionCardItem: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E3ECEF',
+        ...SHADOWS.small,
+        width: '100%',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 6,
+    },
+    sessionCardTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+        flex: 1,
+        marginRight: 12,
+        lineHeight: 20,
+    },
+    cardArrow: {
+        marginTop: 2,
+    },
+    sessionCardSubtitle: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        lineHeight: 18,
+        marginBottom: 12,
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+        paddingTop: 10,
+    },
+    sessionDuration: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        fontWeight: '600',
+    },
+    badge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        flexShrink: 0
     },
-    categoryToggleActionText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: COLORS.primary
+    freeBadge: {
+        backgroundColor: '#DDF4EF',
     },
-    horizontalList: { marginHorizontal: -20, paddingHorizontal: 20, marginBottom: 16 },
-    sessionCardItem: { backgroundColor: '#fff', borderRadius: 20, padding: 16, ...SHADOWS.small, borderWidth: 1, borderColor: '#E3ECEF' },
-    sessionCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-    sessionIconBg: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#DDF4EF', justifyContent: 'center', alignItems: 'center' },
-    badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center' },
-    freeBadge: { backgroundColor: '#DDF4EF' },
-    badgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-    sessionCardTitle: { ...FONTS.body, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-    sessionCardSubtitle: { ...FONTS.small, color: COLORS.textSecondary, lineHeight: 18, marginBottom: 12 },
-    sessionCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 10 },
-    sessionDuration: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+    badgeText: {
+        fontSize: 9,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+
     noPetAvatar: { width: 150, height: 150, backgroundColor: COLORS.lavender, borderRadius: 75, justifyContent: 'center', alignItems: 'center', marginBottom: 30, ...SHADOWS.small },
     noPetTitle: { ...FONTS.h1, color: COLORS.primary, textAlign: 'center', marginBottom: 16 },
     noPetDesc: { ...FONTS.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 24 },

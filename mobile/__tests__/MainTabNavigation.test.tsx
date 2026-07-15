@@ -81,7 +81,7 @@ describe('MainTabNavigator Focused Tests', () => {
     fireEvent.press(routinesTab);
     const routinesScreen = await findByTestId('routines-tab-screen');
     expect(routinesScreen).toBeTruthy();
-    expect(within(routinesScreen).getByText('Browse Routines')).toBeTruthy();
+    expect(within(routinesScreen).getByText('Routines')).toBeTruthy();
     expect(routinesTab.props.accessibilityState.selected).toBe(true);
 
     const soundsTab = getByTestId('main-tab-sounds');
