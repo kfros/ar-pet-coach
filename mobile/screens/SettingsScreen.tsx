@@ -154,6 +154,7 @@ export default function SettingsScreen({ navigation }: any) {
                         styles.backButton,
                         pressed && { opacity: 0.7 }
                     ]}
+                    testID="settings-back-button"
                 >
                     <Ionicons name="arrow-back" size={24} color={COLORS.text} />
                 </Pressable>

@@ -287,6 +287,7 @@ export default function DashboardScreen({ navigation }: any) {
                 <Pressable
                     onPress={() => navigation.navigate('Settings')}
                     style={({ pressed }) => [styles.settingsButton, pressed && { opacity: 0.6 }]}
+                    testID="settings-button"
                 >
                     <Ionicons name="settings-outline" size={26} color={COLORS.text} />
                 </Pressable>

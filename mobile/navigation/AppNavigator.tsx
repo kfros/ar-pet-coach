@@ -5,7 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { auth } from '../services/firebaseConfig';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import LoginScreen from '../screens/LoginScreen';
-import DashboardScreen from '../screens/DashboardScreen';
+import MainTabNavigator from './MainTabNavigator';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
 import TermsScreen from '../screens/TermsScreen';
@@ -45,7 +45,7 @@ type AppEntryState = {
 function AppNavigatorStack({ initialRouteName }: { initialRouteName: AppRouteName }) {
     return (
         <AppStack.Navigator initialRouteName={initialRouteName}>
-            <AppStack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
+            <AppStack.Screen name="Dashboard" component={MainTabNavigator} options={{ headerShown: false }} />
             <AppStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
             <AppStack.Screen name="PetProfileStepper" component={PetProfileStepper} options={{ headerShown: false }} />
             <AppStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
