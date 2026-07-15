@@ -19,6 +19,7 @@ import { getAnxietyColor } from '../helpers/anxietyGradient';
 import PetProfileRepository from '../services/petProfileRepository';
 import SessionService from '../services/sessionService';
 import { HomeSnapshot } from '../types/Session';
+import { getProfileRecommendation } from '../services/profileRecommendationService';
 
 export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
@@ -60,34 +61,17 @@ export default function DashboardScreen({ navigation }: any) {
                 const snapshot = await SessionService.getHomeSnapshot(pet.id || 'guest_pet');
                 setHomeSnapshot(snapshot || null);
 
-                // Recommendation selection logic
                 const allSessions = SessionService.getSessions();
-                let recommended = allSessions.find(s => s.id === 'daily_calm_reset');
-                let reason = 'Start here: short and easy';
-
-                const triggers = pet.anxietyTriggers || [];
+                const triggers = pet.anxietyTriggers;
                 const isSevere = !!snapshot?.latestCheckIn?.hasSevereSigns;
 
-                if (!isSevere && (triggers.includes('new_places') || triggers.includes('traffic_car_horns') || triggers.includes('nighttime') || triggers.includes('not_sure'))) {
-                    recommended = allSessions.find(s => s.id === 'outdoor_confidence_reset');
-                    reason = 'Outdoor threshold practice for new places/worry';
-                } else if (triggers.includes('loud_noises') || triggers.includes('fireworks')) {
-                    recommended = isPremium 
-                        ? allSessions.find(s => s.id === 'fireworks_prep_routine') 
-                        : allSessions.find(s => s.id === 'fireworks_loud_noises_basic');
-                    reason = 'Because noise/fireworks trigger is selected';
-                } else if (triggers.includes('visitors')) {
-                    recommended = allSessions.find(s => s.id === 'visitors_at_home');
-                    reason = 'Practice calm distance for visitors';
-                } else if (triggers.includes('being_alone')) {
-                    recommended = allSessions.find(s => s.id === 'being_alone');
-                    reason = 'Practice tiny distance for being alone';
-                } else if (triggers.includes('vet_visits')) {
-                    recommended = allSessions.find(s => s.id === 'vet_visit_prep');
-                    reason = 'Low-pressure prep for handling & vet visits';
-                }
+                const { session: recommended, reason } = getProfileRecommendation(
+                    allSessions,
+                    triggers,
+                    isSevere
+                );
 
-                setRecommendedSession(recommended || null);
+                setRecommendedSession(recommended);
                 setRecommendationReason(reason);
             } else {
                 setPetId(null);
