@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROUTINE_CATEGORIES } from '../appContent/routineCategories';
 import { RoutineCategory } from '../types/Session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import PreviewDisclosureSection from '../components/PreviewDisclosureSection';
 import {
     OUTDOOR_CONFIDENCE_LEVELS,
     getOutdoorConfidenceLevel,
@@ -182,13 +183,53 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
         );
     }
 
+    // Resolve safety notes and stopIf following safety block evaluation order (CP-PREVIEW-001-SAFETY-SOURCE)
+    const hasSafetyNotes = Array.isArray(session.safetyNotes) && session.safetyNotes.some(item => typeof item === 'string' && item.trim() !== '');
+    
+    let safetyContent: string[] = [];
+    let safetyHeading = '';
+    
+    if (hasSafetyNotes) {
+        safetyContent = session.safetyNotes!.filter((item: any) => typeof item === 'string' && item.trim() !== '');
+        safetyHeading = 'Before you start';
+    } else if (Array.isArray(session.stopIf)) {
+        // Filter stopIf: remove internal IDs (trimmed matches ^[a-z0-9_]+$)
+        const isInternalId = (val: string) => /^[a-z0-9_]+$/.test(val.trim());
+        safetyContent = session.stopIf
+            .filter((item: any): item is string => typeof item === 'string' && item.trim() !== '' && !isInternalId(item));
+        if (safetyContent.length > 0) {
+            safetyHeading = 'Stop the session if';
+        }
+    }
+
+    // Resolve Get ready (beforeYouStart) items with exact deduplication against the safety content rendered
+    let getReadyItems: string[] = [];
+    if (Array.isArray(session.beforeYouStart)) {
+        const safetyContentTrimmedSet = new Set(safetyContent.map(s => s.trim()));
+        getReadyItems = session.beforeYouStart
+            .filter((item: any): item is string => typeof item === 'string' && item.trim() !== '')
+            .filter((item: string) => !safetyContentTrimmedSet.has(item.trim()));
+    }
+
+    // Meta counts helper for accordion labels
+    const stepsCount = session.steps ? session.steps.filter(s => !!s.title).length : 0;
+    const suitableCount = session.suitableFor ? session.suitableFor.length : 0;
+    const readyCount = getReadyItems.length;
+    const fallbackCount = session.fallbacks ? session.fallbacks.length : 0;
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Pressable onPress={() => navigation.goBack()} style={styles.backButton} testID="preview-back-button">
+                <Pressable 
+                    onPress={() => navigation.goBack()} 
+                    style={styles.backButton} 
+                    testID="preview-back-button"
+                    accessibilityRole="button"
+                    accessibilityLabel="Back"
+                >
                     <Ionicons name="chevron-back" size={28} color={COLORS.text} />
                 </Pressable>
-                <Text style={styles.headerTitle}>Session Preview</Text>
+                <Text style={styles.headerTitle}>Routine preview</Text>
             </View>
 
             <ScrollView
@@ -197,14 +238,16 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     { paddingBottom: insets.bottom + 120 } // Ensure content is not hidden by sticky footer
                 ]}
             >
-                {/* 1. Routine Summary Card */}
+                {/* 1. Celebration Banner (after purchase) */}
                 {route.params?.unlockedAfterPurchase && (
                     <View style={styles.celebrationBanner}>
                         <Ionicons name="sparkles" size={20} color="#11866F" />
                         <Text style={styles.celebrationText}>Premium Unlocked! Enjoy the routine.</Text>
                     </View>
                 )}
-                <View style={styles.heroCard}>
+                
+                {/* 2. Routine Summary Card */}
+                <View style={styles.heroCard} testID="preview-summary-card">
                     <View style={styles.heroTopRow}>
                         {session.category && (
                             <Text style={styles.categoryLabel}>
@@ -238,13 +281,23 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     <View style={styles.metaRow}>
                         <View style={styles.metaItem}>
                             <Ionicons name="time-outline" size={16} color={COLORS.primary} />
-                            <Text style={styles.metaText}>{session.durationMinutes} min</Text>
+                            <Text style={styles.metaText}>
+                                {session.suggestedTimeCopy || `${session.durationMinutes} min`}
+                            </Text>
                         </View>
                         <View style={styles.metaItem}>
                             <Ionicons name="stats-chart-outline" size={16} color={COLORS.primary} />
                             <Text style={styles.metaText}>{session.difficulty}</Text>
                         </View>
                     </View>
+                    {session.backgroundSoundPolicy && session.backgroundSoundPolicy.mode !== 'none' && (
+                        <View style={styles.silentBadge}>
+                            <Ionicons name="musical-notes-outline" size={16} color={COLORS.primary} />
+                            <Text style={styles.silentText}>
+                                {session.backgroundSoundPolicy.helperText || session.backgroundSoundPolicy.label || 'Background sound recommended.'}
+                            </Text>
+                        </View>
+                    )}
                     {session.backgroundSoundPolicy?.mode === 'none' && (
                         <View style={styles.silentBadge}>
                             <Ionicons name="volume-mute" size={16} color="#6B7280" />
@@ -253,39 +306,7 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     )}
                 </View>
 
-                {/* Premium context block */}
-                {isLocked && (
-                    <View 
-                        testID="premium-preview-access-card" 
-                        style={styles.premiumContextCard}
-                    >
-                        <Text style={styles.premiumContextTitle}>Premium routine</Text>
-                        <Text style={styles.premiumContextBody}>
-                            This routine is included with ChillPup Premium. You can review it before deciding whether to unlock it.
-                        </Text>
-                    </View>
-                )}
-
-                {/* What you'll do overview */}
-                {session.steps && session.steps.length > 0 && session.steps.some(step => !!step.title) && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>What you'll do</Text>
-                        <View style={styles.stepsOverviewContainer}>
-                            {session.steps
-                                .filter(step => !!step.title)
-                                .map((step, idx) => (
-                                    <View key={step.id || idx} style={styles.stepOverviewItem}>
-                                        <View style={styles.stepOverviewNumber}>
-                                            <Text style={styles.stepOverviewNumberText}>{idx + 1}</Text>
-                                        </View>
-                                        <Text style={styles.stepOverviewText}>{step.title}</Text>
-                                    </View>
-                                ))}
-                        </View>
-                    </View>
-                )}
-
-                {/* 2. New Level Available banner, if applicable */}
+                {/* 3. New Level Available / Easier level suggested notice (Milestone notices) */}
                 {showBanner && newlyUnlockedLevel && (
                     <View style={[
                         styles.notificationBanner,
@@ -341,68 +362,20 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
 
-                {/* 3. Outdoor Confidence Level selector */}
-                {sessionId === 'outdoor_confidence_reset' && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Outdoor Confidence level</Text>
-                        <Text style={styles.helperText}>Choose today’s outdoor level. This level changes one practice step inside the session. Repeating an easier level is always okay.</Text>
-                        <View style={styles.levelLadder}>
-                            {OUTDOOR_LEVELS.map((lvl) => {
-                                const isUnlocked = unlockedLevels.includes(lvl);
-                                const isSelected = selectedLevel === lvl;
-                                const isNew = newlyUnlockedLevel === lvl;
-
-                                return (
-                                    <Pressable
-                                        key={lvl}
-                                        disabled={!isUnlocked}
-                                        style={[
-                                            styles.ladderStep,
-                                            isSelected && styles.ladderStepSelected,
-                                            !isUnlocked && styles.ladderStepLocked
-                                        ]}
-                                        onPress={() => handleSelectLevel(lvl)}
-                                    >
-                                        <View style={styles.ladderStepLeft}>
-                                            <Ionicons 
-                                                name={isUnlocked ? (isSelected ? "radio-button-on" : "radio-button-off") : "lock-closed"} 
-                                                size={18} 
-                                                color={isUnlocked ? (isSelected ? COLORS.primary : COLORS.textSecondary) : "#A3A3A3"} 
-                                            />
-                                            <Text style={[
-                                                styles.ladderStepLabel,
-                                                isSelected && styles.ladderStepLabelSelected,
-                                                !isUnlocked && styles.ladderStepLabelLocked
-                                            ]}>
-                                                {(() => {
-                                                    const info = getOutdoorConfidenceLevel(lvl);
-                                                    return info ? `Level ${info.levelIndex} of 7: ${info.label}` : LEVEL_LABELS[lvl];
-                                                })()}
-                                            </Text>
-                                        </View>
-                                        {isNew && (
-                                            <View style={styles.newBadge}>
-                                                <Text style={styles.newBadgeText}>New</Text>
-                                            </View>
-                                        )}
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
-                    </View>
-                )}
-
-                {/* 4. Compact threshold/safety warning */}
-                {sessionId === 'outdoor_confidence_reset' && (
-                    <View style={styles.outdoorWarningBanner}>
-                        <Ionicons name="alert-circle" size={20} color="#9A5B00" />
-                        <Text style={styles.outdoorWarningText}>
-                            This routine is for threshold practice at the safest edge, not a full walk.
+                {/* 4. Compact Premium Context Block (shown for confirmed locked state only) */}
+                {isLocked && (
+                    <View 
+                        testID="premium-preview-access-card" 
+                        style={styles.premiumContextCard}
+                    >
+                        <Text style={styles.premiumContextTitle}>Premium routine</Text>
+                        <Text style={styles.premiumContextBody}>
+                            Premium is required to start. You can review the routine first.
                         </Text>
                     </View>
                 )}
 
-                {/* 5. Best for / Use another option if / Try instead / Before you start */}
+                {/* 5. Target Level Banner (if sessionId is not outdoor_confidence_reset but has level param) */}
                 {sessionId !== 'outdoor_confidence_reset' && route.params?.level && LEVEL_LABELS[route.params.level] && (
                     <View style={styles.levelTargetBanner}>
                         <Ionicons name="flag-outline" size={20} color="#0F766E" />
@@ -412,22 +385,11 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
 
-                {session.suitableFor && session.suitableFor.length > 0 && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Best for</Text>
-                        {session.suitableFor.map((item, index) => (
-                            <View key={index} style={styles.listItem}>
-                                <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.success} />
-                                <Text style={styles.listText}>{item}</Text>
-                            </View>
-                        ))}
-                    </View>
-                )}
-
+                {/* 6. Use another option if (visible & expanded by default) */}
                 {session.notFor && session.notFor.length > 0 && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Use another option if</Text>
-                        {session.notFor.map((item, index) => (
+                        {session.notFor.map((item: string, index: number) => (
                             <View key={index} style={styles.listItem}>
                                 <Ionicons name="close-circle-outline" size={18} color="#B7791F" />
                                 <Text style={styles.listText}>{item}</Text>
@@ -436,59 +398,185 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                     </View>
                 )}
 
-                {session.fallbacks && session.fallbacks.length > 0 && (
+                {/* 7. Active Safety Block (visible & expanded by default) */}
+                {safetyContent.length > 0 && (
+                    <View style={styles.safetySection}>
+                        <Text style={styles.safetyTitle}>{safetyHeading}</Text>
+                        {safetyContent.map((item: string, index: number) => (
+                            <View key={index} style={styles.listItem}>
+                                <Ionicons name="alert-circle" size={18} color="#9A5B00" />
+                                <Text style={styles.safetyText}>{item}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* 8. Outdoor Level Selection (selected summary + threshold warning + collapsible ladder) */}
+                {sessionId === 'outdoor_confidence_reset' && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Try instead</Text>
-                        {session.fallbacks.map((fallback: any, index: number) => (
-                            <Pressable
-                                key={index}
-                                style={[
-                                    styles.fallbackCard,
-                                    fallback.type === 'info' && { opacity: 0.9 }
-                                ]}
-                                onPress={() => {
-                                    if (fallback.type === 'routine' && fallback.routineId) {
-                                        navigation.navigate('SessionPreview', { sessionId: fallback.routineId, petId });
-                                    }
-                                }}
-                            >
-                                <View style={styles.fallbackHeader}>
-                                    <Text style={styles.fallbackTitle}>{fallback.title}</Text>
-                                    {fallback.type === 'routine' && (
-                                        <Ionicons name="chevron-forward" size={16} color="#0F8A7A" />
-                                    )}
+                        <View style={styles.selectedLevelCard} testID="outdoor-level-summary">
+                            <Text style={styles.selectedLevelTitle}>Outdoor Confidence level</Text>
+                            <Text style={styles.selectedLevelValue}>
+                                {(() => {
+                                    const info = getOutdoorConfidenceLevel(selectedLevel);
+                                    return info ? `Level ${info.levelIndex} of 7: ${info.label}` : LEVEL_LABELS[selectedLevel] || selectedLevel;
+                                })()}
+                            </Text>
+                        </View>
+                        
+                        <View style={styles.outdoorWarningBanner}>
+                            <Ionicons name="alert-circle" size={20} color="#9A5B00" />
+                            <Text style={styles.outdoorWarningText}>
+                                This routine is for threshold practice at the safest edge, not a full walk.
+                            </Text>
+                        </View>
+
+                        <PreviewDisclosureSection
+                            title={(expanded) => expanded ? "Hide levels" : "Change level"}
+                            testID="preview-disclosure-outdoor-levels"
+                        >
+                            <Text style={styles.helperText}>Choose today’s outdoor level. This level changes one practice step inside the session. Repeating an easier level is always okay.</Text>
+                            <View style={styles.levelLadder}>
+                                {OUTDOOR_LEVELS.map((lvl) => {
+                                    const isUnlocked = unlockedLevels.includes(lvl);
+                                    const isSelected = selectedLevel === lvl;
+                                    const isNew = newlyUnlockedLevel === lvl;
+
+                                    return (
+                                        <Pressable
+                                            key={lvl}
+                                            disabled={!isUnlocked}
+                                            style={[
+                                                styles.ladderStep,
+                                                isSelected && styles.ladderStepSelected,
+                                                !isUnlocked && styles.ladderStepLocked
+                                            ]}
+                                            onPress={() => handleSelectLevel(lvl)}
+                                        >
+                                            <View style={styles.ladderStepLeft}>
+                                                <Ionicons 
+                                                    name={isUnlocked ? (isSelected ? "radio-button-on" : "radio-button-off") : "lock-closed"} 
+                                                    size={18} 
+                                                    color={isUnlocked ? (isSelected ? COLORS.primary : COLORS.textSecondary) : "#A3A3A3"} 
+                                                />
+                                                <Text style={[
+                                                    styles.ladderStepLabel,
+                                                    isSelected && styles.ladderStepLabelSelected,
+                                                    !isUnlocked && styles.ladderStepLabelLocked
+                                                ]}>
+                                                    {(() => {
+                                                        const info = getOutdoorConfidenceLevel(lvl);
+                                                        return info ? `Level ${info.levelIndex} of 7: ${info.label}` : LEVEL_LABELS[lvl];
+                                                    })()}
+                                                </Text>
+                                            </View>
+                                            {isNew && (
+                                                <View style={styles.newBadge}>
+                                                    <Text style={styles.newBadgeText}>New</Text>
+                                                </View>
+                                            )}
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </PreviewDisclosureSection>
+                    </View>
+                )}
+
+                {/* 9. Disclosures */}
+                {/* What you'll do disclosure */}
+                {stepsCount > 0 && (
+                    <PreviewDisclosureSection
+                        title="What you'll do"
+                        collapsedMeta={`${stepsCount} ${stepsCount === 1 ? 'step' : 'steps'}`}
+                        testID="preview-disclosure-steps"
+                    >
+                        <View style={styles.stepsOverviewContainer}>
+                            {session.steps!
+                                .filter(step => !!step.title)
+                                .map((step, idx) => (
+                                    <View key={step.id || idx} style={styles.stepOverviewItem}>
+                                        <View style={styles.stepOverviewNumber}>
+                                            <Text style={styles.stepOverviewNumberText}>{idx + 1}</Text>
+                                        </View>
+                                        <Text style={styles.stepOverviewText}>{step.title}</Text>
+                                    </View>
+                                ))}
+                        </View>
+                    </PreviewDisclosureSection>
+                )}
+
+                {/* Best for disclosure */}
+                {suitableCount > 0 && (
+                    <PreviewDisclosureSection
+                        title="Best for"
+                        collapsedMeta={`${suitableCount} ${suitableCount === 1 ? 'note' : 'notes'}`}
+                        testID="preview-disclosure-best-for"
+                    >
+                        <View style={{ marginTop: 8 }}>
+                            {session.suitableFor!.map((item: string, index: number) => (
+                                <View key={index} style={styles.listItem}>
+                                    <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.success} />
+                                    <Text style={styles.listText}>{item}</Text>
                                 </View>
-                                <Text style={styles.fallbackBody}>{fallback.body}</Text>
-                            </Pressable>
-                        ))}
-                    </View>
+                            ))}
+                        </View>
+                    </PreviewDisclosureSection>
                 )}
 
-                {session.safetyNotes && session.safetyNotes.length > 0 && (
-                    <View style={styles.safetySection}>
-                        <Text style={styles.safetyTitle}>Before you start</Text>
-                        {session.safetyNotes.map((item, index) => (
-                            <View key={index} style={styles.listItem}>
-                                <Ionicons name="alert-circle" size={18} color="#9A5B00" />
-                                <Text style={styles.safetyText}>{item}</Text>
-                            </View>
-                        ))}
-                    </View>
+                {/* Get ready disclosure (excluding rendered safety duplicates) */}
+                {readyCount > 0 && (
+                    <PreviewDisclosureSection
+                        title="Get ready"
+                        collapsedMeta={`${readyCount} ${readyCount === 1 ? 'item' : 'items'}`}
+                        testID="preview-disclosure-get-ready"
+                    >
+                        <View style={{ marginTop: 8 }}>
+                            {getReadyItems.map((item: string, index: number) => (
+                                <View key={index} style={styles.listItem}>
+                                    <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} />
+                                    <Text style={styles.listText}>{item}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </PreviewDisclosureSection>
                 )}
 
-                {!session.safetyNotes && session.stopIf && (
-                    <View style={styles.safetySection}>
-                        <Text style={styles.safetyTitle}>Stop the session if:</Text>
-                        {session.stopIf.map((item, index) => (
-                            <View key={index} style={styles.listItem}>
-                                <Ionicons name="alert-circle" size={18} color="#9A5B00" />
-                                <Text style={styles.safetyText}>{item}</Text>
-                            </View>
-                        ))}
-                    </View>
+                {/* Try instead disclosure */}
+                {fallbackCount > 0 && (
+                    <PreviewDisclosureSection
+                        title="Try instead"
+                        collapsedMeta={`${fallbackCount} ${fallbackCount === 1 ? 'option' : 'options'}`}
+                        testID="preview-disclosure-try-instead"
+                    >
+                        <View style={{ marginTop: 8 }}>
+                            {session.fallbacks!.map((fallback: any, index: number) => (
+                                <Pressable
+                                    key={index}
+                                    style={[
+                                        styles.fallbackCard,
+                                        fallback.type === 'info' && { opacity: 0.9 }
+                                    ]}
+                                    onPress={() => {
+                                        if (fallback.type === 'routine' && fallback.routineId) {
+                                            navigation.navigate('SessionPreview', { sessionId: fallback.routineId, petId });
+                                        }
+                                    }}
+                                >
+                                    <View style={styles.fallbackHeader}>
+                                        <Text style={styles.fallbackTitle}>{fallback.title}</Text>
+                                        {fallback.type === 'routine' && (
+                                            <Ionicons name="chevron-forward" size={16} color="#0F8A7A" />
+                                        )}
+                                    </View>
+                                    <Text style={styles.fallbackBody}>{fallback.body}</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </PreviewDisclosureSection>
                 )}
 
-                {/* 6. Disclaimer */}
+                {/* 10. Disclaimer */}
                 <View style={styles.disclaimer}>
                     <Text style={styles.disclaimerText}>
                         ChillPup routines are gentle practice guides based on owner observations. They are not a diagnosis, treatment plan, or substitute for advice from a veterinarian or qualified behavior professional.
@@ -833,5 +921,24 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: COLORS.text,
         flex: 1,
+    },
+    selectedLevelCard: {
+        backgroundColor: '#fff',
+        borderRadius: SIZES.radius,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.small,
+    },
+    selectedLevelTitle: {
+        ...FONTS.caption,
+        color: COLORS.textSecondary,
+        marginBottom: 4,
+    },
+    selectedLevelValue: {
+        ...FONTS.body,
+        fontWeight: 'bold',
+        color: COLORS.text,
     },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, act, waitFor, within } from '@testing-library/react-native';
 import GuidedSessionScreen from '../screens/GuidedSessionScreen';
 import SessionPreviewScreen from '../screens/SessionPreviewScreen';
 import { SubscriptionProvider } from '../components/SubscriptionManager';
@@ -213,7 +213,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
       'short_pause'
     );
 
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -221,6 +221,10 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
         />
       </SubscriptionProvider>
     );
+    await act(async () => {});
+
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
     await act(async () => {});
 
     // Verify newly unlocked level 'Short Outside Pause' is visible
@@ -249,7 +253,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
       'open_edge'
     );
 
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -259,8 +263,13 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
     );
     await act(async () => {});
 
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
+    await act(async () => {});
+
     // Select doorway_calm (easier step)
-    fireEvent.press(getByText(/Doorway Calm/i));
+    const ladderContent = getByTestId('preview-disclosure-outdoor-levels-content');
+    fireEvent.press(within(ladderContent).getByText(/Doorway Calm/i));
     await act(async () => {});
 
     // Verify selected level is set to doorway_calm
@@ -323,7 +332,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
       'open_edge'
     );
 
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -331,6 +340,10 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
         />
       </SubscriptionProvider>
     );
+    await act(async () => {});
+
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
     await act(async () => {});
 
     // Verify that the level is still visible and has the 'New' badge
@@ -405,7 +418,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
       'open_edge'
     );
 
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -413,6 +426,10 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
         />
       </SubscriptionProvider>
     );
+    await act(async () => {});
+
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
     await act(async () => {});
 
     // Level 'Open Edge' is visible and unlocked in the selector ladder
@@ -550,7 +567,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
   });
 
   test('outdoor_progress_016: SessionPreview uses level terminology rather than step terminology in helper', async () => {
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -558,6 +575,10 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
         />
       </SubscriptionProvider>
     );
+    await act(async () => {});
+
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
     await act(async () => {});
 
     // Assert that the preview copy uses "outdoor level" helper instead of "outdoor step"
@@ -572,7 +593,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
     await AsyncStorage.setItem('chillpup_outdoor_confidence_achieved_level_test-pet', 'few_steps');
     await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'hundred_steps');
 
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -582,8 +603,13 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
     );
     await act(async () => {});
 
-    expect(getByText('Level 5 of 7: A Few Calm Steps')).toBeTruthy();
-    expect(getByText('Level 6 of 7: 100-Step Confidence')).toBeTruthy();
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
+    await act(async () => {});
+
+    const ladderContent = getByTestId('preview-disclosure-outdoor-levels-content');
+    expect(within(ladderContent).getByText('Level 5 of 7: A Few Calm Steps')).toBeTruthy();
+    expect(within(ladderContent).getByText('Level 6 of 7: 100-Step Confidence')).toBeTruthy();
     expect(getByText('New')).toBeTruthy();
 
     fireEvent.press(getByText('Start Session'));
@@ -603,7 +629,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
     await AsyncStorage.setItem('chillpup_outdoor_confidence_achieved_level_test-pet', 'few_steps');
     await AsyncStorage.setItem('chillpup_newly_unlocked_outdoor_confidence_level_test-pet', 'hundred_steps');
 
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -613,7 +639,12 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
     );
     await act(async () => {});
 
-    fireEvent.press(getByText('Level 6 of 7: 100-Step Confidence'));
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
+    await act(async () => {});
+
+    const ladderContent = getByTestId('preview-disclosure-outdoor-levels-content');
+    fireEvent.press(within(ladderContent).getByText('Level 6 of 7: 100-Step Confidence'));
     await act(async () => {});
 
     fireEvent.press(getByText('Start Session'));
@@ -866,7 +897,7 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
       'open_edge'
     );
 
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText, getByTestId } = render(
       <SubscriptionProvider>
         <SessionPreviewScreen
           navigation={mockNavigation}
@@ -874,6 +905,10 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
         />
       </SubscriptionProvider>
     );
+    await act(async () => {});
+
+    // Expand the levels ladder
+    fireEvent.press(getByTestId('preview-disclosure-outdoor-levels'));
     await act(async () => {});
 
     // Select new level -> acknowledges banner
@@ -884,7 +919,8 @@ describe('Suite 17: Outdoor Confidence Milestones and Routing', () => {
     expect(queryByText('New level available')).toBeNull();
 
     // The level 'Level 2 of 7: Open Edge' is still visible in the ladder
-    expect(getByText('Level 2 of 7: Open Edge')).toBeTruthy();
+    const ladderContent = getByTestId('preview-disclosure-outdoor-levels-content');
+    expect(within(ladderContent).getByText('Level 2 of 7: Open Edge')).toBeTruthy();
   });
 });
 

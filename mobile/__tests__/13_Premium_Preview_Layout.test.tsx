@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import SessionPreviewScreen from '../screens/SessionPreviewScreen';
 import RoutinesScreen from '../screens/RoutinesScreen';
 import * as SubscriptionManager from '../components/SubscriptionManager';
@@ -150,13 +150,18 @@ describe('Premium Preview Layout and Badge State', () => {
         };
         (SessionService.getSessionById as jest.Mock).mockReturnValue(sessionWithFallbacks);
 
-        const { getByText } = render(
+        const { getByText, getByTestId } = render(
             <SubscriptionManager.SubscriptionProvider>
                 <SessionPreviewScreen navigation={mockNavigation} route={mockRoute} />
             </SubscriptionManager.SubscriptionProvider>
         );
 
         expect(getByText('Try instead')).toBeTruthy();
+        
+        // Expand the disclosure
+        const header = getByTestId('preview-disclosure-try-instead');
+        fireEvent.press(header);
+
         expect(getByText('Fallback Routine')).toBeTruthy();
         expect(getByText('Use this instead')).toBeTruthy();
     });
