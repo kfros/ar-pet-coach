@@ -1,4 +1,4 @@
-import { getProfileRecommendation } from '../services/profileRecommendationService';
+import { getProfileRecommendation, getHomeRecommendation } from '../services/profileRecommendationService';
 import { Session } from '../types/Session';
 
 describe('ProfileRecommendationSafety - getProfileRecommendation pure selector tests', () => {
@@ -115,5 +115,31 @@ describe('ProfileRecommendationSafety - getProfileRecommendation pure selector t
                 }
             }).not.toThrow();
         }
+    });
+    test('getHomeRecommendation Non-Premium entitlement safety checks', () => {
+        // Safe Space remains profile-source match
+        const noiseRes = getHomeRecommendation(mockSessions, ['loud_noises'], false, false);
+        expect(noiseRes.session?.id).toBe('fireworks_loud_noises_basic');
+        expect(noiseRes.source).toBe('profile');
+
+        // All other triggers fall back to Daily Calm Reset
+        const outdoorRes = getHomeRecommendation(mockSessions, ['new_places'], false, false);
+        expect(outdoorRes.session?.id).toBe('daily_calm_reset');
+        expect(outdoorRes.source).toBe('free_baseline');
+
+        const visitorsRes = getHomeRecommendation(mockSessions, ['visitors'], false, false);
+        expect(visitorsRes.session?.id).toBe('daily_calm_reset');
+        expect(visitorsRes.source).toBe('free_baseline');
+    });
+
+    test('getHomeRecommendation Premium entitlement safety checks', () => {
+        // Mapped trigger-specific recommendations are preserved
+        const visitorsRes = getHomeRecommendation(mockSessions, ['visitors'], false, true);
+        expect(visitorsRes.session?.id).toBe('visitors_at_home');
+        expect(visitorsRes.source).toBe('profile');
+
+        const outdoorRes = getHomeRecommendation(mockSessions, ['new_places'], false, true);
+        expect(outdoorRes.session?.id).toBe('outdoor_confidence_reset');
+        expect(outdoorRes.source).toBe('profile');
     });
 });

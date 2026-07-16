@@ -78,3 +78,65 @@ export function getProfileRecommendation(
         reason: defaultSession ? 'Start here: short and easy' : ''
     };
 }
+
+export type HomeRecommendationSource = 'profile' | 'free_baseline' | 'none';
+
+export interface HomeRecommendationResult extends RecommendationResult {
+    source: HomeRecommendationSource;
+}
+
+export function getHomeRecommendation(
+    sessions: Session[],
+    anxietyTriggers: readonly any[] | null | undefined,
+    isSevere: boolean,
+    isPremium: boolean
+): HomeRecommendationResult {
+    if (isSevere) {
+        return { session: null, reason: '', source: 'none' };
+    }
+
+    // Normalize anxietyTriggers dynamically
+    const triggers = Array.isArray(anxietyTriggers)
+        ? anxietyTriggers.filter(
+            (t): t is string => typeof t === 'string'
+          )
+        : [];
+
+    // 1. Highest priority safety trigger: loud noises or fireworks
+    if (triggers.includes('loud_noises') || triggers.includes('fireworks')) {
+        const found = sessions.find(s => s.id === 'fireworks_loud_noises_basic');
+        if (found && found.accessLevel === 'free') {
+            return {
+                session: found,
+                reason: 'Profile match: loud noises or fireworks',
+                source: 'profile'
+            };
+        }
+        return { session: null, reason: '', source: 'none' };
+    }
+
+    // 2. Confirmed Premium: use the trigger-specific matrix
+    if (isPremium) {
+        const result = getProfileRecommendation(sessions, anxietyTriggers, isSevere);
+        if (result.session) {
+            return {
+                session: result.session,
+                reason: result.reason,
+                source: 'profile'
+            };
+        }
+        return { session: null, reason: '', source: 'none' };
+    }
+
+    // 3. Confirmed Non-Premium baseline: Daily Calm Reset
+    const baseline = sessions.find(s => s.id === 'daily_calm_reset');
+    if (baseline && baseline.accessLevel === 'free') {
+        return {
+            session: baseline,
+            reason: 'A simple place to start',
+            source: 'free_baseline'
+        };
+    }
+
+    return { session: null, reason: '', source: 'none' };
+}

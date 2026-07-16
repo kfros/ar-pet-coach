@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -19,7 +19,7 @@ import { getAnxietyColor } from '../helpers/anxietyGradient';
 import PetProfileRepository from '../services/petProfileRepository';
 import SessionService from '../services/sessionService';
 import { HomeSnapshot } from '../types/Session';
-import { getProfileRecommendation } from '../services/profileRecommendationService';
+import { getProfileRecommendation, getHomeRecommendation } from '../services/profileRecommendationService';
 
 export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
@@ -27,11 +27,36 @@ export default function DashboardScreen({ navigation }: any) {
     const [petId, setPetId] = useState<string | null>(null);
     const [profile, setProfile] = useState<any>(null);
     const [homeSnapshot, setHomeSnapshot] = useState<HomeSnapshot | null>(null);
-    const [recommendedSession, setRecommendedSession] = useState<any>(null);
-    const [recommendationReason, setRecommendationReason] = useState<string>('');
 
     const { isPremium, isLoading: subLoading } = useSubscription();
     const insets = useSafeAreaInsets();
+
+    const recommendationResult = useMemo(() => {
+        if (!petId) {
+            return { session: null, reason: '', source: 'none' as const };
+        }
+
+        const isSevere = !!homeSnapshot?.latestCheckIn?.hasSevereSigns;
+        if (isSevere) {
+            return { session: null, reason: '', source: 'none' as const };
+        }
+
+        // While subscription entitlement is loading, we do NOT compute a suggestion
+        if (subLoading) {
+            return { session: null, reason: '', source: 'none' as const, loading: true };
+        }
+
+        const allSessions = SessionService.getSessions();
+        const triggers = profile?.anxietyTriggers;
+
+        return getHomeRecommendation(allSessions, triggers, isSevere, isPremium);
+    }, [
+        petId,
+        subLoading,
+        isPremium,
+        JSON.stringify(profile?.anxietyTriggers),
+        !!homeSnapshot?.latestCheckIn?.hasSevereSigns
+    ]);
 
     const formatDateTime = (dateStr: string) => {
         if (!dateStr) return 'Saved recently';
@@ -56,28 +81,14 @@ export default function DashboardScreen({ navigation }: any) {
             const pet = await PetProfileRepository.getPetProfile();
             if (pet) {
                 setPetId(pet.id || 'guest_pet');
-                setProfile({ petName: pet.petName });
+                setProfile(pet);
 
                 const snapshot = await SessionService.getHomeSnapshot(pet.id || 'guest_pet');
                 setHomeSnapshot(snapshot || null);
-
-                const allSessions = SessionService.getSessions();
-                const triggers = pet.anxietyTriggers;
-                const isSevere = !!snapshot?.latestCheckIn?.hasSevereSigns;
-
-                const { session: recommended, reason } = getProfileRecommendation(
-                    allSessions,
-                    triggers,
-                    isSevere
-                );
-
-                setRecommendedSession(recommended);
-                setRecommendationReason(reason);
             } else {
                 setPetId(null);
                 setProfile(null);
                 setHomeSnapshot(null);
-                setRecommendedSession(null);
             }
         } catch (error) {
             console.error("Error fetching dashboard data:", error);
@@ -151,7 +162,9 @@ export default function DashboardScreen({ navigation }: any) {
     }
 
     const renderSuggestionCard = () => {
-        if (!recommendedSession) {
+        const { session, reason, source } = recommendationResult;
+
+        if (source === 'none' || !session) {
             return (
                 <Pressable
                     style={styles.suggestionFallbackCard}
@@ -171,58 +184,47 @@ export default function DashboardScreen({ navigation }: any) {
             );
         }
 
-        const isPremiumRoutine = recommendedSession.accessLevel === 'premium';
-        const isChecking = isPremiumRoutine && subLoading;
-        const isLocked = isPremiumRoutine && !isPremium && !subLoading;
+        const isPremiumRoutine = session.accessLevel === 'premium';
+        const isLocked = isPremiumRoutine && !isPremium;
         
         let ctaLabel = "View routine";
-        if (isChecking) {
-            ctaLabel = "Checking access";
-        }
-
         let cardAccessibilityLabel = "";
-        if (isChecking) {
-            cardAccessibilityLabel = `Checking access: ${recommendedSession.title}. ${recommendationReason}`;
-        } else if (isLocked) {
-            cardAccessibilityLabel = `View routine: ${recommendedSession.title}. Premium required to start. ${recommendationReason}`;
+        
+        if (isLocked) {
+            cardAccessibilityLabel = `View routine: ${session.title}. Premium required to start. ${reason}`;
         } else {
-            cardAccessibilityLabel = `View routine: ${recommendedSession.title}. ${recommendationReason}`;
+            cardAccessibilityLabel = `View routine: ${session.title}. ${reason}`;
         }
 
         return (
             <Pressable
                 style={styles.suggestionCard}
-                onPress={() => handleStartSession(recommendedSession)}
+                onPress={() => handleStartSession(session)}
                 accessibilityLabel={cardAccessibilityLabel}
-                accessibilityState={{ disabled: isChecking }}
                 testID="suggested-routine-card"
             >
                 <View style={styles.suggestionHeader}>
                     <Ionicons name="sparkles-outline" size={16} color={COLORS.primary} />
-                    <Text style={styles.suggestionReason} numberOfLines={1}>{recommendationReason}</Text>
+                    <Text style={styles.suggestionReason} numberOfLines={1}>{reason}</Text>
                 </View>
                 
-                <Text style={styles.suggestionRoutineTitle}>{recommendedSession.title}</Text>
-                <Text style={styles.suggestionRoutineSubtitle}>{recommendedSession.subtitle}</Text>
+                <Text style={styles.suggestionRoutineTitle}>{session.title}</Text>
+                <Text style={styles.suggestionRoutineSubtitle}>{session.subtitle}</Text>
                 
                 <View style={styles.suggestionFooter}>
                     <View style={styles.suggestionMeta}>
                         <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
                         <Text style={styles.suggestionDuration}>
-                            {recommendedSession.suggestedTimeCopy || `${recommendedSession.durationMinutes} min`}
+                            {session.suggestedTimeCopy || `${session.durationMinutes} min`}
                         </Text>
                     </View>
                     <View style={styles.suggestionCta}>
                         <Text style={styles.suggestionCtaText}>{ctaLabel}</Text>
-                        {isChecking ? (
-                            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginLeft: 4 }} />
-                        ) : (
-                            <Ionicons 
-                                name={isLocked ? "lock-closed" : "chevron-forward"} 
-                                size={16} 
-                                color={COLORS.primary} 
-                            />
-                        )}
+                        <Ionicons 
+                            name={isLocked ? "lock-closed" : "chevron-forward"} 
+                            size={16} 
+                            color={COLORS.primary} 
+                        />
                     </View>
                 </View>
             </Pressable>
@@ -278,35 +280,65 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
 
             {/* Suggestion Card */}
-            <Text style={styles.sectionTitle}>
-                {homeSnapshot?.latestCheckIn?.hasSevereSigns ? "Before another routine" : "Suggested from your profile"}
-            </Text>
-            <Text style={styles.suggestionExplanation}>
-                {homeSnapshot?.latestCheckIn?.hasSevereSigns
-                    ? (homeSnapshot.latestCheckIn.severeCategory === 'medical'
-                        ? "Medical signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment."
-                        : "Strong signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment.")
-                    : `Based on the triggers saved in ${profile?.petName || 'your dog'}'s profile — not a live assessment.`
-                }
-            </Text>
             {(() => {
-                if (homeSnapshot?.latestCheckIn?.hasSevereSigns) {
-                    const isMedical = homeSnapshot.latestCheckIn.severeCategory === 'medical';
-                    return (
-                        <View style={styles.suggestionCard} testID="historical-severe-boundary-card">
-                            <View style={styles.suggestionHeader}>
-                                <Ionicons name="alert-circle-outline" size={16} color="#B85C38" style={{ marginRight: 6 }} />
-                                <Text style={styles.suggestionReason} numberOfLines={2}>
-                                    {isMedical
-                                        ? "For medical symptoms or severe distress, contact a veterinarian."
-                                        : "For panic, aggression, self-injury, or escape attempts, stop routines and get professional support."
-                                    }
-                                </Text>
-                            </View>
-                        </View>
-                    );
+                const isSevere = !!homeSnapshot?.latestCheckIn?.hasSevereSigns;
+                
+                let sectionTitle = "Suggested from your profile";
+                let explanationText = `Based on the triggers saved in ${profile?.petName || 'your dog'}'s profile — not a live assessment.`;
+
+                if (isSevere) {
+                    sectionTitle = "Before another routine";
+                    explanationText = homeSnapshot?.latestCheckIn?.severeCategory === 'medical'
+                        ? "Medical signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment."
+                        : "Strong signs were noted in the latest saved check-in. This is a saved check-in, not a live assessment.";
+                } else if (subLoading) {
+                    sectionTitle = "Finding a routine";
+                    explanationText = "Checking which routines are available.";
+                } else if (recommendationResult.source === 'free_baseline') {
+                    sectionTitle = "Start with a free routine";
+                    explanationText = "Try a short owner-guided routine before exploring the full catalogue.";
+                } else if (recommendationResult.source === 'none') {
+                    sectionTitle = "Choose a routine";
+                    explanationText = "Browse the catalogue to see available routines.";
                 }
-                return renderSuggestionCard();
+
+                return (
+                    <>
+                        <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+                        <Text style={styles.suggestionExplanation}>{explanationText}</Text>
+                        {(() => {
+                            if (isSevere) {
+                                const isMedical = homeSnapshot?.latestCheckIn?.severeCategory === 'medical';
+                                return (
+                                    <View style={styles.suggestionCard} testID="historical-severe-boundary-card">
+                                        <View style={styles.suggestionHeader}>
+                                            <Ionicons name="alert-circle-outline" size={16} color="#B85C38" style={{ marginRight: 6 }} />
+                                            <Text style={styles.suggestionReason} numberOfLines={2}>
+                                                {isMedical
+                                                    ? "For medical symptoms or severe distress, contact a veterinarian."
+                                                    : "For panic, aggression, self-injury, or escape attempts, stop routines and get professional support."
+                                                }
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            }
+                            
+                            if (subLoading) {
+                                return (
+                                    <View style={styles.suggestionCard} testID="home-recommendation-loading">
+                                        <View style={[styles.suggestionHeader, { justifyContent: 'center' }]}>
+                                            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 8 }} />
+                                            <Text style={[styles.suggestionReason, { color: COLORS.text }]}>Checking access</Text>
+                                        </View>
+                                    </View>
+                                );
+                            }
+
+                            return renderSuggestionCard();
+                        })()}
+                    </>
+                );
             })()}
 
             {/* Latest check-in */}
