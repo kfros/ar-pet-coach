@@ -53,7 +53,7 @@ describe('Premium Routing Logic', () => {
         (SessionService.getSessionById as jest.Mock).mockReturnValue(premiumSession);
     });
 
-    test('non-premium user tapping premium routine in RoutinesScreen navigates to Paywall', async () => {
+    test('non-premium user tapping premium routine in RoutinesScreen navigates to SessionPreview', async () => {
         jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
             isPremium: false,
             isLoading: false,
@@ -68,7 +68,7 @@ describe('Premium Routing Logic', () => {
         const card = await findByText('Premium Routine');
         fireEvent.press(card);
 
-        expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', expect.objectContaining({
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', expect.objectContaining({
             sessionId: 'premium_1',
             petId: 'pet_1'
         }));

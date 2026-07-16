@@ -28,9 +28,12 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
     const insets = useSafeAreaInsets();
     const { sessionId, petId } = route.params;
     const session = SessionService.getSessionById(sessionId);
-    const { isPremium } = useSubscription();
+    const { isPremium, isLoading } = useSubscription();
 
-    const isLocked = session?.accessLevel === 'premium' && !isPremium;
+    const isPremiumRoutine = session?.accessLevel === 'premium';
+    const isChecking = isPremiumRoutine && isLoading;
+    const isLocked = isPremiumRoutine && !isLoading && !isPremium;
+    const isIncluded = isPremiumRoutine && !isLoading && isPremium;
 
     const isNavigatingRef = React.useRef(false);
     const [isNavigating, setIsNavigating] = React.useState(false);
@@ -127,6 +130,22 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
     const handlePrimaryAction = async () => {
         if (!session || isNavigatingRef.current) return;
 
+        if (isChecking) {
+            return;
+        }
+
+        if (isLocked) {
+            isNavigatingRef.current = true;
+            setIsNavigating(true);
+            navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
+            navigationTimeoutRef.current = setTimeout(() => {
+                isNavigatingRef.current = false;
+                setIsNavigating(false);
+            }, 500);
+            return;
+        }
+
+        // Only free or included routines get here: we can run writes and start the session
         isNavigatingRef.current = true;
         setIsNavigating(true);
 
@@ -138,18 +157,15 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
             }
         }
 
-        if (isLocked) {
-            navigation.navigate('Paywall', { source: 'premium_session', sessionId, petId });
-        } else {
-            if (sessionId === 'outdoor_confidence_reset') {
-                try {
-                    await AsyncStorage.setItem(`chillpup_selected_outdoor_confidence_level_${petId}`, selectedLevel);
-                } catch (e) {
-                    console.error(e);
-                }
+        if (sessionId === 'outdoor_confidence_reset') {
+            try {
+                await AsyncStorage.setItem(`chillpup_selected_outdoor_confidence_level_${petId}`, selectedLevel);
+            } catch (e) {
+                console.error(e);
             }
-            navigation.navigate('GuidedSession', { sessionId, petId, level: selectedLevel });
         }
+
+        navigation.navigate('GuidedSession', { sessionId, petId, level: selectedLevel });
 
         navigationTimeoutRef.current = setTimeout(() => {
             isNavigatingRef.current = false;
@@ -195,21 +211,23 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                                 {ROUTINE_CATEGORIES[session.category as RoutineCategory]?.title || session.category}
                             </Text>
                         )}
-                        {session.accessLevel === 'premium' && (
+                        {isPremiumRoutine && (
                             <View style={[
                                 styles.previewBadge,
-                                isLocked ? styles.previewBadgeLocked : styles.previewBadgeUnlocked
+                                isChecking && { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' },
+                                isLocked && styles.previewBadgeLocked,
+                                isIncluded && styles.previewBadgeUnlocked
                             ]}>
                                 <Ionicons
-                                    name={isLocked ? "lock-closed" : "checkmark-circle"}
+                                    name={isChecking ? "time-outline" : (isLocked ? "lock-closed" : "checkmark-circle")}
                                     size={12}
-                                    color={isLocked ? "#fff" : "#0F766E"}
+                                    color={isChecking ? "#4B5563" : (isLocked ? "#fff" : "#0F766E")}
                                 />
                                 <Text style={[
                                     styles.previewBadgeText,
-                                    { color: isLocked ? "#fff" : "#0F766E" }
+                                    { color: isChecking ? "#4B5563" : (isLocked ? "#fff" : "#0F766E") }
                                 ]}>
-                                    {isLocked ? 'PREMIUM' : 'INCLUDED'}
+                                    {isChecking ? 'CHECKING ACCESS' : (isLocked ? 'PREMIUM' : 'INCLUDED')}
                                 </Text>
                             </View>
                         )}
@@ -234,6 +252,38 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                         </View>
                     )}
                 </View>
+
+                {/* Premium context block */}
+                {isLocked && (
+                    <View 
+                        testID="premium-preview-access-card" 
+                        style={styles.premiumContextCard}
+                    >
+                        <Text style={styles.premiumContextTitle}>Premium routine</Text>
+                        <Text style={styles.premiumContextBody}>
+                            This routine is included with ChillPup Premium. You can review it before deciding whether to unlock it.
+                        </Text>
+                    </View>
+                )}
+
+                {/* What you'll do overview */}
+                {session.steps && session.steps.length > 0 && session.steps.some(step => !!step.title) && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>What you'll do</Text>
+                        <View style={styles.stepsOverviewContainer}>
+                            {session.steps
+                                .filter(step => !!step.title)
+                                .map((step, idx) => (
+                                    <View key={step.id || idx} style={styles.stepOverviewItem}>
+                                        <View style={styles.stepOverviewNumber}>
+                                            <Text style={styles.stepOverviewNumberText}>{idx + 1}</Text>
+                                        </View>
+                                        <Text style={styles.stepOverviewText}>{step.title}</Text>
+                                    </View>
+                                ))}
+                        </View>
+                    </View>
+                )}
 
                 {/* 2. New Level Available banner, if applicable */}
                 {showBanner && newlyUnlockedLevel && (
@@ -450,14 +500,16 @@ export default function SessionPreviewScreen({ navigation, route }: any) {
                 <Pressable
                     style={({ pressed }) => [
                         styles.startButton,
+                        isChecking && { backgroundColor: '#D1D5DB' },
                         isLocked && { backgroundColor: '#D97706' },
-                        (pressed || isNavigating) && { opacity: 0.8 }
+                        (pressed || isNavigating || isChecking) && { opacity: 0.8 }
                     ]}
                     onPress={handlePrimaryAction}
-                    disabled={isNavigating}
+                    disabled={isNavigating || isChecking}
+                    accessibilityState={{ disabled: isNavigating || isChecking }}
                 >
                     <Text style={styles.startButtonText}>
-                        {isLocked ? 'Unlock with Premium' : 'Start Session'}
+                        {isChecking ? 'Checking access' : (isLocked ? 'Unlock routine' : 'Start Session')}
                     </Text>
                 </Pressable>
             </View>
@@ -731,5 +783,55 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         fontSize: 13,
         fontWeight: '500',
+    },
+    premiumContextCard: {
+        backgroundColor: '#FFF8E8',
+        borderRadius: SIZES.radius,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#F4D08A',
+    },
+    premiumContextTitle: {
+        ...FONTS.h3,
+        color: '#9A5B00',
+        marginBottom: 8,
+    },
+    premiumContextBody: {
+        ...FONTS.body,
+        color: '#6B4A1D',
+        lineHeight: 20,
+    },
+    stepsOverviewContainer: {
+        backgroundColor: '#fff',
+        borderRadius: SIZES.radius,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        gap: 12,
+    },
+    stepOverviewItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    stepOverviewNumber: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#EEF8F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    stepOverviewNumberText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: COLORS.primary,
+    },
+    stepOverviewText: {
+        ...FONTS.body,
+        fontWeight: '500',
+        color: COLORS.text,
+        flex: 1,
     },
 });

@@ -71,3 +71,4 @@ mobile/clear.ps1
 mobile/rm.ps1
 *.ipa
 Content/
+.idea/caches/deviceStreaming.xml

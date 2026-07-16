@@ -104,8 +104,7 @@ export default function DashboardScreen({ navigation }: any) {
             return;
         }
 
-        if (session.accessLevel === 'premium' && !isPremium && !subLoading) {
-            navigation.navigate('Paywall', { sessionId: session.id, petId });
+        if (session.accessLevel === 'premium' && subLoading) {
             return;
         }
 
@@ -172,17 +171,30 @@ export default function DashboardScreen({ navigation }: any) {
             );
         }
 
-        const isLocked = recommendedSession.accessLevel === 'premium' && !isPremium && !subLoading;
-        const ctaLabel = isLocked ? "Unlock routine" : "View routine";
-        const cardAccessibilityLabel = isLocked 
-            ? `Unlock routine: ${recommendedSession.title}. ${recommendationReason}` 
-            : `View routine: ${recommendedSession.title}. ${recommendationReason}`;
+        const isPremiumRoutine = recommendedSession.accessLevel === 'premium';
+        const isChecking = isPremiumRoutine && subLoading;
+        const isLocked = isPremiumRoutine && !isPremium && !subLoading;
+        
+        let ctaLabel = "View routine";
+        if (isChecking) {
+            ctaLabel = "Checking access";
+        }
+
+        let cardAccessibilityLabel = "";
+        if (isChecking) {
+            cardAccessibilityLabel = `Checking access: ${recommendedSession.title}. ${recommendationReason}`;
+        } else if (isLocked) {
+            cardAccessibilityLabel = `View routine: ${recommendedSession.title}. Premium required to start. ${recommendationReason}`;
+        } else {
+            cardAccessibilityLabel = `View routine: ${recommendedSession.title}. ${recommendationReason}`;
+        }
 
         return (
             <Pressable
                 style={styles.suggestionCard}
                 onPress={() => handleStartSession(recommendedSession)}
                 accessibilityLabel={cardAccessibilityLabel}
+                accessibilityState={{ disabled: isChecking }}
                 testID="suggested-routine-card"
             >
                 <View style={styles.suggestionHeader}>
@@ -202,11 +214,15 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
                     <View style={styles.suggestionCta}>
                         <Text style={styles.suggestionCtaText}>{ctaLabel}</Text>
-                        <Ionicons 
-                            name={isLocked ? "lock-closed" : "chevron-forward"} 
-                            size={16} 
-                            color={COLORS.primary} 
-                        />
+                        {isChecking ? (
+                            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginLeft: 4 }} />
+                        ) : (
+                            <Ionicons 
+                                name={isLocked ? "lock-closed" : "chevron-forward"} 
+                                size={16} 
+                                color={COLORS.primary} 
+                            />
+                        )}
                     </View>
                 </View>
             </Pressable>
