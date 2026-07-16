@@ -145,9 +145,10 @@ describe('Premium Preview Before Paywall (CP-PAYWALL-001)', () => {
 
         // Set suggestion mock returning our premium routine
         const profileRecService = require('../services/profileRecommendationService');
-        jest.spyOn(profileRecService, 'getProfileRecommendation').mockReturnValue({
+        jest.spyOn(profileRecService, 'getHomeRecommendation').mockReturnValue({
             session: testPremiumSession,
-            reason: 'Trigger match: thunder'
+            reason: 'Trigger match: thunder',
+            source: 'profile'
         });
 
         const { getByTestId, getByText } = renderTestStack('Dashboard');

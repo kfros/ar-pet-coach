@@ -246,7 +246,7 @@ describe('DashboardScreen - Rebuilt Home', () => {
     });
   });
 
-  test('renders locked Premium routine suggestion on Home, showing View routine and routing to SessionPreview', async () => {
+  test('renders free baseline suggestion on Home for non-Premium user instead of locked Premium trigger-matched routine', async () => {
     // Reset mock profile to include visitors trigger which matches a premium routine
     require('../services/petProfileRepository').__setMockProfile({
       id: 'test-pet-id',
@@ -255,7 +255,16 @@ describe('DashboardScreen - Rebuilt Home', () => {
       anxietyTriggers: ['visitors']
     });
 
-    // Mock visitors routine which is premium
+    // Mock both visitors routine (premium) and daily_calm_reset (free baseline)
+    const baselineSession = {
+        id: 'daily_calm_reset',
+        title: 'Daily Calm Reset',
+        subtitle: 'Start here: short and easy',
+        accessLevel: 'free',
+        durationMinutes: 5,
+        difficulty: 'easy',
+        steps: []
+    };
     const premiumSession = {
         id: 'visitors_at_home',
         title: 'Visitor Calm Reset',
@@ -267,7 +276,7 @@ describe('DashboardScreen - Rebuilt Home', () => {
     };
 
     const originalGetSessions = SessionService.getSessions;
-    jest.spyOn(SessionService, 'getSessions').mockReturnValue([premiumSession as any]);
+    jest.spyOn(SessionService, 'getSessions').mockReturnValue([baselineSession as any, premiumSession as any]);
     jest.spyOn(SessionService, 'getHomeSnapshot').mockImplementation(() => Promise.resolve({
       latestPractice: null,
       latestCheckIn: null
@@ -280,7 +289,7 @@ describe('DashboardScreen - Rebuilt Home', () => {
         isLoading: false,
     } as any);
 
-    const { getByText, getByTestId } = render(
+    const { getByText, getByTestId, queryByText } = render(
       <SubscriptionProvider>
         <NavigationContainer>
           <DashboardScreen navigation={mockNavigation} />
@@ -289,15 +298,16 @@ describe('DashboardScreen - Rebuilt Home', () => {
     );
 
     await waitFor(() => {
-      expect(getByText('Visitor Calm Reset')).toBeTruthy();
+      expect(getByText('Daily Calm Reset')).toBeTruthy();
+      expect(queryByText('Visitor Calm Reset')).toBeNull();
       expect(getByText('View routine')).toBeTruthy();
       const card = getByTestId('suggested-routine-card');
       expect(card).toBeTruthy();
-      expect(card.props.accessibilityLabel).toContain('View routine: Visitor Calm Reset. Premium required to start.');
+      expect(card.props.accessibilityLabel).toBe('View routine: Daily Calm Reset. A simple place to start');
       
       fireEvent.press(card);
       expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', {
-          sessionId: 'visitors_at_home',
+          sessionId: 'daily_calm_reset',
           petId: 'test-pet-id'
       });
     });
