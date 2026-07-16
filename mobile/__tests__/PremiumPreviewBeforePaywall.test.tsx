@@ -172,13 +172,18 @@ describe('Premium Preview Before Paywall (CP-PAYWALL-001)', () => {
         await waitFor(() => {
             expect(getByText('PREMIUM')).toBeTruthy();
             expect(getByText('Premium routine')).toBeTruthy();
-            expect(getByText(/This routine is included with ChillPup Premium. You can review it before deciding whether to unlock it./)).toBeTruthy();
-            expect(getByText('What you\'ll do')).toBeTruthy();
-            expect(getByText('Prepare room')).toBeTruthy();
-            expect(getByText('Play sound')).toBeTruthy();
-            expect(getByText('Unlock routine')).toBeTruthy();
-            expect(queryByText('Start Session')).toBeNull();
+            expect(getByText('Premium is required to start. You can review the routine first.')).toBeTruthy();
+            expect(getByText("What you'll do")).toBeTruthy();
         });
+
+        // Expand steps section first
+        const stepsHeader = getByTestId('preview-disclosure-steps');
+        fireEvent.press(stepsHeader);
+
+        expect(getByText('Prepare room')).toBeTruthy();
+        expect(getByText('Play sound')).toBeTruthy();
+        expect(getByText('Unlock routine')).toBeTruthy();
+        expect(queryByText('Start Session')).toBeNull();
     });
 
     test('Checking-access Preview is disabled and performs no navigation or writes', async () => {
