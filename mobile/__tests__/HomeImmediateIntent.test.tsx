@@ -246,6 +246,67 @@ describe('DashboardScreen - Rebuilt Home', () => {
     });
   });
 
+  test('renders locked Premium routine suggestion on Home, showing View routine and routing to SessionPreview', async () => {
+    // Reset mock profile to include visitors trigger which matches a premium routine
+    require('../services/petProfileRepository').__setMockProfile({
+      id: 'test-pet-id',
+      petName: 'Buddy',
+      anxietyScore: 5,
+      anxietyTriggers: ['visitors']
+    });
+
+    // Mock visitors routine which is premium
+    const premiumSession = {
+        id: 'visitors_at_home',
+        title: 'Visitor Calm Reset',
+        subtitle: 'Calm greeting practices',
+        accessLevel: 'premium',
+        durationMinutes: 10,
+        difficulty: 'moderate',
+        steps: []
+    };
+
+    const originalGetSessions = SessionService.getSessions;
+    jest.spyOn(SessionService, 'getSessions').mockReturnValue([premiumSession as any]);
+    jest.spyOn(SessionService, 'getHomeSnapshot').mockImplementation(() => Promise.resolve({
+      latestPractice: null,
+      latestCheckIn: null
+    }));
+
+    // Mock non-premium user
+    mockNavigation.navigate.mockClear();
+    const spySub = jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({
+        isPremium: false,
+        isLoading: false,
+    } as any);
+
+    const { getByText, getByTestId } = render(
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <DashboardScreen navigation={mockNavigation} />
+        </NavigationContainer>
+      </SubscriptionProvider>
+    );
+
+    await waitFor(() => {
+      expect(getByText('Visitor Calm Reset')).toBeTruthy();
+      expect(getByText('View routine')).toBeTruthy();
+      const card = getByTestId('suggested-routine-card');
+      expect(card).toBeTruthy();
+      expect(card.props.accessibilityLabel).toContain('View routine: Visitor Calm Reset. Premium required to start.');
+      
+      fireEvent.press(card);
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', {
+          sessionId: 'visitors_at_home',
+          petId: 'test-pet-id'
+      });
+    });
+
+    // Restore mocks
+    spySub.mockRestore();
+    jest.spyOn(SessionService, 'getSessions').mockImplementation(originalGetSessions);
+  });
+
   test('suggestion fallback is rendered when no recommendation can be resolved', async () => {
     // Set triggers to empty so no specific routine matches and we simulate null recommended
     require('../services/petProfileRepository').__setMockProfile({

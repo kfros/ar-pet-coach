@@ -139,11 +139,6 @@ export default function RoutinesScreen({ navigation }: any) {
             return;
         }
 
-        if (session.accessLevel === 'premium' && !isPremium) {
-            navigation.navigate('Paywall', { sessionId: session.id, petId });
-            return;
-        }
-
         navigation.navigate('SessionPreview', { sessionId: session.id, petId });
     };
 
@@ -163,18 +158,15 @@ export default function RoutinesScreen({ navigation }: any) {
         const phaseMeta = getNoiseRoutinePhasePresentation(item);
         let cardAccessibilityLabel = '';
 
+        let actionWord = isLocked ? 'View routine preview. Premium required to start' : 'View routine';
+        if (isChecking) {
+            actionWord = 'Checking access';
+        }
+
         if (phaseMeta) {
             const phaseWord = phaseMeta.label.charAt(0).toUpperCase() + phaseMeta.label.slice(1).toLowerCase();
-            let actionWord = isLocked ? 'Unlock routine' : 'View routine';
-            if (isChecking) {
-                actionWord = 'Checking access';
-            }
             cardAccessibilityLabel = `${phaseWord}. ${problemTitle}. ${actionWord}.`;
         } else {
-            let actionWord = isLocked ? 'Unlock routine' : 'View routine';
-            if (isChecking) {
-                actionWord = 'Checking access';
-            }
             cardAccessibilityLabel = `${problemTitle}. ${actionWord}`;
         }
 

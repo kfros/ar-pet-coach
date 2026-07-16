@@ -105,11 +105,15 @@ export default function PaywallScreen({ navigation, route }: any) {
     };
 
     const checkSubscription = () => {
-        const { sessionId, petId } = route.params || {};
+        const { sessionId, petId, source } = route.params || {};
 
         if (isPremium) {
             if (sessionId) {
-                navigation.replace('SessionPreview', { sessionId, petId });
+                if (source === 'premium_session') {
+                    navigation.popTo('SessionPreview', { sessionId, petId }, { merge: true });
+                } else {
+                    navigation.replace('SessionPreview', { sessionId, petId });
+                }
                 return;
             }
             navigation.replace('PremiumStatus', { source: 'settings' });
@@ -213,17 +217,18 @@ export default function PaywallScreen({ navigation, route }: any) {
         setPurchasing(true);
         try {
             const customerInfo = await RevenueCatService.purchasePackage(selectedPackage);
-            const { sessionId, petId } = route.params || {};
+            const { sessionId, petId, source } = route.params || {};
 
             // Refresh global entitlement state
             await refreshEntitlement();
 
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
                 if (sessionId) {
-                    // First dismiss the paywall modal
-                    navigation.goBack();
-                    // Then navigate back to the existing routine preview to update it
-                    navigation.navigate('SessionPreview', { sessionId, petId, unlockedAfterPurchase: true });
+                    if (source === 'premium_session') {
+                        navigation.popTo('SessionPreview', { sessionId, petId, unlockedAfterPurchase: true }, { merge: true });
+                    } else {
+                        navigation.replace('SessionPreview', { sessionId, petId });
+                    }
                 } else {
                     navigation.replace('PremiumStatus', { source: 'post_purchase' });
                 }
@@ -239,17 +244,18 @@ export default function PaywallScreen({ navigation, route }: any) {
         setPurchasing(true);
         try {
             const customerInfo = await RevenueCatService.restorePurchases();
-            const { sessionId, petId } = route.params || {};
+            const { sessionId, petId, source } = route.params || {};
 
             // Refresh global entitlement state
             await refreshEntitlement();
 
             if (customerInfo && customerInfo.entitlements.active['ar-pet-coach-premium']) {
                 if (sessionId) {
-                    // First dismiss the paywall modal
-                    navigation.goBack();
-                    // Then navigate back to the existing routine preview to update it
-                    navigation.navigate('SessionPreview', { sessionId, petId, unlockedAfterPurchase: true });
+                    if (source === 'premium_session') {
+                        navigation.popTo('SessionPreview', { sessionId, petId, unlockedAfterPurchase: true }, { merge: true });
+                    } else {
+                        navigation.replace('SessionPreview', { sessionId, petId });
+                    }
                 } else {
                     navigation.replace('PremiumStatus', { source: 'settings' });
                 }

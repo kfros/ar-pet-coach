@@ -392,7 +392,7 @@ describe('RoutineCatalogue - Dedicated Redesign', () => {
         });
     });
 
-    test('locked Premium cards route to Paywall, free/included cards route to SessionPreview', async () => {
+    test('locked Premium cards and free/included cards route to SessionPreview', async () => {
         // 1. Non-premium user
         const { getByTestId, rerender } = render(
             <SubscriptionManager.SubscriptionProvider>
@@ -408,13 +408,13 @@ describe('RoutineCatalogue - Dedicated Redesign', () => {
         fireEvent.press(getByTestId('routine-card-daily_calm_reset'));
         expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', { sessionId: 'daily_calm_reset', petId: 'test-pet-123' });
 
-        // Tap locked Premium -> Paywall
+        // Tap locked Premium -> SessionPreview
         fireEvent.press(getByTestId('routine-category-walk_fear'));
         await waitFor(() => {
             expect(getByTestId('routine-card-outdoor_confidence_reset')).toBeTruthy();
         });
         fireEvent.press(getByTestId('routine-card-outdoor_confidence_reset'));
-        expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', { sessionId: 'outdoor_confidence_reset', petId: 'test-pet-123' });
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', { sessionId: 'outdoor_confidence_reset', petId: 'test-pet-123' });
 
         // 2. Premium user
         jest.spyOn(SubscriptionManager, 'useSubscription').mockReturnValue({

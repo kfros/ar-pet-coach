@@ -104,7 +104,7 @@ describe('Suite 02: Main Navigation And Content', () => {
       </SubscriptionProvider>
     );
     
-    const unlockButton = getByText(/Unlock with Premium/i);
+    const unlockButton = getByText(/Unlock routine/i);
     fireEvent.press(unlockButton);
     
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', expect.anything());
@@ -130,7 +130,7 @@ describe('Suite 02: Main Navigation And Content', () => {
     );
     
     expect(getByText(/Start Session/i)).toBeTruthy();
-    expect(queryByText(/Unlock with Premium/i)).toBeNull();
+    expect(queryByText(/Unlock routine/i)).toBeNull();
   });
 
   test('session_premium_003: Locked premium session CTA navigates to Paywall and not to SessionPreview', async () => {
@@ -153,7 +153,7 @@ describe('Suite 02: Main Navigation And Content', () => {
       </SubscriptionProvider>
     );
 
-    const unlockButton = getByText(/Unlock with Premium/i);
+    const unlockButton = getByText(/Unlock routine/i);
     fireEvent.press(unlockButton);
 
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', expect.objectContaining({
@@ -184,7 +184,7 @@ describe('Suite 02: Main Navigation And Content', () => {
       </SubscriptionProvider>
     );
 
-    const unlockButton = getByText(/Unlock with Premium/i);
+    const unlockButton = getByText(/Unlock routine/i);
     fireEvent.press(unlockButton);
     fireEvent.press(unlockButton);
     fireEvent.press(unlockButton);

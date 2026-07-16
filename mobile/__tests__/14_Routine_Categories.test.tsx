@@ -169,7 +169,7 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
         expect(await screen.findByText('Scared to go outside')).toBeTruthy();
     });
 
-    test('free routine opens SessionPreview, premium routine opens Paywall for non-premium user', async () => {
+    test('free routine opens SessionPreview, premium routine opens SessionPreview for non-premium user', async () => {
         const screen = render(
             <SubscriptionManager.SubscriptionProvider>
                 <RoutinesScreen navigation={mockNavigation} />
@@ -186,7 +186,7 @@ describe('RoutinesScreen - Catalogue Relocation & Integration', () => {
         fireEvent.press(walkCard);
         await screen.findByText('Scared to go outside');
         fireEvent.press(screen.getByText('Scared to go outside'));
-        expect(mockNavigation.navigate).toHaveBeenCalledWith('Paywall', expect.objectContaining({ sessionId: 'outdoor_confidence_reset' }));
+        expect(mockNavigation.navigate).toHaveBeenCalledWith('SessionPreview', expect.objectContaining({ sessionId: 'outdoor_confidence_reset' }));
     });
 
     test('premium routine opens SessionPreview for premium user', async () => {

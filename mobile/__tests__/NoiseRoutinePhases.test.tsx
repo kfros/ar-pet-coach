@@ -386,7 +386,7 @@ describe('NoiseRoutinePhases - Presentation Gating & Ordering', () => {
             expect(duringCard.props.accessibilityLabel).toBe('During. Thunder or fireworks are happening. View routine.');
 
             const beforeCard = getByTestId('routine-card-fireworks_prep_routine');
-            expect(beforeCard.props.accessibilityLabel).toBe('Before. Prepare before fireworks. Unlock routine.');
+            expect(beforeCard.props.accessibilityLabel).toBe('Before. Prepare before fireworks. View routine preview. Premium required to start.');
         });
 
         // 2. Premium-Entitled: BEFORE/AFTER included cards
