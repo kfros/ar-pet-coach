@@ -72,3 +72,10 @@ mobile/rm.ps1
 *.ipa
 Content/
 .idea/caches/deviceStreaming.xml
+
+# Audio toolchain
+/.venv-audio/
+/tools/audio/generated/**/*.wav
+/tools/audio/generated/**/*.m4a
+/tools/audio/**/*.pcm
+/tools/audio/generated/temp/
