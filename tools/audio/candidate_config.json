@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "sample_rate_hz": 48000,
+  "duration_seconds": 180,
+  "target_integrated_lufs": -22.0,
+  "candidates": [
+    {
+      "id": "neutral",
+      "display_name": "Candidate A — Neutral",
+      "design_direction": "A restrained noise-led ambient bed with minimal low-mid tonal presence and very slow, shallow movement.",
+      "seed": 1001,
+      "synthesis_parameters": {
+        "noise_alpha": 0.8,
+        "noise_high_cutoff_hz": 1200,
+        "tonal_layers": [
+          { "frequency_hz": 108.0, "gain_db": -28.0 },
+          { "frequency_hz": 162.0, "gain_db": -32.0 }
+        ],
+        "airy_noise_gain_db": -60.0,
+        "lfo_frequency_hz": 0.022222222222222223,
+        "lfo_depth": 0.15,
+        "stereo_decorrelation_phase_rad": 0.35
+      }
+    },
+    {
+      "id": "warm",
+      "display_name": "Candidate B — Warm",
+      "design_direction": "A warmer version with a more noticeable but non-melodic low-mid harmonic bed and less prominent noise texture.",
+      "seed": 2002,
+      "synthesis_parameters": {
+        "noise_alpha": 1.2,
+        "noise_high_cutoff_hz": 700,
+        "tonal_layers": [
+          { "frequency_hz": 72.0, "gain_db": -18.0 },
+          { "frequency_hz": 108.0, "gain_db": -22.0 },
+          { "frequency_hz": 144.0, "gain_db": -26.0 },
+          { "frequency_hz": 216.0, "gain_db": -30.0 }
+        ],
+        "airy_noise_gain_db": -60.0,
+        "lfo_frequency_hz": 0.011111111111111112,
+        "lfo_depth": 0.2,
+        "stereo_decorrelation_phase_rad": 0.4
+      }
+    },
+    {
+      "id": "soft",
+      "display_name": "Candidate C — Soft",
+      "design_direction": "A lighter and softer texture with less low-mid weight and a gentle airy layer, without sparkle, bells, chimes, or prominent high-frequency events.",
+      "seed": 3003,
+      "synthesis_parameters": {
+        "noise_alpha": 1.4,
+        "noise_high_cutoff_hz": 450,
+        "tonal_layers": [
+          { "frequency_hz": 180.0, "gain_db": -34.0 },
+          { "frequency_hz": 270.0, "gain_db": -38.0 }
+        ],
+        "airy_noise_band": [2000, 3500],
+        "airy_noise_gain_db": -36.0,
+        "lfo_frequency_hz": 0.016666666666666666,
+        "lfo_depth": 0.12,
+        "stereo_decorrelation_phase_rad": 0.3
+      }
+    }
+  ]
+}
