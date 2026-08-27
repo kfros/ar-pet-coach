@@ -73,9 +73,14 @@ mobile/rm.ps1
 Content/
 .idea/caches/deviceStreaming.xml
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Audio toolchain
 /.venv-audio/
 /tools/audio/generated/**/*.wav
 /tools/audio/generated/**/*.m4a
 /tools/audio/**/*.pcm
 /tools/audio/generated/temp/
+
