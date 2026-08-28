@@ -275,6 +275,18 @@ jest.mock('./services/revenueCatService', () => ({
   isReady: jest.fn(() => true),
 }));
 
+// Mock Slider
+jest.mock('@react-native-community/slider', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return (props) => {
+    return React.createElement(View, {
+      ...props,
+      testID: props.testID || 'slider',
+    });
+  };
+});
+
 // Drain pending microtasks after each test to prevent act() warnings from
 // async state updates that resolve after the test body has finished.
 afterEach(async () => {

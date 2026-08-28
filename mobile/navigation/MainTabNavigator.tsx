@@ -3,7 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import DashboardScreen from '../screens/DashboardScreen';
 import RoutinesScreen from '../screens/RoutinesScreen';
-import { SoundsScreen, ProgressScreen } from '../screens/TemporaryTabScreens';
+import SoundsScreen from '../screens/SoundsScreen';
+import { ProgressScreen } from '../screens/TemporaryTabScreens';
 import { COLORS } from '../constants/Theme';
 
 const Tab = createBottomTabNavigator();
