@@ -19,18 +19,6 @@ jest.mock('../components/SubscriptionManager', () => ({
   }),
 }));
 
-// Mock useCalmAudio hook
-jest.mock('../hooks/useCalmAudio', () => ({
-  useCalmAudio: jest.fn(() => ({
-    isPlaying: false,
-    stopAudio: jest.fn(),
-    handleNext: jest.fn(),
-    pauseAudio: jest.fn(() => Promise.resolve()),
-    resumeAudio: jest.fn(() => Promise.resolve()),
-    currentTrackId: 'calm_01',
-  })),
-}));
-
 // Mock PetProfileRepository
 jest.mock('../services/petProfileRepository', () => ({
   getPetProfile: jest.fn(() => Promise.resolve({ id: 'test-pet', petName: 'Buddy' })),

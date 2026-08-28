@@ -32,14 +32,24 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "ios": {
       "buildNumber": "24",
       "supportsTablet": false,
       "entitlements": {},
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "audio"
+        ]
       },
       "bundleIdentifier": "com.kfsoftware.chillpup",
       "googleServicesFile": "./GoogleService-Info.plist"

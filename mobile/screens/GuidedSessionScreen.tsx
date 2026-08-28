@@ -6,7 +6,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/Theme';
 import { useSubscription } from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
-import { useCalmAudio } from '../hooks/useCalmAudio';
 import { Session, SessionStep, AnxietyLevel, AnxietySign, PositiveSign, CheckIn, CheckInProfile, CheckInSignOption } from '../types/Session';
 import { getCheckInProfile } from '../appContent/checkInProfiles';
 import {
@@ -75,7 +74,6 @@ const POSITIVE_SIGNS: { id: PositiveSign; label: string }[] = [
 ];
 
 const HINT_STORAGE_KEY = 'guidedFocusCircleHintDismissed';
-const REPEAT_STORAGE_KEY = 'backgroundSoundRepeatEnabled';
 
 const MILESTONE_OPTIONS = [
     { id: "doorway_calm", label: "Stayed calm near the door" },
@@ -156,10 +154,6 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [afterPositiveExpanded, setAfterPositiveExpanded] = useState(true);
     const [afterSafetyExpanded, setAfterSafetyExpanded] = useState(false);
 
-    const sessionPolicy = session?.backgroundSoundPolicy;
-    const initialAudioEnabled = sessionPolicy ? sessionPolicy.defaultEnabled : true;
-    const [audioEnabled, setAudioEnabled] = useState(initialAudioEnabled);
-    const [repeatEnabled, setRepeatEnabled] = useState(false);
     const [showHint, setShowHint] = useState(false);
 
     // Milestone progression prompt state
@@ -232,16 +226,6 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const steps = getDynamicSteps();
     const currentStep = steps[currentStepIndex];
 
-    const stepPolicy = currentStep?.backgroundSoundPolicy;
-    const currentSoundMode = stepPolicy?.mode || sessionPolicy?.mode || 'calm_music';
-    const isSoundAllowed = currentSoundMode !== 'none';
-    const showAudioControls = stepPolicy ? stepPolicy.showControls : (sessionPolicy ? sessionPolicy.showControls : true);
-
-    // Audio Hook
-    const { isPlaying, stopAudio, handleNext, pauseAudio, resumeAudio } = useCalmAudio(
-        phase === 'active' && audioEnabled && isSoundAllowed
-    );
-    const wasSoundPlayingBeforePause = useRef(false);
     const [beforeLevel, setBeforeLevel] = useState<AnxietyLevel | null>(null);
     const [beforeSigns, setBeforeSigns] = useState<string[]>([]);
     const [afterLevel, setAfterLevel] = useState<AnxietyLevel | null>(null);
@@ -259,18 +243,7 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const [showAfterSafetyNotice, setShowAfterSafetyNotice] = useState<{ title: string, body: string } | null>(null);
 
     useEffect(() => {
-        const loadSettings = async () => {
-            const repeatOn = await AsyncStorage.getItem(REPEAT_STORAGE_KEY);
-            if (repeatOn === 'true') setRepeatEnabled(true);
-        };
-        loadSettings();
-
         return () => {
-            try {
-                stopAudio();
-            } catch (e) {
-                console.error(e);
-            }
             if (pulseLoop.current) {
                 pulseLoop.current.stop();
             }
@@ -401,22 +374,8 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         }
     };
 
-    const togglePause = async () => {
-        const newPaused = !isPaused;
-        setIsPaused(newPaused);
-
-        if (newPaused) {
-            // Pausing
-            wasSoundPlayingBeforePause.current = isPlaying;
-            if (isPlaying) {
-                await pauseAudio();
-            }
-        } else {
-            // Resuming
-            if (wasSoundPlayingBeforePause.current && audioEnabled) {
-                await resumeAudio();
-            }
-        }
+    const togglePause = () => {
+        setIsPaused(!isPaused);
     };
 
     const handleEndSession = () => {
@@ -433,12 +392,6 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
     const dismissHint = async () => {
         await AsyncStorage.setItem(HINT_STORAGE_KEY, 'true');
         setShowHint(false);
-    };
-
-    const toggleRepeat = async () => {
-        const newValue = !repeatEnabled;
-        setRepeatEnabled(newValue);
-        await AsyncStorage.setItem(REPEAT_STORAGE_KEY, newValue.toString());
     };
 
     const checkBeforeSafety = (signs = beforeSigns) => {
@@ -503,12 +456,6 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
         if (!session) return;
         setIsSaving(true);
 
-        // Stop audio immediately
-        try {
-            stopAudio();
-        } catch (e) {
-            console.error('Error stopping audio:', e);
-        }
         if (pulseLoop.current) {
             pulseLoop.current.stop();
         }
@@ -1076,72 +1023,17 @@ export default function GuidedSessionScreen({ navigation, route }: any) {
                         </ScrollView>
 
                         <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-                            {showAudioControls ? (
-                                <View style={styles.controlGrid}>
-                                    <Pressable
-                                        style={styles.controlToggle}
-                                        onPress={() => setAudioEnabled(!audioEnabled)}
-                                    >
-                                        <Ionicons
-                                            name={audioEnabled ? "volume-medium" : "volume-mute"}
-                                            size={18}
-                                            color={audioEnabled ? COLORS.primary : COLORS.textSecondary}
-                                        />
-                                        <View>
-                                            <Text style={[styles.controlLabel, !audioEnabled && { color: COLORS.textSecondary }]}>Sound</Text>
-                                            <Text style={[styles.controlState, !audioEnabled && { color: COLORS.textSecondary }]}>{audioEnabled ? 'On' : 'Off'}</Text>
-                                        </View>
-                                    </Pressable>
-
-                                    <Pressable
-                                        style={styles.controlToggle}
-                                        onPress={toggleRepeat}
-                                    >
-                                        <Ionicons
-                                            name="refresh"
-                                            size={18}
-                                            color={repeatEnabled ? COLORS.primary : COLORS.textSecondary}
-                                        />
-                                        <View>
-                                            <Text style={[styles.controlLabel, !repeatEnabled && { color: COLORS.textSecondary }]}>Repeat</Text>
-                                            <Text style={[styles.controlState, !repeatEnabled && { color: COLORS.textSecondary }]}>{repeatEnabled ? 'On' : 'Off'}</Text>
-                                        </View>
-                                    </Pressable>
-
-                                    <Pressable
-                                        style={styles.controlToggle}
-                                        onPress={handleNext}
-                                    >
-                                        <Ionicons name="play-skip-forward" size={18} color={COLORS.primary} />
-                                        <View>
-                                            <Text style={styles.controlLabel}>Next</Text>
-                                            <Text style={styles.controlState}>Sound</Text>
-                                        </View>
-                                    </Pressable>
-
-                                    <Pressable
-                                        style={styles.controlToggle}
-                                        onPress={togglePause}
-                                    >
-                                        <Ionicons name={isPaused ? "play" : "pause"} size={18} color={COLORS.primary} />
-                                        <View>
-                                            <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
-                                        </View>
-                                    </Pressable>
-                                </View>
-                            ) : (
-                                <View style={styles.controlGrid}>
-                                    <Pressable
-                                        style={[styles.controlToggle, { width: '97%', justifyContent: 'center', alignItems: 'center' }]}
-                                        onPress={togglePause}
-                                    >
-                                        <Ionicons name={isPaused ? "play" : "pause"} size={18} color={COLORS.primary} style={{ marginRight: 8 }} />
-                                        <View>
-                                            <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
-                                        </View>
-                                    </Pressable>
-                                </View>
-                            )}
+                            <View style={styles.controlGrid}>
+                                <Pressable
+                                    style={[styles.controlToggle, { width: '97%', justifyContent: 'center', alignItems: 'center' }]}
+                                    onPress={togglePause}
+                                >
+                                    <Ionicons name={isPaused ? "play" : "pause"} size={18} color={COLORS.primary} style={{ marginRight: 8 }} />
+                                    <View>
+                                        <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
+                                    </View>
+                                </Pressable>
+                            </View>
 
                             <View style={styles.stepControlsRow}>
                                 <Pressable

@@ -20,6 +20,7 @@ import PremiumStatusScreen from '../screens/PremiumStatusScreen';
 import SessionPreviewScreen from '../screens/SessionPreviewScreen';
 import PetProfileRepository, { AuthMode } from '../services/petProfileRepository';
 import MigrationService from '../services/migrationService';
+import { AudioPlaybackProvider } from '../audio/AudioPlaybackProvider';
 import { COLORS } from '../constants/Theme';
 
 const AuthStack = createNativeStackNavigator();
@@ -44,25 +45,27 @@ type AppEntryState = {
 // App Stack - shown when user IS logged in OR in guest mode
 function AppNavigatorStack({ initialRouteName }: { initialRouteName: AppRouteName }) {
     return (
-        <AppStack.Navigator initialRouteName={initialRouteName}>
-            <AppStack.Screen name="Dashboard" component={MainTabNavigator} options={{ headerShown: false }} />
-            <AppStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
-            <AppStack.Screen name="PetProfileStepper" component={PetProfileStepper} options={{ headerShown: false }} />
-            <AppStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
-            <AppStack.Screen name="Account" component={AccountScreen} options={{ headerShown: false }} />
-            <AppStack.Screen name="GuidedSession" component={GuidedSessionScreen} options={{ headerShown: false }} />
-            <AppStack.Screen name="SessionPreview" component={SessionPreviewScreen} options={{ headerShown: false }} />
-            <AppStack.Screen name="Privacy" component={PrivacyScreen} />
-            <AppStack.Screen name="Terms" component={TermsScreen} />
-            <AppStack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
-            <AppStack.Screen name="PremiumStatus" component={PremiumStatusScreen} options={{ headerShown: false, presentation: 'modal' }} />
-            {/* ДОБАВЛЯЕМ ЭКРАН ЛОГИНА ДЛЯ ГОСТЕЙ */}
-            <AppStack.Screen
-                name="Login"
-                component={LoginScreen}
-                options={{ headerShown: false, presentation: 'modal' }}
-            />
-        </AppStack.Navigator>
+        <AudioPlaybackProvider>
+            <AppStack.Navigator initialRouteName={initialRouteName}>
+                <AppStack.Screen name="Dashboard" component={MainTabNavigator} options={{ headerShown: false }} />
+                <AppStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+                <AppStack.Screen name="PetProfileStepper" component={PetProfileStepper} options={{ headerShown: false }} />
+                <AppStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+                <AppStack.Screen name="Account" component={AccountScreen} options={{ headerShown: false }} />
+                <AppStack.Screen name="GuidedSession" component={GuidedSessionScreen} options={{ headerShown: false }} />
+                <AppStack.Screen name="SessionPreview" component={SessionPreviewScreen} options={{ headerShown: false }} />
+                <AppStack.Screen name="Privacy" component={PrivacyScreen} />
+                <AppStack.Screen name="Terms" component={TermsScreen} />
+                <AppStack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
+                <AppStack.Screen name="PremiumStatus" component={PremiumStatusScreen} options={{ headerShown: false, presentation: 'modal' }} />
+                {/* ДОБАВЛЯЕМ ЭКРАН ЛОГИНА ДЛЯ ГОСТЕЙ */}
+                <AppStack.Screen
+                    name="Login"
+                    component={LoginScreen}
+                    options={{ headerShown: false, presentation: 'modal' }}
+                />
+            </AppStack.Navigator>
+        </AudioPlaybackProvider>
     );
 }
 

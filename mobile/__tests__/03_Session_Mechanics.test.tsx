@@ -4,7 +4,6 @@ import GuidedSessionScreen from '../screens/GuidedSessionScreen';
 import { NavigationContainer } from '@react-navigation/native';
 import { SubscriptionProvider } from '../components/SubscriptionManager';
 import SessionService from '../services/sessionService';
-import { Audio } from 'expo-av';
 
 // Removed NativeAnimatedHelper mock since it causes a module resolution error in this RN version.
 
@@ -18,26 +17,6 @@ jest.mock('../components/SubscriptionManager', () => ({
     refreshEntitlement: jest.fn(),
     isLoading: false,
   }),
-}));
-
-// Mock Expo AV
-jest.mock('expo-av', () => ({
-  Audio: {
-    Sound: {
-      createAsync: jest.fn(() => Promise.resolve({ 
-        sound: { 
-          playAsync: jest.fn(), 
-          pauseAsync: jest.fn(), 
-          stopAsync: jest.fn(), 
-          setVolumeAsync: jest.fn(), 
-          unloadAsync: jest.fn() 
-        }, 
-        status: {} 
-      })),
-    },
-    setIsEnabledAsync: jest.fn(),
-    setAudioModeAsync: jest.fn(),
-  },
 }));
 
 // Mock SessionService
@@ -159,18 +138,15 @@ describe('Suite 03: Session Mechanics', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Dashboard');
   });
 
-  test('guided_focus_005: Background Sound toggle controls audio state clearly', async () => {
-    const { getByText, getAllByText } = await renderSession();
+  test('guided_focus_005: legacy audio controls are absent from active session', async () => {
+    const { getByText, queryByText, queryAllByText } = await renderSession();
 
     fireEvent.press(getByText(/Start Session/i));
 
-    const soundLabels = getAllByText('Sound');
-    expect(soundLabels.length).toBeGreaterThan(0);
-    expect(getByText('On')).toBeTruthy();
-
-    fireEvent.press(soundLabels[0]);
-    const offLabels = getAllByText('Off');
-    expect(offLabels.length).toBeGreaterThanOrEqual(2);
+    expect(queryByText('Repeat')).toBeNull();
+    expect(queryByText('Next')).toBeNull();
+    expect(queryAllByText('Sound').length).toBe(0);
+    expect(getByText('Pause')).toBeTruthy();
   });
 
   test('checkin_001: Before and after Calm Check-Ins save owner-reported signs', async () => {
@@ -189,16 +165,6 @@ describe('Suite 03: Session Mechanics', () => {
 
     expect(SessionService.saveSessionHistory).toHaveBeenCalled();
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Dashboard');
-  });
-
-  test('guided_focus_006: Next Sound button cycles track through handleNext', async () => {
-    const { getByText, getAllByText } = await renderSession();
-
-    fireEvent.press(getByText(/Start Session/i));
-
-    const nextLabels = getAllByText('Next');
-    expect(nextLabels.length).toBeGreaterThan(0);
-    fireEvent.press(nextLabels[0]);
   });
 
   test('guided_focus_007: Timer completion triggers "Ready for next step?" prompt', async () => {
