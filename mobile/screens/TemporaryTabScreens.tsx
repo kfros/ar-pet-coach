@@ -19,10 +19,6 @@ export function TemporaryTabScreen({ title, testID }: TemporaryTabScreenProps) {
     );
 }
 
-export function SoundsScreen() {
-    return <TemporaryTabScreen title="Sounds" testID="sounds-tab-screen" />;
-}
-
 export function ProgressScreen() {
     return <TemporaryTabScreen title="Progress" testID="progress-tab-screen" />;
 }

@@ -5,6 +5,47 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MainTabNavigator from '../navigation/MainTabNavigator';
 import SettingsScreen from '../screens/SettingsScreen';
 import { SubscriptionProvider } from '../components/SubscriptionManager';
+const mockAudioTrack = {
+  id: 'the_reading_nook',
+  displayTitle: 'The Reading Nook',
+  artist: 'ChillPup',
+  album: 'ChillPup Sounds',
+  durationSeconds: 1296.953469,
+  durationDisplayRounded: '21:37',
+  deliveryType: 'bundled_offline' as const,
+  deliveryLabel: 'Available offline',
+  repeatLabel: 'Repeats automatically',
+  ownerApprovalDate: '2026-08-27',
+  rightsDecision: 'approved_by_kf_software_for_chillpup_mobile_distribution',
+  disclosureShort: 'AI-generated music · Edited and mastered by KF Software',
+  provenanceSummary: 'Generated with Google Flow Music by KF Software. Edited, mastered, and approved by KF Software on 2026-08-27.',
+  sha256: 'f7942b778776da50ff04a955b15ea8ade4dcecb4b1d57ae6eac22da584ebc3be',
+  sizeBytes: 30828250,
+  codec: 'mp3',
+  sampleRateHz: 44100,
+  channels: 2,
+  averageBitrateBps: 190157,
+  source: 1,
+};
+
+// Mock useAudioPlayback at hook boundary with deterministic fixture
+jest.mock('../audio/useAudioPlayback', () => ({
+  useAudioPlayback: () => ({
+    track: mockAudioTrack,
+    status: 'ready',
+    isPlaying: false,
+    isLoaded: true,
+    isBuffering: false,
+    currentTimeSeconds: 0,
+    durationSeconds: 1296.953469,
+    errorMessage: null,
+    play: jest.fn(() => Promise.resolve()),
+    pause: jest.fn(() => Promise.resolve()),
+    stop: jest.fn(() => Promise.resolve()),
+    seekTo: jest.fn(() => Promise.resolve()),
+    retry: jest.fn(() => Promise.resolve()),
+  }),
+}));
 
 // Mock PetProfileRepository locally
 jest.mock('../services/petProfileRepository', () => ({
@@ -64,7 +105,7 @@ describe('MainTabNavigator Focused Tests', () => {
     expect(routinesTab.props.accessibilityState.selected).toBe(false);
   });
 
-  test('Tapping Routines, Sounds, and Progress selects the correct tab and renders temporary shells', async () => {
+  test('Tapping Routines, Sounds, and Progress selects the correct tab and renders corresponding screens', async () => {
     const { getByTestId, getByText, findByTestId } = render(
       <SubscriptionProvider>
         <NavigationContainer>
@@ -88,7 +129,7 @@ describe('MainTabNavigator Focused Tests', () => {
     fireEvent.press(soundsTab);
     const soundsScreen = await findByTestId('sounds-tab-screen');
     expect(soundsScreen).toBeTruthy();
-    expect(within(soundsScreen).getByText('Sounds')).toBeTruthy();
+    expect(within(soundsScreen).getByText('The Reading Nook')).toBeTruthy();
     expect(soundsTab.props.accessibilityState.selected).toBe(true);
 
     const progressTab = getByTestId('main-tab-progress');
@@ -99,7 +140,7 @@ describe('MainTabNavigator Focused Tests', () => {
     expect(progressTab.props.accessibilityState.selected).toBe(true);
   });
 
-  test('Verify that Sounds and Progress remain temporary screens', async () => {
+  test('Verify that Sounds renders production player and Progress remains a temporary screen', async () => {
     const { getByTestId, findByTestId } = render(
       <SubscriptionProvider>
         <NavigationContainer>
@@ -111,7 +152,8 @@ describe('MainTabNavigator Focused Tests', () => {
     const soundsTab = getByTestId('main-tab-sounds');
     fireEvent.press(soundsTab);
     const soundsScreen = await findByTestId('sounds-tab-screen');
-    expect(within(soundsScreen).getByText('This section is being prepared.')).toBeTruthy();
+    expect(within(soundsScreen).getByText('The Reading Nook')).toBeTruthy();
+    expect(within(soundsScreen).queryByText('This section is being prepared.')).toBeNull();
 
     const progressTab = getByTestId('main-tab-progress');
     fireEvent.press(progressTab);
