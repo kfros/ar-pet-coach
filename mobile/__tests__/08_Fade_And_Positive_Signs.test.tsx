@@ -4,20 +4,6 @@ import GuidedSessionScreen from '../screens/GuidedSessionScreen';
 import { NavigationContainer } from '@react-navigation/native';
 import SessionService from '../services/sessionService';
 
-// Mock useCalmAudio hook
-const mockAudioControls = {
-  isPlaying: true,
-  stopAudio: jest.fn(),
-  handleNext: jest.fn(),
-  pauseAudio: jest.fn(() => Promise.resolve()),
-  resumeAudio: jest.fn(() => Promise.resolve()),
-  currentTrackId: 'calm_01',
-};
-
-jest.mock('../hooks/useCalmAudio', () => ({
-  useCalmAudio: jest.fn(() => mockAudioControls),
-}));
-
 // Mock SessionService
 const mockSession = {
   id: 'daily_calm_reset',
@@ -138,8 +124,8 @@ describe('Suite 08: Fade And Positive Signs', () => {
     }));
   });
 
-  test('test_pause_resume_calls_audio_controls: GFM-007', async () => {
-    const { getByText } = await renderGuidedSession();
+  test('test_pause_resume_pauses_and_resumes_session: GFM-007', async () => {
+    const { getByText, queryAllByText } = await renderGuidedSession();
 
     jest.useFakeTimers();
 
@@ -151,12 +137,13 @@ describe('Suite 08: Fade And Positive Signs', () => {
     await act(async () => {
         fireEvent.press(getByText(/Pause/i));
     });
-    expect(mockAudioControls.pauseAudio).toHaveBeenCalled();
+    expect(queryAllByText(/Resume/i).length).toBeGreaterThan(0);
+    expect(queryAllByText(/Paused/i).length).toBeGreaterThan(0);
 
     // Resume
     await act(async () => {
         fireEvent.press(getByText(/Resume/i));
     });
-    expect(mockAudioControls.resumeAudio).toHaveBeenCalled();
+    expect(queryAllByText(/Pause/i).length).toBeGreaterThan(0);
   });
 });

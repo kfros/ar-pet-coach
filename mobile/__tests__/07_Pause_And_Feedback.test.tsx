@@ -18,20 +18,6 @@ jest.mock('../components/SubscriptionManager', () => ({
   }),
 }));
 
-// Mock useCalmAudio hook
-const mockAudioControls = {
-  isPlaying: true,
-  stopAudio: jest.fn(),
-  handleNext: jest.fn(),
-  pauseAudio: jest.fn(() => Promise.resolve()),
-  resumeAudio: jest.fn(() => Promise.resolve()),
-  currentTrackId: 'calm_01',
-};
-
-jest.mock('../hooks/useCalmAudio', () => ({
-  useCalmAudio: jest.fn(() => mockAudioControls),
-}));
-
 // Mock SessionService
 const mockSession = {
   id: 'daily_calm_reset',
@@ -84,8 +70,8 @@ describe('Suite 07: Pause And Feedback', () => {
     jest.clearAllMocks();
   });
 
-  test('test_pause_pauses_audio: GFM-006', async () => {
-    const { getByText } = await renderGuidedSession();
+  test('test_pause_pauses_session: GFM-006', async () => {
+    const { getByText, queryAllByText } = await renderGuidedSession();
 
     fireEvent.press(getByText(/Start Session/i));
 
@@ -93,11 +79,12 @@ describe('Suite 07: Pause And Feedback', () => {
         fireEvent.press(getByText(/Pause/i));
     });
 
-    expect(mockAudioControls.pauseAudio).toHaveBeenCalled();
+    expect(queryAllByText(/Resume/i).length).toBeGreaterThan(0);
+    expect(queryAllByText(/Paused/i).length).toBeGreaterThan(0);
   }, 15000);
 
-  test('test_resume_restores_audio_only_if_previously_playing: GFM-006', async () => {
-    const { getByText } = await renderGuidedSession();
+  test('test_resume_restores_active_session: GFM-006', async () => {
+    const { getByText, queryAllByText } = await renderGuidedSession();
 
     fireEvent.press(getByText(/Start Session/i));
 
@@ -105,14 +92,14 @@ describe('Suite 07: Pause And Feedback', () => {
     await act(async () => {
         fireEvent.press(getByText(/Pause/i));
     });
-    expect(mockAudioControls.pauseAudio).toHaveBeenCalled();
+    expect(queryAllByText(/Resume/i).length).toBeGreaterThan(0);
 
     // Resume
     await act(async () => {
         fireEvent.press(getByText(/Resume/i));
     });
 
-    expect(mockAudioControls.resumeAudio).toHaveBeenCalled();
+    expect(queryAllByText(/Pause/i).length).toBeGreaterThan(0);
   }, 15000);
 
   test('test_current_signs_uses_latest_after_checkin: HOME-001', async () => {

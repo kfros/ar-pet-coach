@@ -48,14 +48,6 @@ jest.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
 }));
 
-// Mock useCalmAudio hook
-jest.mock('./hooks/useCalmAudio', () => ({
-  useCalmAudio: jest.fn(() => ({
-    isPlaying: false,
-    stopAudio: jest.fn(),
-  })),
-}));
-
 // Mock AnimatedPawIcon (uses Reanimated internals that don't resolve in test env)
 jest.mock('./components/AnimatedPawIcon', () => 'AnimatedPawIcon');
 
@@ -151,16 +143,56 @@ jest.mock('react-native-purchases', () => ({
   PACKAGE_TYPE: { MONTHLY: 'MONTHLY' },
 }));
 
-// Mock Expo AV
-jest.mock('expo-av', () => ({
-  Audio: {
-    Sound: {
-      createAsync: jest.fn(() => Promise.resolve({ sound: { playAsync: jest.fn(), pauseAsync: jest.fn(), stopAsync: jest.fn(), setVolumeAsync: jest.fn(), unloadAsync: jest.fn() }, status: {} })),
+// Mock Expo Audio
+jest.mock('expo-audio', () => {
+  const createMockPlayer = () => ({
+    id: 1,
+    playing: false,
+    muted: false,
+    loop: false,
+    paused: false,
+    isLoaded: true,
+    isBuffering: false,
+    currentTime: 0,
+    duration: 1296.953469,
+    volume: 1.0,
+    playbackRate: 1.0,
+    currentStatus: {
+      isLoaded: true,
+      playing: false,
+      isBuffering: false,
+      currentTime: 0,
+      duration: 1296.953469,
     },
-    setIsEnabledAsync: jest.fn(),
-    setAudioModeAsync: jest.fn(),
-  },
-}));
+    play: jest.fn(),
+    pause: jest.fn(),
+    replace: jest.fn(),
+    seekTo: jest.fn(() => Promise.resolve()),
+    setPlaybackRate: jest.fn(),
+    setActiveForLockScreen: jest.fn(),
+    updateLockScreenMetadata: jest.fn(),
+    clearLockScreenControls: jest.fn(),
+    remove: jest.fn(),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    emit: jest.fn(),
+  });
+
+  return {
+    useAudioPlayer: jest.fn(() => createMockPlayer()),
+    useAudioPlayerStatus: jest.fn(() => ({
+      isLoaded: true,
+      playing: false,
+      isBuffering: false,
+      currentTime: 0,
+      duration: 1296.953469,
+    })),
+    createAudioPlayer: jest.fn(() => createMockPlayer()),
+    setAudioModeAsync: jest.fn(() => Promise.resolve()),
+    setIsAudioActiveAsync: jest.fn(() => Promise.resolve()),
+    requestRecordingPermissionsAsync: jest.fn(() => Promise.resolve({ granted: false, status: 'denied' })),
+    getRecordingPermissionsAsync: jest.fn(() => Promise.resolve({ granted: false, status: 'denied' })),
+  };
+});
 
 // Mock Ionicons (to avoid render errors)
 jest.mock('@expo/vector-icons', () => ({

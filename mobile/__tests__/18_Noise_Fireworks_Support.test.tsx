@@ -19,26 +19,6 @@ jest.mock('../components/SubscriptionManager', () => ({
   }),
 }));
 
-// Mock Expo AV
-jest.mock('expo-av', () => ({
-  Audio: {
-    Sound: {
-      createAsync: jest.fn(() => Promise.resolve({ 
-        sound: { 
-          playAsync: jest.fn(), 
-          pauseAsync: jest.fn(), 
-          stopAsync: jest.fn(), 
-          setVolumeAsync: jest.fn(), 
-          unloadAsync: jest.fn() 
-        }, 
-        status: {} 
-      })),
-    },
-    setIsEnabledAsync: jest.fn(),
-    setAudioModeAsync: jest.fn(),
-  },
-}));
-
 // Mock PetProfileRepository
 jest.mock('../services/petProfileRepository', () => ({
   getPetProfile: jest.fn(() => Promise.resolve({ id: 'test-pet', petName: 'Buddy' })),

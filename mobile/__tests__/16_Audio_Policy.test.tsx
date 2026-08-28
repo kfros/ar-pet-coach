@@ -2,7 +2,6 @@ import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import GuidedSessionScreen from '../screens/GuidedSessionScreen';
 import { SubscriptionProvider } from '../components/SubscriptionManager';
-import { useCalmAudio } from '../hooks/useCalmAudio';
 
 // Mock SubscriptionManager
 jest.mock('../components/SubscriptionManager', () => ({
@@ -14,20 +13,6 @@ jest.mock('../components/SubscriptionManager', () => ({
     refreshEntitlement: jest.fn(),
     isLoading: false,
   }),
-}));
-
-// Mock useCalmAudio hook
-const mockAudioControls = {
-  isPlaying: false,
-  stopAudio: jest.fn(),
-  handleNext: jest.fn(),
-  pauseAudio: jest.fn(() => Promise.resolve()),
-  resumeAudio: jest.fn(() => Promise.resolve()),
-  currentTrackId: 'calm_01',
-};
-
-jest.mock('../hooks/useCalmAudio', () => ({
-  useCalmAudio: jest.fn(() => mockAudioControls),
 }));
 
 // Mock PetProfileRepository
@@ -53,7 +38,7 @@ const mockNavigation = {
   goBack: jest.fn(),
 };
 
-describe('Audio Policy and Controls Visibility', () => {
+describe('Audio Policy & Legacy Audio Removal Regression', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
@@ -63,7 +48,7 @@ describe('Audio Policy and Controls Visibility', () => {
     jest.useRealTimers();
   });
 
-  test('daily_calm_reset: audio is enabled, controls are visible', async () => {
+  test('daily_calm_reset: legacy audio controls and autoplay are removed from active session', async () => {
     const { getByText, queryByText, queryAllByText } = render(
       <SubscriptionProvider>
         <GuidedSessionScreen
@@ -77,16 +62,19 @@ describe('Audio Policy and Controls Visibility', () => {
     // Start Session
     fireEvent.press(getByText(/Start Session/i));
 
-    // Verify Sound and Repeat controls are displayed
-    expect(queryAllByText('Sound').length).toBeGreaterThan(0);
-    expect(queryByText('Repeat')).toBeTruthy();
+    // Verify Sound, Repeat, and Next Sound controls are absent
+    expect(queryByText('Repeat')).toBeNull();
+    expect(queryByText('Next')).toBeNull();
+    // Verify no audio toggle with label "Sound" in the controls area
+    const soundElements = queryAllByText('Sound');
+    expect(soundElements.length).toBe(0);
 
-    // Verify useCalmAudio was called with true (autoplay enabled/allowed)
-    expect(useCalmAudio).toHaveBeenCalledWith(true);
+    // Verify session-level Pause/Resume button exists and is functional
+    expect(getByText('Pause')).toBeTruthy();
   });
 
-  test('outdoor_confidence_reset: audio is disabled, controls are hidden', async () => {
-    const { getByText, queryByText } = render(
+  test('outdoor_confidence_reset: no audio controls exist and session mechanics remain functional', async () => {
+    const { getByText, queryByText, queryAllByText } = render(
       <SubscriptionProvider>
         <GuidedSessionScreen
           navigation={mockNavigation}
@@ -99,14 +87,12 @@ describe('Audio Policy and Controls Visibility', () => {
     // Start Session
     fireEvent.press(getByText(/Start Session/i));
 
-    // Verify Sound and Repeat controls are hidden
-    expect(queryByText('Sound')).toBeNull();
+    // Verify Sound, Repeat, and Next Sound controls are absent
     expect(queryByText('Repeat')).toBeNull();
+    expect(queryByText('Next')).toBeNull();
+    expect(queryAllByText('Sound').length).toBe(0);
 
     // Verify Pause/Resume button exists
     expect(getByText('Pause')).toBeTruthy();
-
-    // Verify useCalmAudio was called with false (since mode is 'none')
-    expect(useCalmAudio).toHaveBeenCalledWith(false);
   });
 });
