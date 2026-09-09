@@ -13,7 +13,7 @@
 
 ## About
 
-ChillPup is a cross-platform mobile app that helps dog owners create small, repeatable calming practices. It combines structured routines, owner-reported check-ins, safety boundaries, and optional background audio.
+ChillPup is a cross-platform mobile app that helps dog owners create small, repeatable calming practices. It combines structured routines, owner-reported check-ins, safety boundaries, and optional background audio. Application originally developed under the working name AR Pet Coach.
 
 The app is designed around a simple principle: observe the dog, keep the difficulty low, and never force participation.
 
@@ -30,7 +30,7 @@ The app is designed around a simple principle: observe the dog, keep the difficu
 - RevenueCat subscription and entitlement integration
 - Accessibility labels and scalable mobile layouts
 
-The first approved audio track, **The Reading Nook**, is bundled for offline use. It is AI-generated music, edited and mastered by KF Software.
+The first approved audio track, **The Reading Nook**, is bundled for offline use. It is AI-generated music, edited and mastered by Kyryl Frosyniak under KF Software brand.
 
 ## Project status
 
