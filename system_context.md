@@ -21,7 +21,6 @@ Develop a mobile application for pet anxiety relief using AR visualization (safe
 
 ## 3. Key Technical Decisions
 - **Apple Auth Library:** Switched from `@invertase` to `expo-apple-authentication` to resolve native linking issues in Expo managed workflow.
-- **Environment Variables:** Currently hardcoded in [eas.json](file:///c:/Users/acer/.gemini/antigravity/scratch/ar-pet-coach/eas.json) (Production profile) for simplicity during complying. **MUST BE MIGRATED TO EAS SECRETS**.
 - **Dev Client:** Using `expo-dev-client` for testing native features (Purchases, File System, Auth) which are not supported in Expo Go.
 
 ## 4. Configuration & Secrets
@@ -40,7 +39,6 @@ Develop a mobile application for pet anxiety relief using AR visualization (safe
     - Configure **RevenueCat Service Account** JSON.
     - Setup **Monetization** in Google Play Console (Merchant Account).
     - Create **Subscriptions** in Google Play Console matching RevenueCat product IDs.
-3.  **Security Cleanup:** Remove hardcoded keys from [eas.json](file:///c:/Users/acer/.gemini/antigravity/scratch/ar-pet-coach/eas.json) and use `eas secret:create`.
 
 ## 6. Known Issues / "Gotchas"
 - **TestFlight Payments:** Apple TestFlight *always* uses Sandbox payments. You cannot test "Real" credit card charges until the app is Live on the App Store.
