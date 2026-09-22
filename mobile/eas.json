@@ -18,7 +18,13 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "kyrylf@icloud.com",
+        "ascAppId": "6762043750",
+        "appleTeamId": "L3GM83MUL2"
+      }
+    }
   },
   "cli": {
     "appVersionSource": "remote"
