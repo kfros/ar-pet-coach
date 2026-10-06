@@ -28,6 +28,11 @@
         {
           "ios": {
             "useFrameworks": "static",
+            "forceStaticLinking": [
+              "RNFBApp",
+              "RNFBAuth",
+              "RNFBFirestore"
+            ],
             "deploymentTarget": "15.1"
           }
         }
